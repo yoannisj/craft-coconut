@@ -1,0 +1,33 @@
+{
+  "name": "yoannisj/craft-coconut",
+  "description": "Plugin to transcode video assets with Coconut.co.",
+  "version": "1.1.0",
+  "type": "craft-plugin",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Yoannis Jamar",
+      "homepage": "https://yoannis.com"
+    }
+  ],
+  "support": {
+    "email": "office@yoannis.com",
+    "issues": "https://github.com/yoannisj/craft-coconut/issues?state=open",
+    "source": "https://github.com/yoannisj/craft-coconut",
+    "docs": "https://github.com/yoannisj/craft-coconut/blob/master/README.md"
+  },
+  "require": {
+    "craftcms/cms": "^3.1.0",
+    "opencoconut/coconut": "2.*"
+  },
+  "autoload": {
+    "psr-4": {
+      "yoannisj\\coconut\\": "src/"
+    }
+  },
+  "extra": {
+    "handle": "coconut",
+    "name": "Coconut",
+    "class": "yoannisj\\coconut\\Coconut"
+  }
+}

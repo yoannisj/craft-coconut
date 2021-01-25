@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 56 56">
+    <defs>
+        <linearGradient x1="100%" y1="100%" x2="0%" y2="0%" id="linearGradient-1">
+            <stop stop-color="#0D5078" stop-opacity="0.996558129" offset="0%"></stop>
+            <stop stop-color="#0084A8" offset="100%"></stop>
+        </linearGradient>
+        <path d="M50,0 C53.3137085,-6.08718376e-16 56,2.6862915 56,6 L56,50 C56,53.3137085 53.3137085,56 50,56 L6,56 C2.6862915,56 4.05812251e-16,53.3137085 0,50 L0,6 C-4.05812251e-16,2.6862915 2.6862915,6.08718376e-16 6,0 L50,0 Z M28,8 C16.954305,8 8,16.954305 8,28 C8,39.045695 16.954305,48 28,48 C39.045695,48 48,39.045695 48,28 C48,16.954305 39.045695,8 28,8 Z M20.1633354,18.433652 C21.2745051,11.9022794 27.7520415,9.15751622 34.631318,12.3030519 C41.5105944,15.4485876 46.1865689,23.2932717 45.0753993,29.8246443 C43.9642296,36.356017 37.4866932,39.1007801 30.6074167,35.9552445 C23.7281402,32.8097088 19.0521658,24.9650246 20.1633354,18.433652 Z" id="path-2"></path>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon-color">
+            <use fill="#000000" xlink:href="#path-2"></use>
+            <use fill="url(#linearGradient-1)" xlink:href="#path-2"></use>
+        </g>
+    </g>
+</svg>
