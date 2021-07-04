@@ -22,8 +22,7 @@ class m200914_132537_add_output_metadata_column extends Migration
     {
         if ($this->db->tableExists(Coconut::TABLE_OUTPUTS))
         {
-            $columnType = DbHelper::isTypeSupported('longtext') ? 'longtext' : 'text';
-            $this->addColumn(Coconut::TABLE_OUTPUTS, 'metadata', $columnType);
+            $this->addColumn(Coconut::TABLE_OUTPUTS, 'metadata', $this->longText()->null());
 
             return true;
         }
