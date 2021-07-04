@@ -17,7 +17,7 @@
   },
   "require": {
     "craftcms/cms": "^3.1.0",
-    "opencoconut/coconut": "2.*"
+    "opencoconut/coconut": "3.*"
   },
   "autoload": {
     "psr-4": {
