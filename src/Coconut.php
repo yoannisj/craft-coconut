@@ -52,6 +52,12 @@ class Coconut extends Plugin
     // =========================================================================
 
     /**
+     * Name of database table used to store references to coconut sources
+     */
+
+    const TABLE_SOURCES = '{{%coconut_sources}}';
+
+    /**
      * Name of database table used to store coconut outputs
      */
 
