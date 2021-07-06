@@ -40,8 +40,9 @@ class Install extends Migration
             $this->createTable(Coconut::TABLE_INPUTS, [
                 'id' => $this->primaryKey(),
                 'assetId' => $this->integer()->null(),
-                'url' => $this->text()->null(),
-                'urlHash' => $this->string(64)->null(),
+                'url' => $this->text()->unique()->null(),
+                'urlHash' => $this->string(64)->unique()->null(),
+                'status' => $this->string()->null(),
                 'metadata' => $this->longText()->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),

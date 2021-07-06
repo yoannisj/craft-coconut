@@ -34,7 +34,10 @@ class m210704_132000_api_v2_data extends Migration
                 'assetId' => $this->integer()->unique()->null(),
                 'url' => $this->text()->unique()->null(),
                 'urlHash' => $this->string(64)->unique()->null(),
+                'status' => $this->string()->null(),
                 'metadata' => $this->longText()->null(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
             ]);
 
