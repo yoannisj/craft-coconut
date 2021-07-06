@@ -75,6 +75,42 @@ class Coconut extends Plugin
 
     const EVENT_REGISTER_VOLUME_ADAPTERS = 'registerVolumeAdapters';
 
+    // =Services
+    // -------------------------------------------------------------------------
+
+    const SERVICE_COCONUT = 'coconut';
+    const SERVICE_S3 = 's3';
+    const SERVICE_GCS = 'gcs';
+    const SERVICE_DOSPACES = 'dospaces';
+    const SERVICE_LINODE = 'linode';
+    const SERVICE_WASABI = 'wasabi';
+    const SERVICE_S3OTHER = 's3other';
+    const SERVICE_BACKBLAZE = 'backblaze';
+    const SERVICE_RACKSPACE = 'rackspace';
+    const SERVICE_AZURE = 'azure';
+
+    const SUPPORTED_SERVICES = [
+        self::SERVICE_COCONUT,
+        self::SERVICE_S3,
+        self::SERVICE_GCS,
+        self::SERVICE_DOSPACES,
+        self::SERVICE_LINODE,
+        self::SERVICE_WASABI,
+        self::SERVICE_S3OTHER,
+        self::SERVICE_BACKBLAZE,
+        self::SERVICE_RACKSPACE,
+        self::SERVICE_AZURE,
+    ];
+
+    const S3_COMPATIBLE_SERVICES = [
+        self::SERVICE_S3,
+        self::SERVICE_GCS,
+        self::SERVICE_DOSPACES,
+        self::SERVICE_LINODE,
+        self::SERVICE_WASABI,
+        self::SERVICE_S3OTHER,
+    ];
+
     // =Properties
     // =========================================================================
 

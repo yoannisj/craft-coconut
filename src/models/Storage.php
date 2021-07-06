@@ -18,53 +18,23 @@ use Craft;
 use craft\base\Model;
 use craft\helpers\StringHelper;
 
-use yoannisj\coconut\models\StorageCredentials;
+use yoannisj\coconut\Coconut;
+use yoannisj\coconut\behaviors\PropertyAliasBehavior;
+use yoannisj\coconut\models\ServiceCredentials;
 
 /**
  * Model representing and validating settings for Cococnut storage method
  * 
- * @property StorageCredentials $credentials Credentials used for storage service
+ * @property ServiceCredentials $credentials Credentials used for storage service
  * @property string $bucket_id Alias for 'bucket' property
  * @property string $container Alias for 'bucket' property
  * 
  */
 
-class StorageSettings extends Model
+class Storage extends Model
 {
     // =Static
     // =========================================================================
-
-    const SERVICE_COCONUT = 'coconut';
-    const SERVICE_S3 = 's3';
-    const SERVICE_GCS = 'gcs';
-    const SERVICE_DOSPACES = 'dospaces';
-    const SERVICE_LINODE = 'linode';
-    const SERVICE_WASABI = 'wasabi';
-    const SERVICE_S3OTHER = 's3other';
-    const SERVICE_BACKBLAZE = 'backblaze';
-    const SERVICE_RACKSPACE = 'rackspace';
-    const SERVICE_AZURE = 'azure';
-
-    const SUPPORTED_SERVICES = [
-        self::SERVICE_COCONUT,
-        self::SERVICE_S3,
-        self::SERVICE_GCS,
-        self::SERVICE_DOSPACES,
-        self::SERVICE_LINODE,
-        self::SERVICE_WASABI,
-        self::SERVICE_S3OTHER,
-        self::SERVICE_BACKBLAZE,
-        self::SERVICE_AZURE,
-    ];
-
-    const S3_COMPATIBLE_SERVICES = [
-        self::SERVICE_S3,
-        self::SERVICE_GCS,
-        self::SERVICE_DOSPACES,
-        self::SERVICE_LINODE,
-        self::SERVICE_WASABI,
-        self::SERVICE_S3OTHER,
-    ];
 
     // =Properties
     // =========================================================================
@@ -158,61 +128,23 @@ class StorageSettings extends Model
     // =========================================================================
 
     /**
-     * @todo Move camel-casing of attribute names into a behavior Class
-     * @body Both `StorageSettings` and `StorageCredentials` models automatically 
-     *  camel-case snake-cased attribute names
-     */
-
-    /**
      * @inheritdoc
      */
 
-    public function canSetProperty( $name, $checkVars = true, $checkBehaviors = true )
+    public function behaviors()
     {
-        if (strpos($name, '_') !== false) {
-            $name = StringHelper::camelCase($name);
-        }
+        $behaviors = parent::behaviors();
 
-        return parent::canSetProperty($name, $checkVars, $checkBehaviors);
-    }
+        $behaviors[] = [
+            'class' => PropertyAliasBehavior::class,
+            'camelCasePropertyAliases' => true, // e.g. `$this->cache_control => $this->cacheControl`
+            'propertyAliases' => [
+                // e.g. `$this->bucketId => $this->bucket`
+                'bucket' => [ 'bucketId', 'container' ],
+            ],
+        ];
 
-    /**
-     * @inheritdoc
-     */
-
-    public function canGetProperty( $name )
-    {
-        if (strpos($name, '_') !== false) {
-            $name = StringHelper::camelCase($name);
-        }
-
-        return parent::canGetProperty($name, $checkVars, $checkBehaviors);
-    }
-
-    /**
-     * @inheritdoc
-     */
-
-    public function setProperty( $name, $value )
-    {
-        if (strpos($name, '_') !== false) {
-            $name = StringHelper::camelCase($name);
-        }
-
-        return parent::setProperty($name, $value);
-    }
-
-    /**
-     * @inheritdoc
-     */
-
-    public function getProperty( $name, $value )
-    {
-        if (strpos($name, '_') !== false) {
-            $name = StringHelper::camelCase($name);
-        }
-
-        return parent::getProperty($name, $value);
+        return $behaviors;
     }
 
     // =Computed
@@ -221,7 +153,7 @@ class StorageSettings extends Model
     /**
      * Setter method for normalized `credentials` property
      * 
-     * @param array|StorageCredentials|null $credentials
+     * @param array|ServiceCredentials|null $credentials
      */
 
     public function setCredentials( $credentials = null )
@@ -232,7 +164,7 @@ class StorageSettings extends Model
     /**
      * Getter method for normalized `credentials` property
      * 
-     * @return StorageCredentials|null
+     * @return ServiceCredentials|null
      */
 
     public function getCredentials()
@@ -246,57 +178,10 @@ class StorageSettings extends Model
         if (is_array($credentials))
         {
             $credentials['service'] = $this->service;
-            $this->_credentials = new StorageCredentials($credentials);
+            $this->_credentials = new ServiceCredentials($credentials);
         }
 
         return $this->_credentials;
-    }
-
-    // =Aliases
-    // -------------------------------------------------------------------------
-
-    /**
-     * Setter method for the `bucketId` property alias (maps to `bucket`)
-     * 
-     * @param string|null $bucketId
-     */
-
-    public function setBucketId( string $bucketId = null )
-    {
-        $this->bucket = $bucketId;
-    }
-
-    /**
-     * Getter method for the `bucketId` property alias (maps to `bucket`)
-     * 
-     * @return string|null
-     */
-
-    public function getBucketId( string $bucketId = null )
-    {
-        return $bucketId;
-    }
-
-    /**
-     * Setter method for the `container` property alias (maps to `bucket`)
-     * 
-     * @param string|null $container
-     */
-
-    public function setContainer( string $container = null )
-    {
-        $this->bucket = $container;;
-    }
-
-    /**
-     * Getter method for the `bucketId` property alias (maps to `bucket`)
-     * 
-     * @return string|null
-     */
-
-    public function getContainer()
-    {
-        return $this->bucket;
     }
 
     // =Validation
@@ -310,31 +195,37 @@ class StorageSettings extends Model
     {
         $rules = parent::rules();
 
+        // =service supported
+        $rules['serviceSupported'] = [ 'service', 'in', 'range' => Coconut::SUPPORTED_SERVICES ];
+
         // =required attributes
+        // get list of required attributes based on service
+        $requiredAttr = [];
+
         // no service? only `url` property is required
-        if (empty($this->service)) {
-            $rules['attrRequired'] = [ 'url', 'required' ];
+        if (empty($this->service) || $this->service == Coconut::SERVICE_COCONUT) {
+            $requiredAttr[] = 'url';
         }
 
-        else if ($this->service != 'coconut')
+        else if (in_array($this->service, Coconut::S3_COMPATIBLE_SERVICES))
         {
-            $rules['attrRequired'] = [ ['service', 'credentials', 'bucket'], 'required' ];
-            $rules['serviceSupported'] = [ 'service', 'in', 'range' => self::SUPPORTED_SERVICES ];
+            $requiredAttr[] = 'service';
+            $requiredAttr[] = 'credentials';
+            $requiredAttr[] = 'bucket';
 
-            if (in_array($this->service, self::S3_COMPATIBLE_SERVICES))
-            {
-                if ($this->service != self::SERVICE_GCS
-                    && $this->service != self::SERVICE_DOSPACES
-                    && $this->service != self::SERVICE_S3OTHER
-                ) {
-                    $rules['regionRequired'] = [ 'region', 'required' ];
-                }
+            if ($this->service != Coconut::SERVICE_GCS
+                && $this->service != Coconut::SERVICE_DOSPACES
+                && $this->service != Coconut::SERVICE_S3OTHER
+            ) {
+                $requiredAttr[] = 'region';
+            }
 
-                if ($this->service == self::SERVICE_S3OTHER) {
-                    $rules['endpointRequired'] = [ 'endpoint', 'required' ];
-                }
+            if ($this->service == Coconut::SERVICE_S3OTHER) {
+                $requiredAttr[] = 'endpoint';
             }
         }
+
+        $rules['attrRequired'] = [ $requiredAttr, 'required' ];
 
         // =format attributes
         $rules['attrString'] = [ [
@@ -359,7 +250,7 @@ class StorageSettings extends Model
      * 
      * @param string $attribute
      * @param array $params
-     * @param  InlineValidator $validator
+     * @param InlineValidator $validator
      */
 
     public function validateCredentials( string $attribute, array $params, InlineValidator $validator )
