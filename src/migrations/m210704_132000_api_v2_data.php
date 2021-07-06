@@ -49,16 +49,18 @@ class m210704_132000_api_v2_data extends Migration
         {
             // add new columns to outputs table
             $this->addColumn(Coconut::TABLE_OUTPUTS, 'inputId', $this->integer()->notNull());
+            $this->addColumn(Coconut::TABLE_OUTPUTS, 'status', $this->string()->null());
 
             $this->addForeignKey('craft_coconut_outputs_inputId_fk',
                 Coconut::TABLE_OUTPUTS, ['inputId'], Coconut::TABLE_INPUTS, ['id'], 'CASCADE', null);
 
             // move data from outputs table to new sources table
-            $this->migrateInputDataUp();
+            $this->migrateDataUp();
 
             // drop legacy columns from outputs table
             $this->dropColumn(Coconut::TABLE_OUTPUTS, 'sourceAssetId');
             $this->dropColumn(Coconut::TABLE_OUTPUTS, 'source');
+            $this->dropColumn(Coconut::TABLE_OUTPUTS, 'inProgress');
 
             MigrationHelper::dropForeignKeyIfExists(Coconut::TABLE_OUTPUTS, 'sourceAssetId', false, $this);
             MigrationHelper::dropIndexIfExists(Coconut::TABLE_OUTPUTS, 'source', false, $this);
@@ -82,13 +84,14 @@ class m210704_132000_api_v2_data extends Migration
         {
             $this->addColumn(Coconut::TABLE_OUTPUTS, 'sourceAssetId', $this->integer()->null());
             $this->addColumn(Coconut::TABLE_OUTPUTS, 'source', $this->text()->null());
+            $this->addColumn(Coconut::TABLE_OUTPUTS, 'inProgress', $this->boolean()->notNull());
 
             $this->createIndex('craft_coconut_outputs_sourceAssetId_idx',
                 Coconut::TABLE_OUTPUTS, 'sourceAssetId', Table::ASSETS, 'id', 'CASCADE', null);
 
-            if ($hasInputsTable) {
-                $this->migrateInputDataDown();
-            }
+            $this->migrateDataDown();
+
+            $this->dropColumn(Coconut::TABLE_OUTPUTS, 'status');
         }
 
         MigrationHelper::dropTable(Coconut::TABLE_INPUTS);
@@ -98,7 +101,6 @@ class m210704_132000_api_v2_data extends Migration
         return true;
     }
 
-
     // =Protected Methods
     // =========================================================================
 
@@ -106,7 +108,7 @@ class m210704_132000_api_v2_data extends Migration
      * 
      */
 
-    protected function migrateInputDataUp()
+    protected function migrateDataUp()
     {
         // move source data from outputs table to new source table
         $outputs = (new Query)
@@ -118,6 +120,12 @@ class m210704_132000_api_v2_data extends Migration
         $inputs = [];
         foreach ($outputs as $output)
         {
+            $this->update(Coconut::TABLE_OUTPUTS, [
+                'status' => ($output['inProgress'] ? null : true),
+            ], [
+                'id' => $output['id'],
+            ]);
+
             $inputAssetId = $output['soureAssetId'] ?? null;
             $inputUrl = $output['source'] ?? null;
 
@@ -185,32 +193,45 @@ class m210704_132000_api_v2_data extends Migration
      * 
      */
 
-    protected function migrateInputDataDown()
+    protected function migrateDataDown()
     {
-        $inputs = (new Query)
-            ->select('*')
-            ->from(Coconut::TABLE_INPUTS)
-            ->all();
-
         $outputs = (new Query)
             ->select('*')
             ->from(Coconut::TABLE_OUTPUTS)
             ->all();
 
-        foreach ($inputs as $input)
+        foreach ($outputs as $output)
         {
-            $inputOutputs = ArrayHelper::where($outputs, 'inputId', $input['id']);
-            foreach ($inputOutputs as $output)
-            {
-                $assetId = $input['assetId'] ?? null;
-                $inputUrl = $input['url'] ?? null;
+            $this->update(Coconut::TABLE_OUTPUTS, [
+                'inProgress' => ($output['status'] != 'completed'),
+            ], [
+                'id' > $output['id']
+            ]);
+        }
 
-                $this->update(Coconut::TABLE_OUTPUTS, [
-                    'sourceAssetId' => $assetId,
-                    'source' => $inputUrl,
-                ], [
-                    'id' => $output['id']
-                ]);
+        if ($this->db->tableExists(Coconut::TABLE_INPUTS))
+        {
+
+            $inputs = (new Query)
+                ->select('*')
+                ->from(Coconut::TABLE_INPUTS)
+                ->all();
+
+            foreach ($inputs as $input)
+            {
+                $inputOutputs = ArrayHelper::where($outputs, 'inputId', $input['id']);
+                foreach ($inputOutputs as $output)
+                {
+                    $assetId = $input['assetId'] ?? null;
+                    $inputUrl = $input['url'] ?? null;
+
+                    $this->update(Coconut::TABLE_OUTPUTS, [
+                        'sourceAssetId' => $assetId,
+                        'source' => $inputUrl,
+                    ], [
+                        'id' => $output['id']
+                    ]);
+                }
             }
         }
     }
