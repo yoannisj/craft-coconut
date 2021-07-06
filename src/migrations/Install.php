@@ -32,12 +32,12 @@ class Install extends Migration
     public function safeUp()
     {
         // check current tables
-        $hasSourcesTable = $this->db->tableExists(Coconut::TABLE_SOURCES);
+        $hasInputsTable = $this->db->tableExists(Coconut::TABLE_INPUTS);
         $hasOutputsTable = $this->db->tableExists(Coconut::TABLE_OUTPUTS);
 
-        if (!$hasSourcesTable)
+        if (!$hasInputsTable)
         {
-            $this->createTable(Coconut::TABLE_SOURCES, [
+            $this->createTable(Coconut::TABLE_INPUTS, [
                 'id' => $this->primaryKey(),
                 'assetId' => $this->integer()->null(),
                 'url' => $this->text()->null(),
@@ -48,11 +48,11 @@ class Install extends Migration
                 'uid' => $this->uid(),
             ]);
 
-            $this->addForeignKey('craft_coconut_sources_assetId_fk',
-                Coconut::TABLE_SOURCES, ['assetId'], Table::ASSETS, ['id'], 'CASCADE', null);
+            $this->addForeignKey('craft_coconut_inputs_assetId_fk',
+                Coconut::TABLE_INPUTS, ['assetId'], Table::ASSETS, ['id'], 'CASCADE', null);
 
-            $this->createIndex('craft_coconut_sources_urlHash_idx',
-                Coconut::TABLE_SOURCES, 'urlHash', false);
+            $this->createIndex('craft_coconut_inputs_urlHash_idx',
+                Coconut::TABLE_INPUTS, 'urlHash', false);
         }
 
         // create outputs table
@@ -60,7 +60,7 @@ class Install extends Migration
         {
             $this->createTable(Coconut::TABLE_OUTPUTS, [
                 'id' => $this->primaryKey(),
-                'sourceId' => $this->integer()->notNull(),
+                'inputId' => $this->integer()->notNull(),
                 'volumeId' => $this->integer()->null(),
                 'format' => $this->string()->notNull(),
                 'url' => $this->string()->notNull(),
@@ -72,8 +72,8 @@ class Install extends Migration
                 'uid' => $this->uid(),
             ]);
 
-            $this->addForeignKey('craft_coconut_outputs_sourceId_fk',
-                Coconut::TABLE_OUTPUTS, ['sourceId'], Coconut::TABLE_SOURCES, ['id'], 'CASCADE', null);
+            $this->addForeignKey('craft_coconut_outputs_inputId_fk',
+                Coconut::TABLE_OUTPUTS, ['inputId'], Coconut::TABLE_INPUTS, ['id'], 'CASCADE', null);
 
             $this->addForeignKey('craft_coconut_outputs_volumeId_fk',
                 Coconut::TABLE_OUTPUTS, ['volumeId'], Table::VOLUMES, ['id'], 'CASCADE', null);
@@ -85,7 +85,7 @@ class Install extends Migration
         }
 
         // refresh database schema if any of the tables were created
-        if (!$hasSourcesTable || !$hasOutputsTable) {
+        if (!$hasInputsTable || !$hasOutputsTable) {
             Craft::$app->db->schema->refresh();
         }
 
@@ -99,7 +99,7 @@ class Install extends Migration
     public function safeDown()
     {
         $this->dropTableIfExists(Coconut::TABLE_OUTPUTS);
-        $this->dropTableIfExists(Coconut::TABLE_SOURCES);
+        $this->dropTableIfExists(Coconut::TABLE_INPUTS);
 
         Craft::$app->db->schema->refresh();
 

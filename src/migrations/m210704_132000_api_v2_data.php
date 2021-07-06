@@ -24,12 +24,12 @@ class m210704_132000_api_v2_data extends Migration
 
     public function safeUp()
     {
-        $hasSourcesTable = $this->db->tableExists(Coconut::TABLE_SOURCES);
+        $hasInputsTable = $this->db->tableExists(Coconut::TABLE_INPUTS);
         $hasOutputsTable = $this->db->tableExists(Coconut::TABLE_OUTPUTS);
 
-        if (!$hasSourcesTable)
+        if (!$hasInputsTable)
         {
-            $this->createTable(Coconut::TABLE_SOURCES, [
+            $this->createTable(Coconut::TABLE_INPUTS, [
                 'id' => $this->primaryKey(),
                 'assetId' => $this->integer()->unique()->null(),
                 'url' => $this->text()->unique()->null(),
@@ -38,23 +38,23 @@ class m210704_132000_api_v2_data extends Migration
                 'uid' => $this->uid(),
             ]);
 
-            $this->addForeignKey('craft_coconut_sources_assetId_fk',
-                Coconut::TABLE_SOURCES, ['assetId'], Table::ASSETS, ['id'], 'CASCADE', null);
+            $this->addForeignKey('craft_coconut_inputs_assetId_fk',
+                Coconut::TABLE_INPUTS, ['assetId'], Table::ASSETS, ['id'], 'CASCADE', null);
 
-            $this->createIndex('craft_coconut_sources_urlHash_idx',
-                Coconut::TABLE_SOURCES, 'urlHash', false);
+            $this->createIndex('craft_coconut_inputs_urlHash_idx',
+                Coconut::TABLE_INPUTS, 'urlHash', false);
         }
 
         if ($hasOutputsTable)
         {
             // add new columns to outputs table
-            $this->addColumn(Coconut::TABLE_OUTPUTS, 'sourceId', $this->integer()->notNull());
+            $this->addColumn(Coconut::TABLE_OUTPUTS, 'inputId', $this->integer()->notNull());
 
-            $this->addForeignKey('craft_coconut_outputs_sourceId_fk',
-                Coconut::TABLE_OUTPUTS, ['sourceId'], Coconut::TABLE_SOURCES, ['id'], 'CASCADE', null);
+            $this->addForeignKey('craft_coconut_outputs_inputId_fk',
+                Coconut::TABLE_OUTPUTS, ['inputId'], Coconut::TABLE_INPUTS, ['id'], 'CASCADE', null);
 
             // move data from outputs table to new sources table
-            $this->migrateSourcesDataUp();
+            $this->migrateInputDataUp();
 
             // drop legacy columns from outputs table
             $this->dropColumn(Coconut::TABLE_OUTPUTS, 'sourceAssetId');
@@ -75,7 +75,7 @@ class m210704_132000_api_v2_data extends Migration
 
     public function safeDown()
     {
-        $hasSourcesTable = $this->db->tableExists(Coconut::TABLE_SOURCES);
+        $hasInputsTable = $this->db->tableExists(Coconut::TABLE_INPUTS);
         $hasOutputsTable = $this->db->tableExists(Coconut::TABLE_OUTPUTS);
 
         if ($hasOutputsTable)
@@ -86,12 +86,12 @@ class m210704_132000_api_v2_data extends Migration
             $this->createIndex('craft_coconut_outputs_sourceAssetId_idx',
                 Coconut::TABLE_OUTPUTS, 'sourceAssetId', Table::ASSETS, 'id', 'CASCADE', null);
 
-            if ($hasSourcesTable) {
-                $this->migrateSourcesDataDown();
+            if ($hasInputsTable) {
+                $this->migrateInputDataDown();
             }
         }
 
-        MigrationHelper::dropTable(Coconut::TABLE_SOURCES);
+        MigrationHelper::dropTable(Coconut::TABLE_INPUTS);
 
         Craft::$app->db->schema->refresh();
 
@@ -106,7 +106,7 @@ class m210704_132000_api_v2_data extends Migration
      * 
      */
 
-    protected function migrateSourcesDataUp()
+    protected function migrateInputDataUp()
     {
         // move source data from outputs table to new source table
         $outputs = (new Query)
@@ -115,48 +115,46 @@ class m210704_132000_api_v2_data extends Migration
             ->all();
 
         // populate sources table with data from outputs
-        $sources = [];
+        $inputs = [];
         foreach ($outputs as $output)
         {
-            $sourceAssetId = $output['soureAssetId'] ?? null;
-            $source = $output['source'] ?? null;
+            $inputAssetId = $output['soureAssetId'] ?? null;
+            $inputUrl = $output['source'] ?? null;
 
             // use a  key to avoid insterting a source multiple times
             // if it has multiple outputs
-            $key = $sourceAssetId ?? $source;
+            $key = $inputAssetId ?? $input;
 
-            if (!array_key_exists($key, $sources))
+            if (!array_key_exists($key, $inputs))
             {
-                $sourceHash = empty($source) ? null : md5($source);
-                $sources[$key] = [
-                    'assetId' => $sourceAssetId,
-                    'url' => $source,
-                    'urlHash' => $sourceHash,
+                $inputHash = empty($input) ? null : md5($input);
+                $inputs[$key] = [
+                    'assetId' => $inputAssetId,
+                    'url' => $inputUrl,
+                    'urlHash' => $inputHash,
                 ];
             }
         }
 
         // insert all sources found in outputs into new sources table
-        $this->batchInsert(Coconut::TABLE_SOURCES, array_values($sources));
+        $this->batchInsert(Coconut::TABLE_INPUTS, array_values($inputs));
 
-        // update foreign key `sourceId` in outputs table accordingly
-        $sources = (new Query())
+        // update foreign key `inputId` in outputs table accordingly
+        $inputs = (new Query())
             ->select('*')
-            ->from(Coconut::TABLE_SOURCES)
+            ->from(Coconut::TABLE_INPUTS)
             ->all();
 
-        foreach ($sources as $source)
+        foreach ($inputs as $input)
         {
-            $assetId = $source['assetId'] ?? null;
-            $sourceUrl = $source['url'] ?? null;
-
+            $assetId = $input['assetId'] ?? null;
             if (!empty($assetId))
             {
                 $assetOutput = ArrayHelper::firstWhere($outputs, 'assetId', $assetId);
                 if ($assetOutput)
                 {
                     $this->update(Coconut::TABLE_OUTPUTS, [
-                        'sourceId' => $source['id'],
+                        'inputId' => $input['id'],
                     ], [
                         'id' => $assetOutput['id'],
                     ]);
@@ -165,14 +163,14 @@ class m210704_132000_api_v2_data extends Migration
                 }
             }
 
-            $sourceUrl = $source['url'] ?? null;
-            if (!empty($sourceUrl))
+            $inputUrl = $input['url'] ?? null;
+            if (!empty($inputUrl))
             {
-                $urlOutput = ArrayHelper::firstWhere($outputs, 'source', $sourceUrl);
+                $urlOutput = ArrayHelper::firstWhere($outputs, 'source', $inputUrl);
                 if ($urlOutput)
                 {
                     $this->update(Coconut::TABLE_OUTPUTS, [
-                        'sourceId' => $source['id'],
+                        'inputId' => $input['id'],
                     ], [
                         'id' => $urlOutput['id'],
                     ]);
@@ -187,11 +185,11 @@ class m210704_132000_api_v2_data extends Migration
      * 
      */
 
-    protected function migrateSourcesDataDown()
+    protected function migrateInputDataDown()
     {
-        $sources = (new Query)
+        $inputs = (new Query)
             ->select('*')
-            ->from(Coconut::TABLE_SOURCES)
+            ->from(Coconut::TABLE_INPUTS)
             ->all();
 
         $outputs = (new Query)
@@ -199,17 +197,17 @@ class m210704_132000_api_v2_data extends Migration
             ->from(Coconut::TABLE_OUTPUTS)
             ->all();
 
-        foreach ($sources as $source)
+        foreach ($inputs as $input)
         {
-            $sourceOutputs = ArrayHelper::where($outputs, 'sourceId', $source['id']);
-            foreach ($sourceOutputs as $output)
+            $inputOutputs = ArrayHelper::where($outputs, 'inputId', $input['id']);
+            foreach ($inputOutputs as $output)
             {
-                $assetId = $source['assetId'] ?? null;
-                $sourceUrl = $source['url'] ?? null;
+                $assetId = $input['assetId'] ?? null;
+                $inputUrl = $input['url'] ?? null;
 
                 $this->update(Coconut::TABLE_OUTPUTS, [
                     'sourceAssetId' => $assetId,
-                    'source' => $sourceUrl,
+                    'source' => $inputUrl,
                 ], [
                     'id' => $output['id']
                 ]);
