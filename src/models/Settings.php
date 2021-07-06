@@ -21,6 +21,7 @@ use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\volumes\Local as LocalVolume;
 use craft\helpers\StringHelper;
+use craft\helpers\App as AppHelper;
 
 use yoannisj\coconut\models\Config;
 
@@ -34,86 +35,205 @@ class Settings extends Model
     // =========================================================================
 
     /**
-     * @var string The API key of the coconut.co account used to convert videos.
+     * @var string The API key of the Coconut.co account used to convert videos.
+     * 
+     * If this is not set, the plugin will check for an environment variable
+     * named `COCONUT_API_KEY` (using `\craft\helper\App::env()`).
+     * 
+     * @default null
      */
 
-    public $apiKey;
+    public $apiKey = null;
 
     /**
-     * @var bool Whether transcoding videos should default to using the queue,
+     * @var boolean Whether transcoding videos should default to using the queue,
      * or run synchonously. It is highly recommended to use the queue whenever
      * possible, but if your craft environment is not running queued jobs in the
-     * background, you may want to default to running jobs synchronously if.
+     * background, you may want to default to running jobs synchronously.
      *
      * More info on how to run queued jobs in the background:
      *  https://nystudio107.com/blog/robust-queue-job-handling-in-craft-cms
+     * 
+     * @default true
      */
 
     public $preferQueue = true;
 
     /**
-     * @var int
+     * @var integer
      *
      * Depending on your Coconut plan and the config you are using to transcode
      * your video, Transcoding jobs can take a long time. To avoid jobs to fail
-     * with a timeout error, this plugin sets a high `Time to Reserve` on jobs
-     * pushed to Yii's queue.
+     * with a timeout error, this plugin sets a high `Time to Reserve` on the
+     * jobs it pushes to Craft's queue.
      *
      * More info:
      *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
+     * 
+     * @default 900
      */
 
-    public $transcodeJobTtr = 600;
+    public $transcodeJobTtr = 900;
 
     /**
-     * @var int | string | \craft\base\VolumeInterface The default volume
-     * where coconut output files are uploaded, when the transcoding config does
-     * not specify its own outputVolume. If this is set to a string which does
-     * not correspond to an existing volume, a new local volume will be created
-     * in the webroot directory.
+     * @var array Named storage settings to use in Coconut transcoding configs.
+     * 
+     * Each key defines a named storage, and its value should be an array of
+     * storage settings as defined here: https://docs.coconut.co/jobs/storage
+     * 
+     * @example [
+     *      'myS3Bucket' => [
+     *          'service' => 's3',
+     *          'region' => 'us-east-1',
+     *          'bucket' => 'mybucket',
+     *          'path' = '/coconut/outputs',
+     *          'credentials' => [
+     *              'access_key_id' => '...',
+     *              'secret_access_key' = '...',
+     *          ]
+     *      ],
+     *      'httpUpload' => [
+     *          'url' => \craft\helpers\UrlHelper::actionUrl('coconut/jobs/upload', [
+     *              'volume' => 'localVolumeHandle'
+     *          ]),
+     *      ],
+     * ]
+     * 
+     * @default []
      */
 
-    private $_outputVolume;
+    public $storages = [];
 
     /**
-     * @var bool Whether the output volume was initialized
+     * @var string|array|\yoannisj\coconut\models\StorageSettings
+     * 
+     * The storage name or settings used to store Coconut output files when none
+     * is given in transcoding job config parameters.
+     * 
+     * This can be set to a string which must be either a key from the `storages`
+     * setting, or a volume handle.
+     * 
+     * If this is set to `null`, it will try to generate storage settings for
+     * the input asset's volume, or fallback to use the HTTP upload method to
+     * store files in the volume defined by the 'defaultUploadVolume' setting.
+     * 
+     * @default null
      */
 
-    private $_isOutputVolumeNormalized;
+    private $_defaultStorage = null;
 
     /**
-     * @var string Relative path to folder where coconut output files are
-     * uploaded in volumes. This may contain the following placeholder strings:
-     * - '{path}' the source folder path (relative to asset volume or url host)
-     * - '{filename}' the source filename (without extension)
-     * - '{hash}' a unique md5 hash based on the source url
+     * @var boolean Whether the `defaultStorage` setting has already been normalized.
      */
 
-    public $outputPathFormat = '/_coconut/{hash}-{format}.{ext}';
+    protected $isDefaultStorageNormalized;
 
     /**
-     * @var array Named coconut job config settings. Only the 'outputs' and
-     * optional 'vars'* keys are supported. The plugin will set the 'source' and
-     * 'webhook' settings programatically.
+     * @var string|\craft\models\Volume
+     * 
+     * The default volume used to store output files when the `storage` parameter
+     * was omitted and the `input` parameter was not a craft asset.
+     * 
+     * @default 'coconut'
+     */
+
+    private $_defaultUploadVolume = 'coconut';
+
+    /**
+     * @var boolean Whether the `defaultUploadVolume` setting has alreay been normalized.
+     */
+
+    protected $isDefaultUploadVolumeNormalized;
+
+    /**
+     * @var string Format used to generate default path to output files in storages.
+     * 
+     * Supports the following placeholder strings:
+     * - '{path}' the input folder path, relative to the volume base path (asset input),
+     *      or the URL path (external URL input)
+     * - '{filename}' the input filename (without extension)
+     * - '{hash}' a unique md5 hash based on the input URL
+     * - '{shortHash}' a shortened version of the unique md5 hash
+     * - '{key}' the outputs `key` parameter (a path-friendly version of it)
+     * - '{ext}' the output file extension
+     * 
+     * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
+     * the path will be prefixed with an '_' (if it is not already).
+     * 
+     * @default '_coconut/{path}/{key}.{ext}'
+     */
+
+    public $defaultPathFormat = '_coconut/{path}/{key}.{ext}';
+
+    /**
+     * @var array Named coconut job config settings.
+     * 
+     * Each key defines a named config, and its value should be an array setting
+     * the 'storage' and 'outputs' parameters.
+     * 
+     * The 'storage' parameter can be a string, which will be matched against
+     * one of the named storages defined, or a volume handle.
+     * 
+     * If the 'storage' parameter is omitted, to plugin wil try to generate store
+     * settings for the input asset's volume, or fallback to use the HTTP upload method
+     * to store files in the volume defined by the 'defaultUploadVolume' setting.
+     * 
+     * The 'outputs' parameter can have indexed string items, in which case the string
+     * will be used as `format` parameter, and the `path` parameter will be generated
+     * based on the `defaultPathFormat` setting.
+     * 
+     * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
+     * their `path` parameter will be prefixed with an '_' (if it is not already).
+     * This can be disabled if the storage is not a volume by adding the custom
+     * 'isVolumeStorage' parameter, although it is not recommended.
+     * 
+     * The 'input' and 'notification' parameters are not supported, as the plugin will
+     * set those programatically.
+     * 
+     * @example [
+     *      'videoSources' => [
+     *          'storage' => 'coconut', // assumin there is a volume called 'coconut'
+     *          'outputs' => [
+     *              'webm', // will generate the output's `path` parameter based on `defaultPathFormat`
+     *              'mp4:360p',
+     *              'mp4:720p',
+     *              'mp4:1080p::quality=4' => [
+     *                  'key' => 'mp4:1080p',
+     *                  'if' => "{{ input.width }} >= 1920
+     *              ]
+     *          ],
+     *      ],
+     * ]
+     * 
+     * @default []
      */
 
     public $configs = [];
 
     /**
-     * @var array Sets default coconut config for source asset volumes.
-     *  Keys should be the handle of a craft volume, and values should be a
-     *  key from the "configs" setting, or an array defining job settings.
+     * @var array Sets default config parameters for craft assets in given volumes.
+     * 
+     * Each key should match the handle of a craft volume, and the its value should
+     * be either a key from the `configs` setting, or an array of parameters (in the
+     * same format as the `configs` setting).
+     * 
+     * @var array
      */
 
     public $volumeConfigs = [];
 
     /**
-     * @var array List of source volumes handles, for which the plugin should
-     *  automatically create a Coconut conversion job (when a video asset is
-     *  added or updated). 
+     * @var array List of input volumes handles, for which the plugin should
+     *  automatically create a Coconut conversion job every time a video asset is
+     *  added or updated.
+     * 
+     * @default `[]`
      */
 
     public $watchVolumes = [];
+
+    // @todo: add `fieldConfigs` and `watchFields` settings to automatically
+    // transcode video assets in asset fields when saving a Craft element.
 
     // =Public Methods
     // =========================================================================
@@ -125,7 +245,7 @@ class Settings extends Model
     public function init()
     {
         if (!isset($this->apiKey)) {
-            $this->apiKey = getenv('COCONUT_API_KEY');
+            $this->apiKey = AppHelper::env('COCONUT_API_KEY');
         }
 
         parent::init();
