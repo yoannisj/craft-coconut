@@ -35,12 +35,12 @@ use yoannisj\coconut\base\VolumeAdapterInterface;
 use yoannisj\coconut\base\VolumeAdapter;
 use yoannisj\coconut\models\Settings;
 use yoannisj\coconut\models\Config;
+use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\elements\actions\TranscodeVideo;
 use yoannisj\coconut\elements\actions\ClearVideoOutputs;
 use yoannisj\coconut\queue\jobs\TranscodeSourceJob;
 use yoannisj\coconut\variables\CoconutVariable;
 use yoannisj\coconut\events\VolumeAdaptersEvent;
-
 
 /**
  * Coconut plugin class for Craft
@@ -55,7 +55,7 @@ class Coconut extends Plugin
      * Name of database table used to store references to coconut inputs
      */
 
-    const TABLE_INPUTS = '{{%coconut_inputs}}';
+    const TABLE_JOBS = '{{%coconut_jobs}}';
 
     /**
      * Name of database table used to store coconut outputs

@@ -32,28 +32,46 @@ class Install extends Migration
     public function safeUp()
     {
         // check current tables
-        $hasInputsTable = $this->db->tableExists(Coconut::TABLE_INPUTS);
+        $hasJobsTable = $this->db->tableExists(Coconut::TABLE_JOBS);
         $hasOutputsTable = $this->db->tableExists(Coconut::TABLE_OUTPUTS);
 
-        if (!$hasInputsTable)
+        if (!$hasJobsTable)
         {
-            $this->createTable(Coconut::TABLE_INPUTS, [
+            $this->createTable(Coconut::TABLE_JOBS, [
                 'id' => $this->primaryKey(),
-                'assetId' => $this->integer()->null(),
-                'url' => $this->text()->unique()->null(),
-                'urlHash' => $this->string(64)->unique()->null(),
+                'coconutId' => $this->string(32)->notNull(),
                 'status' => $this->string()->null(),
-                'metadata' => $this->longText()->null(),
+                'progress' => $this->string()->null(),
+                'inputAssetId' => $this->integer()->notNull(),
+                'inputUrl' => $this->text()->null(),
+                'inputUrlHash' => $this->string(64)->null(),
+                'inputStatus' => $this->string()->null(),
+                'inputMetadata' => $this->longText()->null(),
+                'inputExpires' => $this->dateTime()->null(),
+                'storageHandle' => $this->string()->notNull(),
+                'storageVolumeId' => $this->text()->null(),
+                'storageSettings' => $this->text()->null(),
+                'createdAt' => $this->dateTime()->notNull(),
+                'completedAt' => $this->dateTime()->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
             ]);
 
-            $this->addForeignKey('craft_coconut_inputs_assetId_fk',
-                Coconut::TABLE_INPUTS, ['assetId'], Table::ASSETS, ['id'], 'CASCADE', null);
+            $this->addForeignKey('craft_coconut_jobs_inputAssetId_fk',
+                Coconut::TABLE_JOBS, ['inputAssetId'], Table::ASSETS, ['id'], 'CASCADE', null);
 
-            $this->createIndex('craft_coconut_inputs_urlHash_idx',
-                Coconut::TABLE_INPUTS, 'urlHash', false);
+            $this->addForeignKey('craft_coconut_jobs_storageVolumeId_fk',
+                Coconut::TABLE_JOBS, ['storageVolumeId'], Table::VOLUMES, ['id'], 'CASCADE', null);
+
+            $this->createIndex('craft_coconut_jobs_coconutId_idx',
+                Coconut::TABLE_JOBS, ['coconutId'], false);
+
+            $this->createIndex('craft_coconut_jobs_inputUrlHash_idx',
+                Coconut::TABLE_JOBS, 'inputUrlHash', false);
+
+            $this->createIndex('craft_coconut_jobs_storageHandle_idx',
+                Coconut::TABLE_JOBS, 'storageHandle', false);
         }
 
         // create outputs table
@@ -61,20 +79,20 @@ class Install extends Migration
         {
             $this->createTable(Coconut::TABLE_OUTPUTS, [
                 'id' => $this->primaryKey(),
-                'inputId' => $this->integer()->notNull(),
-                'coconutJobId' => $this->integer()->null(),
+                'jobId' => $this->integer()->null(),
+                'key' => $this->string()->notNull(),
+                'type' => $this->string()->notNull(),
                 'format' => $this->string()->notNull(),
                 'url' => $this->string()->notNull(),
                 'metadata' => $this->longText()->null(),
-                'volumeId' => $this->integer()->null(),
                 'status' => $this->string()->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
             ]);
 
-            $this->addForeignKey('craft_coconut_outputs_inputId_fk',
-                Coconut::TABLE_OUTPUTS, ['inputId'], Coconut::TABLE_INPUTS, ['id'], 'CASCADE', null);
+            $this->addForeignKey('craft_coconut_outputs_jobId_fk',
+                Coconut::TABLE_OUTPUTS, ['jobId'], Coconut::TABLE_JOBS, ['id'], null, null);
 
             $this->addForeignKey('craft_coconut_outputs_volumeId_fk',
                 Coconut::TABLE_OUTPUTS, ['volumeId'], Table::VOLUMES, ['id'], 'CASCADE', null);
@@ -86,7 +104,7 @@ class Install extends Migration
         }
 
         // refresh database schema if any of the tables were created
-        if (!$hasInputsTable || !$hasOutputsTable) {
+        if (!$hasJobsTable || !$hasOutputsTable) {
             Craft::$app->db->schema->refresh();
         }
 
@@ -100,7 +118,7 @@ class Install extends Migration
     public function safeDown()
     {
         $this->dropTableIfExists(Coconut::TABLE_OUTPUTS);
-        $this->dropTableIfExists(Coconut::TABLE_INPUTS);
+        $this->dropTableIfExists(Coconut::TABLE_JOBS);
 
         Craft::$app->db->schema->refresh();
 

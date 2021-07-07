@@ -19,6 +19,7 @@ use craft\helpers\StringHelper;
 use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\models\Storage;
 
 /**
  * Static helper class to work with coconut configs
@@ -112,6 +113,39 @@ class ConfigHelper
 
     // =Methods
     // -------------------------------------------------------------------------
+
+    /**
+     * @param string|array|Volume $storage
+     * 
+     * @return Storage|null
+     */
+
+    public static function parseStorage( $storage )
+    {
+        if (is_string($storage))
+        {
+            // check if this is a named storage handle
+            $storages = static::getSettings()->storages;
+
+            if (array_key_exists($storage, $storages)) {
+                $storage = $storages[$storage];
+            }
+            
+            else { // or, assume this is a volume handle
+                $storage = Craft::$app->getVolumes()->getVolumeByHandle($storage);
+            }
+        }
+
+        if ($storage instanceof Volume) {
+            return static::getVolumeStorageSettings($storage);
+        }
+
+        if (is_array($storage)) {
+            return Craft::configure(new Storage(), $storage);
+        }
+
+        return null;
+    }
 
     /**
      * @param string $format
