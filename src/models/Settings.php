@@ -93,9 +93,7 @@ class Settings extends Model
      *          ]
      *      ],
      *      'httpUpload' => [
-     *          'url' => \craft\helpers\UrlHelper::actionUrl('coconut/jobs/upload', [
-     *              'volume' => 'localVolumeHandle'
-     *          ]),
+     *          'url' => 'https://remote.server.com/coconut/upload',
      *      ],
      * ]
      * 
@@ -105,7 +103,7 @@ class Settings extends Model
     public $storages = [];
 
     /**
-     * @var string|array|\yoannisj\coconut\models\StorageSettings
+     * @var string|array|\yoannisj\coconut\models\Storage
      * 
      * The storage name or settings used to store Coconut output files when none
      * is given in transcoding job config parameters.
@@ -132,7 +130,8 @@ class Settings extends Model
      * @var string|\craft\models\Volume
      * 
      * The default volume used to store output files when the `storage` parameter
-     * was omitted and the `input` parameter was not a craft asset.
+     * was omitted and no asset volume could be determined (.e.g. if the `input`
+     * parameter was not a Craft asset).
      * 
      * @default 'coconut'
      */
@@ -192,7 +191,7 @@ class Settings extends Model
      * 
      * @example [
      *      'videoSources' => [
-     *          'storage' => 'coconut', // assumin there is a volume called 'coconut'
+     *          'storage' => 'coconut', // assuming there is a volume with handle 'coconut'
      *          'outputs' => [
      *              'webm', // will generate the output's `path` parameter based on `defaultPathFormat`
      *              'mp4:360p',
