@@ -39,40 +39,28 @@ class Output extends Model
     // =========================================================================
 
     /**
-     * @var int | null
+     * @var integer|null
      */
 
     public $id;
 
     /**
-     * @var int | null
+     * @var integer ID of coconut input in Craft database
      */
 
-    public $volumeId;
+    public $inputId;
 
     /**
-     * @var \craft\base\VolumeInterface
+     * @var \yoannisj\coconu\models\Input Coconut input model
      */
 
-    private $_volume; 
+    private $_input;
 
     /**
-     * @var int | null
+     * @var string|null ID of coconut job that created this output
      */
 
-    private $_sourceAssetId;
-
-    /**
-     * @var \craft\elements\Asset
-     */
-
-    private $_sourceAsset;
-
-    /**
-     * @var string Url of output's source
-     */
-
-    private $_source;
+    public $coconutJobId;
 
     /**
      * @var string
@@ -84,25 +72,38 @@ class Output extends Model
      * @var string
      */
 
-    public $url;
-
-    /**
-     * @var string
-     */
-
     private $_mimeType;
 
     /**
-     * @var bool
+     * @var array | null
      */
 
-    public $inProgress;
+    private $_metadata;
 
     /**
-     * @var int | null
+     * @var integer|null
      */
 
-    public $coconutJobId;
+    public $volumeId;
+
+    /**
+     * @var \craft\base\VolumeInterface
+     */
+
+    private $_volume;
+
+    /**
+     * @var string Output file URL (on storage)
+     */
+
+    public $url;
+
+    /**
+     * @var string Latest output status from Coconut job
+     * @see https://docs.coconut.co/jobs/api#job-status
+     */
+
+    public $status;
 
     /**
      * @var \Datetime
@@ -116,14 +117,94 @@ class Output extends Model
 
     public $dateUpdated;
 
-    /**
-     * @var array | null
-     */
-
-    private $_metadata;
-
     // =Public Methods
     // =========================================================================
+
+    // =Properties
+    // -------------------------------------------------------------------------
+
+    /**
+     * Setter method for the normalized `metadata` property
+     * 
+     * @param string|array|null $value
+     */
+
+    public function setMetadata( $value )
+    {
+        $this->_metadata = $value;
+    }
+
+    /**
+     * Getter method for the normalized `metadata` property
+     * 
+     * @return array|null
+     */
+
+    public function getMetadata()
+    {
+        if ($this->_metadata && is_string($this->_metadata)) {
+            $this->_metadata = JsonHelper::decodeIfJson($this->_metadata);
+        }
+
+        return $this->_metadata;
+    }
+
+    /**
+     * Getter method for the readonly `mimeType` property
+     * 
+     * @return string
+     */
+
+    public function getMimeType(): string
+    {
+        if (!isset($this->_mimeType))
+        {
+            $file = parse_url($this->url, PHP_URL_PATH);
+            $this->_mimeType = FileHelper::getMimeTypeByExtension($file);
+        }
+
+        return $this->_mimeType;
+    }
+
+    /**
+     * Setter method for the resolved `volume` property
+     * 
+     * @param VolumeInterface|string|null
+     */
+
+    public function setVolume( $volume )
+    {
+        if (is_string($volume)) {
+            $volume = Craft::$app->getVolumes()->getVolumeByHandle($volume);
+        }
+
+        if ($volume instanceof VolumeInterface) {
+            $this->volumeId = $volume->id;
+            $this->_volume = $volume;
+        }
+
+        else if ($volume === null) {
+            $this->volumeId = null;
+            $this->_volume = null;
+        }
+    }
+
+    /**
+     * Getter method for the resolved `volume` property
+     * 
+     * @return VolumeInterface|null
+     */
+
+    public function getVolume()
+    {
+        if (isset($this->volumeId) && !isset($this->_volume))
+        {
+            $this->_volume = Craft::$app->getVolumes()
+                ->getVolumeById($this->volumeId);
+        }
+
+        return $this->_volume;
+    }
 
     // =Attributes
     // -------------------------------------------------------------------------
@@ -136,98 +217,7 @@ class Output extends Model
     {
         $attributes = parent::attributes();
 
-        $attributes[] = 'sourceAssetId';
-        $attributes[] = 'source';
-        $attributes[] = 'metadata';
-
         return $attributes;
-    }
-
-    /**
-     * @param int | null
-     */
-
-    public function setSourceAssetId( $value )
-    {
-        $this->_sourceAssetId = $value;
-        $this->_sourceAsset = null;
-        $this->_source = null;
-    }
-
-    /**
-     * @return int | null
-     */
-
-    public function getSourceAssetId()
-    {
-        return $this->_sourceAssetId;
-    }
-
-    /**
-     * @param string | null $value
-     */
-
-    public function setSource( $value )
-    {
-        if (is_numeric($value))
-        {
-            $this->_sourceAssetId = (int)$value;
-            $this->_sourceAsset = null;
-            $this->_source = null;
-        }
-
-        else if (is_string($value))
-        {
-            // $this->_sourceAssetId = null;
-            // $this->_sourceAsset = null;
-            $this->_source = $value;
-        }
-
-        else if ($value instanceof Asset)
-        {
-            $this->_sourceAssetId = $value->id;
-            $this->_sourceAsset = $value;
-            $this->_source = $value->url;
-        }
-    }
-
-    /**
-     * @return string | null
-     */
-
-    public function getSource()
-    {
-        if (isset($this->_source)) {
-            return $this->_source;
-        }
-
-        if (($asset = $this->getSourceAsset())) {
-            return $asset->url;
-        }
-
-        return null;
-    }
-
-    /**
-     * @param string | array | null $value
-     */
-
-    public function setMetadata( $value )
-    {
-        $this->_metadata = $value;
-    }
-
-    /**
-     * @return array | null
-     */
-
-    public function getMetadata()
-    {
-        if ($this->_metadata && is_string($this->_metadata)) {
-            $this->_metadata = JsonHelper::decodeIfJson($this->_metadata);
-        }
-
-        return $this->_metadata;
     }
 
     // =Validation
@@ -272,92 +262,21 @@ class Output extends Model
     {
         $fields = parent::extraFields();
 
-        $fields[] = 'sourceAsset';
+        $fields[] = 'metadata';
+        $fields[] = 'mimeType';
         $fields[] = 'volume';
         $fields[] = 'coconutJobInfo';
-        $fields[] = 'mimeType';
 
         return $fields;
     }
 
     /**
-     * @return \craft\elements\Asset | null
-     */
-
-    public function getSourceAsset()
-    {
-        if (!isset($this->_sourceAsset))
-        {
-            $asset = null;
-
-            if (isset($this->_sourceAssetId))
-            {
-                $asset = Asset::find()
-                    ->id($this->_sourceAssetId)
-                    ->one();            
-            }
-
-            $this->_sourceAsset = $asset;
-        }
-
-        return $this->_sourceAsset;
-    }
-
-    /**
-     * @return craft\base\VolumeInterface
-     */
-
-    public function getVolume()
-    {
-        if (!isset($this->_volume))
-        {
-            $volume = null;
-
-            if (isset($this->volumeId)) {
-                $volume = Craft::$app->getVolumes()->getVolumeById($this->volumeId);
-            }
-
-            else if (($asset = $this->getSourceAsset())) {
-                $volume = $asset->getVolume();
-            }
-
-            if (!$volume) { // fallback to default volume
-                $volume = Coconut::$plugin->getSettings()->getOutputVolume();
-            }
-
-            $this->_volume = $volume;
-        }
-
-        return $this->_volume;
-    }
-
-    /**
-     * 
-     */
-
-    public function getMimeType(): string
-    {
-        if (!isset($this->_mimeType))
-        {
-            $file = parse_url($this->url, PHP_URL_PATH);
-            $this->_mimeType = FileHelper::getMimeTypeByExtension($file);
-        }
-
-        return $this->_mimeType;
-    }
-
-
-    /**
-     * @return array
+     * @return array|null
      */
 
     public function getCoconutJobInfo()
     {
-        if (!$this->inProgress || !isset($this->coconutJobId)) {
-            return null;
-        }
-
-        return Coconut::get($this->coconutJobId);
+        return null;
     }
 
 }

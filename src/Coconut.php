@@ -111,6 +111,15 @@ class Coconut extends Plugin
         self::SERVICE_S3OTHER,
     ];
 
+    /**
+     * 
+     */
+
+    public static function volumeStorage($volume)
+    {
+        return [];
+    }
+
     // =Properties
     // =========================================================================
 

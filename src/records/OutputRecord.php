@@ -17,21 +17,20 @@ use yii\db\ActiveQueryInterface;
 use Craft;
 use craft\db\ActiveRecord;
 use craft\records\Volume as VolumeRecord;
-use craft\records\Asset as AssetRecord;
 use craft\errors\VolumeException;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\records\InputRecord;
 
 /**
  * @property $id
- * @property $volumeId
- * @property $sourceAssetId
- * @property $source
+ * @property $inputId
+ * @property $coconutJobId
  * @property $format
  * @property $url
- * @property $inProgress
- * @property $coconutJobId
  * @property $metadata
+ * @property $volumeId
+ * @property $status
  * @property $dateCreated
  * @property $dateUpdated
  * @property $uid
@@ -44,8 +43,6 @@ class OutputRecord extends ActiveRecord
 
     /**
      * @inheritdoc
-     *
-     * @return string
      */
 
     public static function tableName(): string
@@ -63,25 +60,47 @@ class OutputRecord extends ActiveRecord
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the output volume.
+     * Returns the coconut input
      *
-     * @return ActiveQueryInterface The relational query object.
+     * @return ActiveQueryInterface The relational query object
+     */
+
+    public function getInput(): ActiveQueryInterface
+    {
+        return $this->hasOne(InputRecord::class, ['id' => 'inputId']);
+    }
+
+    /**
+     * Setter method for memoized `volume` property
+     * 
+     * @param \craft\models\Volume|string|null $volume
+     */
+
+    public function setVolume( $volume )
+    {
+        if (is_string($volume)) {
+            $volume = Craft::$app->getVolumes()->getVolumeByHandle($volume);
+        }
+
+        if ($volume instanceof Volume) {
+            $this->_volume = $volume;
+            $this->volumeId = $volume->id;
+        }
+
+        else if (is_null($volume)) {
+            $this->_volume = null;
+        }
+    }
+
+    /**
+     * Returns the output volume (for storage)
+     *
+     * @return ActiveQueryInterface The relational query object
      */
 
     public function getVolume(): ActiveQueryInterface
     {
         return $this->hasOne(VolumeRecord::class, ['id' => 'volumeId']);
-    }
-
-    /**
-     * Returns the source asset.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-
-    public function getSourceAsset(): ActiveQueryInterface
-    {
-        return $this->hasOne(AssetRecord::class, ['id' => 'sourceAssetId']);
     }
 
     // =Events
@@ -93,18 +112,21 @@ class OutputRecord extends ActiveRecord
 
     public function afterDelete()
     {
-        $volume = Craft::$app->getVolumes()->getVolumeById($this->volumeId);
-
-        if ($volume)
+        if (isset($this->volumeId))
         {
-            $volumeUrl = $volume->getRootUrl();
-            $url = $this->url;
-            $path = trim(str_replace($volumeUrl, '', $url), '/');
+            $volume = Craft::$app->getVolumes()->getVolumeById($this->volumeId);
+            if ($volume)
+            {
+                $volumeUrl = $volume->getRootUrl();
+                $url = $this->url;
+                $path = trim(str_replace($volumeUrl, '', $url), '/');
 
-            try {
-                $volume->deleteFile($path);
-            } catch (VolumeException $e) {
-                Craft::warning($e->getMessage());
+                try {
+                    $volume->deleteFile($path);
+                } catch (VolumeException $e) {
+                    // Fail silently (log a warning instead of throwing an error)
+                    Craft::warning($e->getMessage());
+                }
             }
         }
 
