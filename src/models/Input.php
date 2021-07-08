@@ -168,12 +168,16 @@ class Input extends Model
     /**
      * Setter method for the normalized `metadata` property
      * 
-     * @param string|array|null $value
+     * @param string|array|null $metadata
      */
 
-    public function setMetadata( $value )
+    public function setMetadata( $metadata )
     {
-        $this->_metadata = $value;
+        if (is_string($metadata)) {
+            $metadata = JsonHelper::decodeIfJson($metadata) ?? [];
+        }
+
+        $this->_metadata = $metadata;
     }
 
     /**
@@ -184,10 +188,6 @@ class Input extends Model
 
     public function getMetadata()
     {
-        if ($this->_metadata && is_string($this->_metadata)) {
-            $this->_metadata = JsonHelper::decodeIfJson($this->_metadata);
-        }
-
         return $this->_metadata;
     }
 

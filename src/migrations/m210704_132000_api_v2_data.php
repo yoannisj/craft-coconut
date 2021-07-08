@@ -161,7 +161,7 @@ class m210704_132000_api_v2_data extends Migration
             $url = $output['url'] ?? null;
 
             // populate new columns in outputs table
-            $key = preg_replace('/:+/', '_', $format);
+            $key = ConfigHelper::formatString($format);
             $urlPath = $url ? parse_url($url, PHP_URL_PATH) : null;
             $type = $urlPath ? AssetsHelper::getFileKindByExtension($urlPath) : null;
             if ($urlPath && empty($type)) $type = 'httpstream'; // craft does not recognize 'httpstream' type

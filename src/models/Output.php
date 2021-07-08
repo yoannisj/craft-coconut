@@ -24,13 +24,18 @@ use craft\base\VolumeInterface;
 use craft\db\Query;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
-use craft\helpers\FileHelper;
 use craft\helpers\Json as JsonHelper;
+use craft\helpers\FileHelper;
+use craft\helpers\Assets as AssetsHelper;
 
 use yoannisj\coconut\Coconut;
 
 /**
- *
+ * @property Job $job
+ * @property array $format
+ * @property string $formatString
+ * @property string $type
+ * @property string $mimeType
  */
 
 class Output extends Model
@@ -45,28 +50,46 @@ class Output extends Model
     public $id;
 
     /**
-     * @var integer ID of coconut input in Craft database
+     * @var integer ID in Craft database of the Coconut job that created this output
      */
 
-    public $inputId;
+    public $jobId;
 
     /**
-     * @var \yoannisj\coconu\models\Input Coconut input model
+     * @var Job|null Coconut job model
      */
 
-    private $_input;
-
-    /**
-     * @var string|null ID of coconut job that created this output
-     */
-
-    public $coconutJobId;
+    private $_job;
 
     /**
      * @var string
      */
 
-    public $format;
+    private $_key;
+
+    /**
+     * @var array
+     */
+
+    private $_format;
+
+    /**
+     * @var string
+     */
+
+    private $_formatString;
+
+    /**
+     * @var string
+     */
+
+    private $_path;
+
+    /**
+     * @var string
+     */
+
+    private $_type;
 
     /**
      * @var string
@@ -79,18 +102,6 @@ class Output extends Model
      */
 
     private $_metadata;
-
-    /**
-     * @var integer|null
-     */
-
-    public $volumeId;
-
-    /**
-     * @var \craft\base\VolumeInterface
-     */
-
-    private $_volume;
 
     /**
      * @var string Output file URL (on storage)
@@ -124,14 +135,146 @@ class Output extends Model
     // -------------------------------------------------------------------------
 
     /**
-     * Setter method for the normalized `metadata` property
-     * 
-     * @param string|array|null $value
+     * @param Job|null $job
      */
 
-    public function setMetadata( $value )
+    public function setJob( Job $job = null )
     {
-        $this->_metadata = $value;
+        if ($job instanceof Job) {
+            $this->jobId = $job->id;
+            $this->_job = $job;
+        }
+
+        else {
+            $this->jobId = null;
+            $this->_job = null;
+        }
+    }
+
+    /**
+     * 
+     * 
+     * @return Job|null
+     */
+
+    public function getJob()
+    {
+        if ($this->jobId) {
+            return Coconut::$plugin->getJobs()->getJobById($this->jobId);
+        }
+
+        return null;
+    }
+
+    /**
+     * 
+     */
+
+    public function setFormat( $format )
+    {
+        if (is_string($format)) {
+            $format = JsonHelper::decodeIfJson($format);
+        }
+
+        if (is_string($format))
+        {
+            $this->_formatString = $format;
+            $this->_format = ConfigHelper::parseFormat($format);
+        }
+
+        else if (is_array($format) || $format === null) {
+            $this->_format = $format;
+            $this->_formatString = null;
+        }
+    }
+
+    /**
+     * 
+     */
+
+    public function getFormat()
+    {
+        return $this->_format;
+    }
+
+    /**
+     * 
+     */
+
+    public function setKey( string $key = null )
+    {
+        $this->_key = $key;
+    }
+
+    /**
+     * 
+     */
+
+    public function getKey()
+    {
+        if (!isset($this->_key) && !empty($this->getFormat())) {
+            $this->_key = $this->getFormatString();
+        }
+
+        return $this->_key;
+    }
+
+    /**
+     * @param string|null $path
+     */
+
+    public function setPath( string $path = null )
+    {
+        if ($path) { // make sure this is a private path by prepending with '_'
+            $path = preg_replace('/^(\.{0,2}\/)?([^_])/', '$1_$2', $path);
+        }
+
+        $this->_path = $path;
+
+    }
+
+    /**
+     * @return string
+     */
+
+    public function getPath(): string
+    {
+        if (empty($this->_path))
+        {
+            if (($job = $this->getJob())
+                && ($input = $job->getInput())
+                && ($inputUrl = $input->getUrl())
+            ) {
+                $pathFormat = Coconut::$plugin->getSettings()->defaultPathFormat;
+                $vars = [
+                    'path' => parse_url($inputUrl, PHP_URL_PATH),
+                    'filename' => pathinfo($path, PATHINFO_FILENAME),
+                    'hash' => $input->getUrlHash(), // @todo: add support for '{shortHash}' in `defaultPathFormat`
+                    'key' => ConfigHelper::keyAsPath($this->getKey()),
+                    'ext' => ConfigHelper::formatExtension($this->format),
+                ];
+
+                $this->setPath(Craft::$app->getView()
+                    ->renderObjectTemplate($pathFormat, $vars));
+            }
+        }
+
+        return $this->_path;
+    }
+
+    /**
+     * Setter method for the normalized `metadata` property
+     * 
+     * @param string|array|null $metadata
+     */
+
+    public function setMetadata( $metadata )
+    {
+        if (is_string($metadata)) {
+            $metadata = JsonHelper::decodeIfJson($this->_metadata) ?? [];
+        }
+
+        $this->_metadata = $metadata;
     }
 
     /**
@@ -142,15 +285,40 @@ class Output extends Model
 
     public function getMetadata()
     {
-        if ($this->_metadata && is_string($this->_metadata)) {
-            $this->_metadata = JsonHelper::decodeIfJson($this->_metadata);
-        }
-
         return $this->_metadata;
     }
 
     /**
-     * Getter method for the readonly `mimeType` property
+     * Getter for read-only `formatString` property
+     * 
+     * @return string|null
+     */
+
+    public function getFormatString()
+    {
+        if (!isset($this->_formatString)
+            && ($format = $this->getFormat())
+        ) {
+            $this->_formatString = ConfigHelper::formatString($format);
+        }
+
+        return $this->_formatString;
+    }
+
+    /**
+     * Getter method for the read-only `type` property
+     * 
+     * @return string|null
+     */
+
+    public function getType()
+    {
+        $path = $this->getPath();
+        return $path ? AssetsHelper::getFileKindByExtension($path) : null;
+    }
+
+    /**
+     * Getter method for the read-only `mimeType` property
      * 
      * @return string
      */
@@ -166,46 +334,6 @@ class Output extends Model
         return $this->_mimeType;
     }
 
-    /**
-     * Setter method for the resolved `volume` property
-     * 
-     * @param VolumeInterface|string|null
-     */
-
-    public function setVolume( $volume )
-    {
-        if (is_string($volume)) {
-            $volume = Craft::$app->getVolumes()->getVolumeByHandle($volume);
-        }
-
-        if ($volume instanceof VolumeInterface) {
-            $this->volumeId = $volume->id;
-            $this->_volume = $volume;
-        }
-
-        else if ($volume === null) {
-            $this->volumeId = null;
-            $this->_volume = null;
-        }
-    }
-
-    /**
-     * Getter method for the resolved `volume` property
-     * 
-     * @return VolumeInterface|null
-     */
-
-    public function getVolume()
-    {
-        if (isset($this->volumeId) && !isset($this->_volume))
-        {
-            $this->_volume = Craft::$app->getVolumes()
-                ->getVolumeById($this->volumeId);
-        }
-
-        return $this->_volume;
-    }
-
     // =Attributes
     // -------------------------------------------------------------------------
 
@@ -216,6 +344,8 @@ class Output extends Model
     public function attributes()
     {
         $attributes = parent::attributes();
+
+        $attributes[] = 'key';
 
         return $attributes;
     }

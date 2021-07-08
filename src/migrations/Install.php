@@ -82,7 +82,7 @@ class Install extends Migration
                 'jobId' => $this->integer()->null(),
                 'key' => $this->string()->notNull(),
                 'type' => $this->string()->notNull(),
-                'format' => $this->string()->notNull(),
+                'format' => $this->text()->notNull(),
                 'url' => $this->string()->notNull(),
                 'metadata' => $this->longText()->null(),
                 'status' => $this->string()->null(),

@@ -32,26 +32,30 @@ class ConfigHelper
 
     /**
      * List of format specs that are relevant for video encoding
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
-    const VIDEO_SPEC_KEYS = [
+    const VIDEO_SPECS = [
         'video_codec', 'resolution', 'video_bitrate', 'fps',
         'pix_fmt', '2pass', 'frag', 'vprofile', 'level', 'quality', 'maxrate',
     ];
 
     /**
      * List of format specs that are relevant for audio encoding
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
-    const AUDIO_SPEC_KEYS = [
+    const AUDIO_SPECS = [
         'audio_codec', 'audio_bitrate', 'sample_rate', 'audio_channel',
     ];
 
     /**
+     * List of format specs that are relevant for image creation
+     * @see https://docs.coconut.co/references/formats#basics
      * 
      */
 
-    const PREVIEW_SPEC_KEYS = [
+    const IMAGE_SPECS = [
         'resolution', 'pix_fmt', // '2pass',
     ];
 
@@ -67,7 +71,8 @@ class ConfigHelper
     ];
 
     /**
-     * 
+     * List of audio codec spec values supported by the Coconut service
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
     const AUDIO_CODECS = [
@@ -77,6 +82,7 @@ class ConfigHelper
 
     /**
      * Regex patterns used to identify specification values
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
     // =common
@@ -93,11 +99,51 @@ class ConfigHelper
     const AUDIO_CHANNEL_PATTERN = '/^(mono|stereo)$/';
 
     // =options
-    const PIX_FMT_PATTERN = '/^(yuv420p|yuv422p)$/';
-    const VPROFILE_PATTERN = '/^(baseline|main|high|high10|high422|high444)$/';
-    const VPROFILE_PATTERN_PRORES = '/^[0-3]{1}$/';
-    const LEVEL_PATTERN = '/^(10|11|12|13|20|21|22|30|31|32|40|41|42|50|51)$/';
-    const QUALITY_PATTERN = '/^[1-5]{1}$/';
+    const PIX_FMT_OPTION_PATTERN = '/^(yuv420p|yuv422p|yuva444p10le)$/';
+    const QUALITY_OPTION_PATTERN = '/^[1-5]{1}$/';
+    const VPROFILE_OPTION_PATTERN = '/^(baseline|main|high|high10|high422|high444|444)$/';
+    const VPROFILE_OPTION_PATTERN_PRORES = '/^[0-3]{1}$/';
+    const LEVEL_OPTION_PATTERN = '/^(10|11|12|13|20|21|22|30|31|32|40|41|42|50|51)$/';
+
+    /**
+     * Map of patterns to validate supported container options
+     */
+
+    const CONTAINER_OPTION_PATTERNS = [
+        'mp4' => [
+            'frag' => true, // boolean value
+        ],
+    ];
+
+    /**
+     * MAp of patterns to validate supported codec options
+     */
+
+    const CODEC_OPTION_PATTERNS = [
+        'prores' => [
+            'vprofile' => self::VPROFILE_OPTION_PATTERN_PRORES,
+        ],
+        'h264' => [
+            'vprofile' => self::VPROFILE_OPTION_PATTERN,
+            'level' => self::LEVEL_OPTION_PATTERN,
+            'quality' => self::QUALITY_OPTION_PATTERN,
+            'maxrate' => self::VIDEO_BITRATE_PATTERN,
+        ],
+        'hevc' => [
+            'vprofile' => self::VPROFILE_OPTION_PATTERN,
+            'level' => self::LEVEL_OPTION_PATTERN,
+            'quality' => self::QUALITY_OPTION_PATTERN,
+            'maxrate' => self::VIDEO_BITRATE_PATTERN,
+        ],
+        'v8' => [
+            'quality' => self::QUALITY_OPTION_PATTERN,
+            'maxrate' => self::VIDEO_BITRATE_PATTERN,
+        ],
+        'v9' => [
+            'quality' => self::QUALITY_OPTION_PATTERN,
+            'maxrate' => self::VIDEO_BITRATE_PATTERN,
+        ],
+    ];
 
     /**
      * Map of container aliases and their target container
@@ -110,10 +156,11 @@ class ConfigHelper
         'wmv' => 'asf',
         'flash' => 'flv',
         'theora' => 'ogv',
+        'jpeg' => 'jpg',
     ];
 
     /**
-     * List of source file containers (i.e. extensions) supported for input files
+     * List of input file containers (i.e. extensions) supported by the Coconut service
      */
 
     const INPUT_CONTAINERS = [
@@ -129,10 +176,11 @@ class ConfigHelper
     ];
 
     /**
-     * List of video containers
+     * List of video output file containers supported by the Coconut service
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
-    const VIDEO_CONTAINERS = [
+    const VIDEO_OUTPUT_CONTAINERS = [
         'mp4',
         'webm',
         'avi', 'divx', 'xvid',
@@ -144,19 +192,48 @@ class ConfigHelper
     ];
 
     /**
-     *
+     * List of audio output file containers supported by the Coconut service
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
-    const AUDIO_CONTAINERS = [
+    const AUDIO_OUTPUT_CONTAINERS = [
         'mp3', 'ogg',
     ];
 
     /**
-     * List of preview containers
+     * List of image output file containers supported by the Coconut service
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
-    const PREVIEW_CONTAINERS = [
-        'jpg', 'png', 'gif',
+    const IMAGE_OUTPUT_CONTAINERS = [
+        'jpg', 'jpeg', 'png', 'gif',
+    ];
+
+    /**
+     * Default specification values for video encoding
+     * @see https://docs.coconut.co/references/formats#basics
+     */
+
+    const DEFAULT_VIDEO_SPECS = [
+        'resolution' => '0x0', 'video_bitrate' => '1000k', 'fps' => '0fps',
+    ];
+
+    /**
+     * Default specification values for audio encoding
+     * @see https://docs.coconut.co/references/formats#basics
+     */
+
+    const DEFAULT_AUDIO_SPECS = [
+        'audio_bitrate' => '44100hz', 'sample_rate' => '128k', 'audio_channel' => 'stereo',
+    ];
+
+    /**
+     * Default specification values for image creation
+     * @see https://docs.coconut.co/references/formats#basics
+     */
+
+    const DEFAULT_IMAGE_SPECS = [
+        'resolution' => '0x0',
     ];
 
     /**
@@ -165,17 +242,6 @@ class ConfigHelper
      */
 
     const CONTAINER_SPECS = [
-
-        // =defaults
-        '*' => [ // (value of container keys below gets merged in with these)
-            'resolution' => '0x0', 'video_bitrate' => '1000k', 'fps' => '0fps', // video
-            'audio_bitrate' => '44100hz', 'sample_rate' => '128k', 'audio_channel' => 'stereo', // audio
-            'pix_fmt' => null, '2pass' => false, // common options
-            'frag' => false, // mp4 options
-            'vprofile' => null, 'level' => null, // h264, hevc options ('vprofile' also for prores)
-            'quality' => null, 'maxrate' => null, // h264, hevc, vp8, vp9 options
-        ],
-
         // =video
         'mp4' => [ 'video_codec' => 'h264', 'audio_codec' => 'aac' ],
         'webm' => [ 'video_codec' => 'vp8', 'audio_codec' => 'vorbis' ],
@@ -194,15 +260,19 @@ class ConfigHelper
     ];
 
     /**
-     * Maps formatting video definitions to video specs
+     * Maps formatting video resolution definitions to video specs
+     * @see https://docs.coconut.co/references/formats#basics
      */
 
     const RESOLUTION_DEFINITION_SPECS = [
         '240p' => [ 'resolution' => '0x240', 'video_bitrate' => '500K' ],
         '360p' => [ 'resolution' => '0x360', 'video_bitrate' => '800K' ],
         '480p' => [ 'resolution' => '0x480', 'video_bitrate' => '1000k' ],
+        '540p' => [ 'resolution' => '0x540', 'video_bitrate' => '1000k' ], // @todo: verify width of 540p resolution
+        '576p' => [ 'resolution' => '0x576', 'video_bitrate' => '1000k' ], // @todo: verify width of 576p resolution
         '720p' => [ 'resolution' => '1280x720', 'video_bitrate' => '2000k' ],
-        '1080p' => [ 'resolution' => '1980x1080', 'video_bitrate' => '4000k' ],
+        '1080p' => [ 'resolution' => '1920x1080', 'video_bitrate' => '4000k' ],
+        '2140p' => [ 'resolution' => '3840x2140', 'video_bitrate' => '8000k' ],  // @todo: verify width of 2140p resolution
         '2160p' => [ 'resolution' => '3840x2160', 'video_bitrate' => '8000k' ],
     ];
     
@@ -210,7 +280,7 @@ class ConfigHelper
      * Regex patterns to parse file paths and urls
      */
 
-    const FILE_EXTENSION_PATTERN = '/\.([a-z0-9]{2,4}$)/';
+    const FILE_EXTENSION_PATTERN = '/\.([a-z0-9]{2,5}$)/';
 
     /**
      * Regex patterns to parse sequence options
@@ -253,7 +323,7 @@ class ConfigHelper
         }
 
         if ($storage instanceof Volume) {
-            return static::getVolumeStorageSettings($storage);
+            return Coconut::$plugin->resolveVolumeStorage($storage);
         }
 
         if (is_array($storage)) {
@@ -270,44 +340,270 @@ class ConfigHelper
 
     public static function parseFormat( string $format ): array
     {
-        $data = [
-            'outputType' => null,
-            'container' => null,
-            'videoSpecs' => null,
-            'audioSpecs' => null,
-            'fomatOptions' => null,
-            'imageSpecs' => null,
-        ];
+        // don't throw errors if this is an empty format string
+        if (empty($format)) return [];
 
         $segments = explode(':', $format);
         $container = $segments[0];
-        $outputType = null;
 
-        if (in_array($container, self::VIDEO_CONTAINERS)) {
-            $outputType = 'video';
-        } else if (in_array($container, self::PREVIEW_CONTAINERS)) {
-            $outputType = 'preview';
-        } else if (in_array($container, self::AUDIO_CONTAINERS)) {
-            $outputType = 'audio';
+        $data = [
+            'outputType' => null,
+            'container' => $container,
+            'specs' => [],
+        ];
+
+        if (in_array($container, self::VIDEO_CONTAINERS))
+        {
+            $options = $segments[3] ?? '';
+
+            $data['outputType'] = 'video';
+            $data['specs'] = array_merge(
+                static::parseFormatVideoSpecs($container, $segments[1] ?? '', $options),
+                static::parseFormatAudioSpecs($container, $segments[2] ?? '', $options)
+            );
         }
 
-        $data['container'] = $container;
-        $data['outputType'] = $outputType;
-
-        switch ($outputType)
+        else if (in_array($container, self::AUDIO_CONTAINERS))
         {
-            case 'video':
-            case 'audio':
-                $data['videoSpecs'] = $segments[1] ?? null;
-                $data['audioSpecs'] = $segments[2] ?? null;
-                $data['formatOptions'] = $segments[3] ?? null;
-                break;
-            case 'preview':
-                $data['videoSpecs'] = $data['imageSpecs'] = $segments[1] ?? null;
-                break;
+            $data['outputType'] = 'audio';
+            $data['specs'] = static::parseFormatAudioSpecs($container, $segments[1] ?? '');
+        }
+
+        else if (in_array($container, self::IMAGE_CONTAINERS))
+        {
+            $data['outputType'] = 'image';
+            $data['specs'] = static::parseFormatImageSpecs($container, $segments[1] ?? '');
         }
 
         return $data;
+    }
+
+    /**
+     * Parses image specification segment from format string
+     * 
+     * @param string $container The format's output file container
+     * @param string $segment The image specification segment to parse
+     * 
+     * @return array All corresponding image specification values (implicit and explicit)
+     */
+
+    public static function parseFormatImageSpecs( string $container, string $segment )
+    {
+        // include default image specs
+        $specs = array_merge([], self::DEFAULT_IMAGE_SPECS);
+
+        // include container's default specs
+        $baseContainer = self::CONTAINER_ALIASES[$container] ?? $container;
+        if (in_array($baseContainer, self::CONTAINER_SPECS)) {
+            $specs = array_merge($specs, self::CONTAINER_SPECS[$baseContainer]);
+        }
+
+        if ($segment != 'x')
+        {
+            // normally this should just be a single resolution spec, but hey...
+            foreach (explode('_', $segment) as $spec)
+            {
+                if (array_key_exists($spec, self::RESOLUTION_DEFINITION_SPECS)) {
+                    // image formats only support the 'resolution' spec
+                    $specs['resolution'] = self::RESOLUTION_DEFINITION_SPECS[$spec]['resolution'];
+                }
+
+                else if (preg_match(self::RESOLUTION_DEFINITION_PATTERN, $spec)) {
+                    $data['specs']['resolution'] = $spec;
+                }
+            }
+        }
+
+        return $specs;
+    }
+
+    /**
+     * Parses video specification segment from format string
+     * 
+     * @param string $container The format's output file container
+     * @param string $segment The video specification segment to parse
+     * @param string $options The format options segment to parse
+     * 
+     * @return array All corresponding video specification values (implicit and explicit)
+     */
+
+    public static function parseFormatVideoSpecs( string $container, string $segment, string $options = null )
+    {
+        // support disabling video by using 'x'
+        if ($segment == 'x') return [];
+
+        // include default video specs
+        $specs = array_merge([], self::DEFAULT_VIDEO_SPECS);
+
+        // include container's default specs
+        $base = self::CONTAINER_ALIASES[$container] ?? $container;
+        if (in_array($base, self::CONTAINER_SPECS)) {
+            $specs = array_merge($specs, self::CONTAINER_SPECS[$base]);
+        }
+
+        foreach (explode('_', $segment) as $spec)
+        {
+            if (array_key_exists($spec, self::RESOLUTION_DEFINITION_SPECS)) {
+                $specs = array_merge($specs, self::RESOLUTION_DEFINITION_SPECS[$spec]);
+            }
+
+            else if (preg_match(self::RESOLUTION_PATTERN, $spec)) {
+                $specs['resolution'] = $spec;
+            }
+
+            else if (in_array($spec, self::VIDEO_CODECS)) {
+                $specs['video_codec'] = $spec;
+            }
+
+            else if (preg_match(self::VIDEO_BITRATE_PATTERN, $spec)) {
+                $specs['video_bitrate'] = $spec;
+            }
+
+            else if (preg_match(self::FPS_PATTERN, $spec)) {
+                $specs['fps'] = $spec;
+            }
+        }
+
+        if (!empty($options))
+        {
+            $codec = $specs['video_codec'];
+            $optionSpecs = static::parseFormatOptions($container, $codec, $options);
+            $specs = array_merge($specs, $optionSpecs);
+        }
+
+        return $specs;
+    }
+
+    /**
+     * Parses audio specification segment from format string
+     * 
+     * @param string $container The format's output file container
+     * @param string $segment The audio specification segment to parse
+     * 
+     * @return array All corresponding audio specification values (implicit and explicit)
+     */
+
+    public function parseFormatAudioSpecs( string $container, string $segment = null )
+    {
+        // support disabling audio by using 'x'
+        if ($segment == 'x') return [];
+
+        // include default specs
+        $specs = array_merge([], self::DEFAULT_AUDIO_SPECS);
+
+        // include container's default specs
+        $base = self::CONTAINER_ALIASES[$container] ?? $container;
+        if (in_array($base, self::CONTAINER_SPECS)) {
+            $specs = array_merge($specs, self::CONTAINER_SPECS[$base]);
+        }
+
+        foreach (explode('_', $segment) as $spec)
+        {
+            if (in_array($spec, self::AUDIO_CODECS)) {
+                $specs['audio_codec'] = $spec;
+            }
+
+            else if (preg_match(self::AUDIO_BITRATE_PATTERN, $spec)) {
+                $specs['audio_bitrate'] = $spec;
+            }
+
+            else if (preg_match(self::SAMPLE_RATE_PATTERN, $spec)) {
+                $specs['sample_rate'] = $spec;
+            }
+
+            else if (preg_match(self::AUDIO_CHANNEL_PATTERN, $spec)) {
+                $specs['audio_channel'] = $spec;
+            }
+        }
+
+        if (!empty($options))
+        {
+            $codec = $specs['audio_codec'];
+            $optionSpecs = static::parseFormatOptions($container, $codec, $options);
+            $specs = array_merge($specs, $optionSpecs);
+        }
+
+        return $specs;
+    }
+
+    /**
+     * Parses options segment from format string
+     * 
+     * @param string $container 
+     */
+
+    public function parseFormatOptions( string $container, string $codec, string $segment )
+    {
+        $options = [];
+
+        // recognise container aliases
+        $base = self::CONTAINER_ALIASES[$container] ?? $container;
+
+        // transform options string into a map
+        $map = [];
+        foreach (explode(',', $segment) as $option)
+        {
+            $option = explode('=', $option);
+            $name = $option[0];
+            $value = $option[1] ?? true;
+
+            // common format options
+            if ($name == '2pass' && $value) {
+                $options['2pass'] = true;
+            }
+
+            if ($name == 'pix_fmt' && preg_match(self::PIX_FMT_OPTION_PATTERN, $value)) {
+                $options['pix_fmt'] = $value;
+            }
+
+            // container/codec specific format options
+            $pattern = (self::CONTAINER_OPTION_PATTERNS[$base][$name] ?? 
+                self::CODEC_OPTION_PATTERNS[$codec][$name] ?? null);
+
+            if ($pattern)
+            {
+                // support boolean options
+                if ($pattern === true) {
+                    $options[$name] = (bool)$value;
+                } else if (preg_match($pattern, $value)) {
+                    $options[$name] = $value;
+                }
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Returns the path-friendly version for given format key
+     * 
+     * @param string $key The format key
+     * 
+     * @return string A path-friendly version of given key
+     */
+
+    public static function keyAsPath( string $key )
+    {
+        return str_replace(
+            [':', '=', ','],
+            ['-', '_', '__'],
+        $key);
+    }
+
+    /**
+     * Returns the key for given format path
+     * 
+     * @param string $path The format path (as returned by `ConfigHelper::keyPath()`)
+     * 
+     * @return string The corresponding format key
+     */
+
+    public static function keyFromPath( string $path )
+    {
+        return str_replace(
+            ['-', '_'],
+            [':', '='],
+        str_replace('__', ',', $path)); // don't replace '__' with '=='
     }
 
     /**
