@@ -12,7 +12,7 @@
 
 namespace yoannisj\coconut\services;
 
-use Coconut\Job as CoconutJob;
+use Coconut\Client as CoconutClient;
 
 use yii\base\Exception;
 
@@ -23,7 +23,7 @@ use craft\helpers\Json as JsonHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Config;
-use yoannisj\coconut\services\Outputs;
+use yoannisj\coconut\exceptions\CoconutRequestException;
 use yoannisj\coconut\events\JobEvent;
 use yoannisj\coconut\events\CancellableJobEvent;
 
@@ -41,8 +41,252 @@ class Jobs extends Component
     const EVENT_JOB_ERROR = 'jobError';
     const EVENT_JOB_COMPLETE = 'jobComplete';
 
+    /**
+     * @param JobRecord $record
+     * 
+     * @return Job
+     */
+
+    public static function jobForRecord( JobRecord $record ): Job
+    {
+        $job = new Job();
+
+        // populate common attributes
+        $job->attributes = $record->getAttributes();
+
+        // populate specific attributes
+        $job->setInput(new Input([
+            'assetId' => $record->inputAssetId,
+            'url' => $record->inputUrl,
+            'urlHash' => $record->inputUrlHash,
+            'status' => $record->inputStatus,
+            'metadata' => $record->inputMetadata,
+            'expires' => $record->inputExpires,
+        ]));
+
+        return $job;
+    }
+
+    /**
+     * @param Job $job
+     * 
+     * @return JobRecord
+     */
+
+    public static function recordForJob( Job $job ): JobRecord
+    {
+        $record = new JobRecord();
+
+        // populate common attributes
+        $record->attributes = $job->getAttributes();
+
+        // populate specific attributes
+        $input = $job->getInput();
+        $record->inputAssetId = $input->assetId;
+        $record->inputUrl = $input->url;
+        $record->inputUrlHash = $input->urlHash;
+        $record->inputStatus = $input->status;
+        $record->inputMetadata = $input->metadata;
+        $record->inputExpires = $input->expires;
+
+        return $record;
+    }
+
+    // =Properties
+    // =========================================================================
+
+    /**
+     * @var Job[] List of memoized Coconut jobs indexed by their ID
+     */
+
+    private $_jobsPerId = [];
+
+    /**
+     * @var Job[] List of memoized Coconut jobs indexed by their coconut ID
+     */
+
+    private $_jobsPerCoconutId = [];
+
+    /**
+     * @var Job[] List of memoized Coconut jobs indexed by their input asset ID
+     */
+
+    private $_jobsPerInputAssetId = [];
+
+    /**
+     * @var Job[] List of memoized Coconut jobs indexed by their input asset ID
+     */
+
+    private $_jobsPerInputAssetUrlHash = [];
+
     // =Public Methods
     // =========================================================================
+
+    /**
+     * @return Job|false
+     * 
+     * @throws CoconutRequestException If there was an error in the request made to the Coconut service
+     */
+
+    public function createJob( Config $config )
+    {
+        // make sure config is valid before creating job
+        if (!$config->validate()) {
+            return false;
+        }
+
+        $client = Coconut::createClient();
+        $data = $client->job->create($config->toArray());
+
+        $status = ArrayHelper::getValue($data, 'status');
+        if ($status == 'error')
+        {
+            throw new CoconutRequestException([
+                'message' => ArrayHelper::getValue($data, 'message'),
+                'errorCode' => ArrayHelper::getValue($data, 'error_code'),
+            ]);
+        }
+
+        $job = new Job($data);
+        $job->setConfig($config);
+
+        return $job;
+    }
+
+    /**
+     * Saves given job model to the database
+     * 
+     * @param Job $job
+     * @param boolean $runValidation
+     * 
+     * @return boolean
+     */
+
+    public function saveJob( Job $job, bool $runValidation = true ): bool
+    {
+        if ($runValidation && !$job->validate()) {
+            return false;
+        }
+
+        $record = static::recordForJob($job);
+
+        if (isset($record->id)) {
+            return $record->update();
+        }
+
+        return $record->insert();
+    }
+
+    /**
+     * @param integer $id
+     * 
+     * @return Job|null
+     */
+
+    public function getJobById( int $id )
+    {
+        if (!array_key_exists($id, $this->_jobsPerId))
+        {
+            $record = JobRecord::findByCondition($id)
+                ->limit(1)->one();
+            
+            if ($record) {
+                $this->memoizeJobRecord($record);
+            } else {
+                $this->_jobsPerId[$id] = null;
+            }
+        }
+
+        return $this->_jobsPerId[$id];
+    }
+
+    /**
+     * Retrieves job with given coconut ID
+     * 
+     * @return Job|null
+     */
+
+    public function getJobByCoconutId( string $coconutId )
+    {
+        if (!array_key_exiss($coconutId, $this->_jobsPerCoconutId))
+        {
+            $record = JobRecord::findByCondition([
+                'coconutId' => $coconutId,
+            ])->limit(1)->one();
+
+            if ($record) {
+                $this->memoizeJobRecord($record);
+            } else {
+                $this->_jobsPerCoconutId[$coconutId] = null;
+            }
+        }
+
+        return $this->_jobsPerCoconutId[$coconutId];
+    }
+
+    /**
+     * Retrieves list of all jobs for given Asset
+     */
+
+    public function getJobsForInputAsset( Asset $asset )
+    {
+        return $this->getJobsForInputAssetId($asset->id);
+    }
+
+    /**
+     * Retrieves list of all jobs for given asset URL
+     * 
+     * @return Job[]
+     */
+
+    public function getJobsForInputAssetId( int $assetId ): array
+    {
+        if (!array_key_exists($this->assetId, $this->_jobsPerInputAssetId))
+        {
+            $records = JobRecord::findAll([
+                'inputAssetId' => $assetId,
+            ]);
+
+            foreach ($records as $record) {
+                $this->memoizeJobRecord($record);
+            }
+        }
+
+        return $this->_jobsPerInputAssetId[$assetId];
+    }
+
+    /**
+     * Retrieves list of all jobs for given input url
+     * 
+     * @return Job[]
+     */
+
+    public function getJobsForInputUrl( string $url )
+    {
+        $urlHash = md5($url);
+
+        if (!array_key_exists($urlHash, $this->_jobsPerInputUrlHash))
+        {
+            $record = JobRecord::findByCondition([
+                'urlHash' => $urlHash,
+            ])->limit(1)->one();
+
+            if ($record) {
+                $this->memoizeJobRecord($record);
+            }
+        }
+
+        return $this->_jobsPerInputUrlHash[$urlHash];
+    }
+
+
+
+
+
+
+
+
+
 
     /**
      * Creates a new Coconut job, runs it synchronously by waiting on its
@@ -176,6 +420,31 @@ class Jobs extends Component
     // =Protected Methods
     // =========================================================================
 
+    /**
+     * 
+     */
+
+    protected function memoizeJobRecord( JobRecord $record = null )
+    {
+        $job = static::jobForRecord($job);
+
+        $this->_jobsPerId[$record->id] = $job;
+        $this->_jobsPerCoconutId[$record->coconutId] = $job;
+
+        if (!empty($record->inputAssetId)) {
+            $this->_jobsPerInputAssetId[$record->inputAssetId] = $job;
+        }
+
+        if (!empty($record->inputAssetUrlHash)) {
+            $this->_jobsPerInputAssetUrlHash[$record->inputAssetUrlHash] = $job;
+        }
+    }
+
+
+
+
+
+    
     /**
      * Handles errors for given Coconut job.
      *

@@ -36,6 +36,9 @@ class Storage extends Model
     // =Static
     // =========================================================================
 
+    const SCENARIO_DEFAULT = 'default';
+    const SCENARIO_CONFIG = 'config';
+
     // =Properties
     // =========================================================================
 

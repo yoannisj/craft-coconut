@@ -13,8 +13,10 @@
 namespace yoannisj\coconut\helpers;
 
 use yii\base\InvalidArgumentException;
+use yii\base\InvalidCallException;
 
 use Craft;
+use craft\base\VolumeInterface;
 use craft\helpers\StringHelper;
 use craft\helpers\FileHelper;
 
@@ -78,6 +80,14 @@ class ConfigHelper
     const AUDIO_CODECS = [
         'mp3', 'mp2', 'aac', 'amr_nb', 'ac3', 'vorbis', 'flac',
         'pcm_u8', 'pcm_s16le', 'pcm_alaw', 'wmav2',
+    ];
+
+    /**
+     * List of format options
+     */
+
+    const FORMAT_OPTIONS = [
+        'pix_fmt', '2pass', 'frag', 'quality', 'vprofile', 'level',
     ];
 
     /**
@@ -248,11 +258,11 @@ class ConfigHelper
         'avi' => [ 'video_codec' => 'mpeg4', 'audio_codec' => 'mp3' ],
         'asf' => [ 'video_codec' => 'wmv2', 'audio_codec' => 'wmav2' ],
         'mpegts' => [ 'video_codec' => 'h264', 'audio_codec' => 'aac' ],
-        'mov' => [ 'video_codec' => 'h364',  'audio_codec' => 'aac' ],
-        'flv' => [ 'video_codec' => 'flv',  'audio_codec' => 'mp3' ],
-        'mkv' => [ 'video_codec' => 'h264',  'audio_codec' => 'aac' ],
-        '3gp' => [ 'video_codec' => 'h263',  'audio_codec' => 'aac', 'sample_rate' => '32k' ],
-        'ogv' => [ 'video_codec' => 'theora',  'audio_codec' => 'vorbis' ],
+        'mov' => [ 'video_codec' => 'h364', 'audio_codec' => 'aac' ],
+        'flv' => [ 'video_codec' => 'flv', 'audio_codec' => 'mp3' ],
+        'mkv' => [ 'video_codec' => 'h264', 'audio_codec' => 'aac' ],
+        '3gp' => [ 'video_codec' => 'h263', 'audio_codec' => 'aac', 'sample_rate' => '32k' ],
+        'ogv' => [ 'video_codec' => 'theora', 'audio_codec' => 'vorbis' ],
 
         // =audio
         'ogg' => [ 'audio_codec' => 'vorbis' ],
@@ -286,22 +296,25 @@ class ConfigHelper
      * Regex patterns to parse sequence options
      */
 
-    const SEQUENCE_IDENTIFIER_PATTERN = '/#num#/';
-    const NUMBER_URL_OPTION_PATTERN = '/(?:^|,)\s*number=(\d+)/';
-    const EVERY_URL_OPTION_PATTERN = '/(?:^|,)\s*offsets=([\d,]+)/';
-    const OFFSETS_URL_OPTION_PATTERN = '/(?:^|,)\s*every=(\d+)/';
+    const SEQUENTIAL_PLACEHOLDER_PATTERN = "/%(\d+\$)?(-|\+| {1}|0|')?(\d+)?(\.\d+)?(%|[b-h]|[F-H]|o|s|u|x|X){1}/";
 
     /**
-     * Regex patterns to normalize output paths
+     * Pattern used to recognize and resolve path formats expressions
      */
 
-    const OUTPUT_PARTS_PATTERN = '/^(\S+)\s*(,.+)?$/'; 
+    const PATH_EXPRESSION_PATTERN = '/(?<!\{)\{([a-zA-Z0-9_]+)\}(?!\})/';
+
+    /**
+     * Pattern used to make paths private
+     */
+
+    const PATH_PRIVATISATION_PATTERN = '/^(\.{0,2}\/)?([^_])/';
 
     // =Methods
     // -------------------------------------------------------------------------
 
     /**
-     * @param string|array|Volume $storage
+     * @param string|array|VolumeInterface $storage
      * 
      * @return Storage|null
      */
@@ -311,71 +324,105 @@ class ConfigHelper
         if (is_string($storage))
         {
             // check if this is a named storage handle
-            $storages = static::getSettings()->storages;
-
-            if (array_key_exists($storage, $storages)) {
-                $storage = $storages[$storage];
-            }
+            $storage = Coconut::$plugin->getSettings()
+                ->getNamedStorage($storage);
             
-            else { // or, assume this is a volume handle
-                $storage = Craft::$app->getVolumes()->getVolumeByHandle($storage);
+            if (!$storage) { // or, assume this is a volume handle
+                $storage = Craft::$app->getVolumes()
+                    ->getVolumeByHandle($storage);
             }
         }
 
-        if ($storage instanceof Volume) {
+        if ($storage instanceof VolumeInterface) {
             return Coconut::$plugin->resolveVolumeStorage($storage);
         }
 
-        if (is_array($storage)) {
-            return Craft::configure(new Storage(), $storage);
+        if (is_array($storage))
+        {
+            if (!array_key_exists('class', $storage)) {
+                $storage['class'] = Storage::class;
+            }
+
+            return Craft::createObject($storage);
         }
 
         return null;
     }
 
     /**
+     * 
+     */
+
+    public static function parseFormat( $format ): array
+    {
+        if (is_string($format)) {
+            return static::decodeFormat($format);
+        }
+
+
+    }
+
+    /**
+     * Parses given format string, and returns the corresponding map of
+     * (explicit and implicit) spec values
+     * 
      * @param string $format
+     * 
      * @return array
      */
 
-    public static function parseFormat( string $format ): array
+    public static function decodeFormat( string $format ): array
     {
         // don't throw errors if this is an empty format string
         if (empty($format)) return [];
 
         $segments = explode(':', $format);
         $container = $segments[0];
+        $type = static::outputContainerType($container);
 
-        $data = [
-            'outputType' => null,
+        $specs = [
             'container' => $container,
-            'specs' => [],
         ];
 
-        if (in_array($container, self::VIDEO_CONTAINERS))
+        switch ($type)
         {
-            $options = $segments[3] ?? '';
-
-            $data['outputType'] = 'video';
-            $data['specs'] = array_merge(
-                static::parseFormatVideoSpecs($container, $segments[1] ?? '', $options),
-                static::parseFormatAudioSpecs($container, $segments[2] ?? '', $options)
-            );
+            case 'video':
+                $options = $segments[3] ?? '';
+                $specs = array_merge( $specs,
+                    static::parseFormatVideoSpecs($container, $segments[1] ?? '', $options),
+                    static::parseFormatAudioSpecs($container, $segments[2] ?? '', $options)
+                );
+                break;
+            case 'audio':
+                $specs = array_merge( $specs,
+                    static::parseFormatAudioSpecs($container, $segments[1] ?? ''));
+                break;
+            case 'image':
+                $specs = array_merge( $specs,
+                    static::parseFormatImageSpecs($container, $segments[1] ?? ''));
+                break;
         }
 
-        else if (in_array($container, self::AUDIO_CONTAINERS))
-        {
-            $data['outputType'] = 'audio';
-            $data['specs'] = static::parseFormatAudioSpecs($container, $segments[1] ?? '');
+        return $specs;
+    }
+
+    /**
+     * Returns the media type of given output file container
+     * 
+     * @return string|null
+     */
+
+    public function outputContainerType( $container )
+    {
+        if (in_array($container, self::VIDEO_OUTPUT_CONTAINERS)) {
+            return 'video';
+        } else if (in_array($container, self::AUDIO_OUTPUT_CONTAINERS)) {
+            return 'audio';
+        } else if (in_array($container, self::IMAGE_OUTPUT_CONTAINERS)) {
+            return 'image';
         }
 
-        else if (in_array($container, self::IMAGE_CONTAINERS))
-        {
-            $data['outputType'] = 'image';
-            $data['specs'] = static::parseFormatImageSpecs($container, $segments[1] ?? '');
-        }
-
-        return $data;
+        return null;
     }
 
     /**
@@ -575,6 +622,132 @@ class ConfigHelper
     }
 
     /**
+     * Returns formatted string for given format specs
+     * 
+     * @param string|array $specs Formatting specs to encode
+     * @param string|null $path Path to output
+     * 
+     * @return string
+     */
+
+    public static function encodeFormat( $specs, string $path = null ): string
+    {
+        if (is_string($specs)) {
+            $specs = static::decodeFormat($specs);
+        }
+
+        $specs = array_filter($specs);
+        $container = $specs['container'] ?? ($path ? pathinfo($path, PATHINFO_EXTENSION) : null);
+
+        if (empty($container)) {
+            throw new InvalidCallException("Could not resolve container from given arguments");
+        }
+
+        // resolve resolution definition specs
+        $resolution = $specs['resolution'] ?? null;
+        if (array_key_exists($resolution, self::RESOLUTION_DEFINITION_SPECS)) {
+            $specs = array_merge($specs, self::RESOLUTION_DEFINITION_SPECS[$resolution]);
+        }
+
+        $type = static::outputContainerType($container);
+
+        // image containers only support the `resolution` spec
+        if ($type == 'image')
+        {
+            $resolution = $specs['resolution'] ?? null;
+            return trim(':', $container.':'.$resolution);
+        }
+
+        $videoSpecs = [];
+        $audioSpecs = [];
+        $formatOptions = [];
+
+        foreach (self::VIDEO_SPECS as $spec) {
+            if (array_key_exists($spec, $specs)) {
+                $videoSpecs[] = $specs[$spec];
+            }
+        }
+
+        foreach (self::AUDIO_SPECS as $spec) {
+            if (array_key_exists($spec, $specs)) {
+                $audioSpecs[] = $specs[$spec];
+            }
+        }
+
+        foreach (self::FORMAT_OPTIONS as $option) {
+            if (array_key_exists($option, $specs)) {
+                $formatOptions[] = $option.'='.$specs[$option];
+            }
+        }
+
+        // if there are no video/audio specs, then video/audio should be disabled
+        $videoSpecs = empty($videoSpecs) ? 'x' : implode('_', $videoSpecs);
+        $audioSpecs = empty($audioSpecs) ? 'x' : implode('_', $audioSpecs);
+        $formatOptions = empty($formatOptions) ? '' : implode(',', $formatOptions);
+
+        return trim(':', $container.':'.$videoSpecs.':'.$audioSpecs.':'.$formatOptions);
+    }
+
+    /**
+     * Normalizes given format specs by resolving aliases such as '720p', and removing
+     * specs set to the container's default spec value
+     * 
+     * @param array $specs Format specs to normalize
+     * @param string|null $container Optional if $specs contains a 'container' key
+     * 
+     * @return array
+     */
+
+    public static function normalizeFormatSpecs( array $specs, string $container = null )
+    {
+        if (!$container) $container = $specs['container'] ?? null;
+        if (empty($container)) {
+            throw new InvalidCallException(
+                "Could not determine the container from given arguments");
+        }
+
+        $defaults = [];
+
+        // get default specs from container type
+        $type = static::outputContainerType($container);
+        switch ($type)
+        {
+            case 'video':
+                $defaults = array_merge([], 
+                    self::DEFAULT_VIDEO_SPECS, self::DEFAULT_AUDIO_SPECS);
+                break;
+            case 'audio':
+                $defaults = self::DEFAULT_AUDIO_SPECS;
+                break;
+            case 'image':
+                $defaults = self::DEFAULT_IMAGE_SPECS;
+                break;
+        }
+
+        // include defaults for container
+        $base = self::CONTAINER_ALIASES[$container] ?? $container;
+        $defaults = array_merge($defaults, self::CONTAINER_SPECS[$base] ?? []);
+
+        // resolve resolution definitions
+        if (array_key_exists('resolution', $specs))
+        {
+            $resolutionSpecs = self::RESOLUTION_DEFINITION_SPECS[$specs['resolution']] ?? null;
+            if ($resolutionSpecs) $specs = array_merge($specs, $resolutionSpecs);
+        }
+
+        $normalized = [];
+
+        // include only specs that are not the default
+        foreach ($specs as $spec => $value)
+        {
+            $default = $defaults[$spec] ?? null;
+            if ($spec != $default) $normalized[$spec] = $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
      * Returns the path-friendly version for given format key
      * 
      * @param string $key The format key
@@ -607,185 +780,71 @@ class ConfigHelper
     }
 
     /**
-     * Formats given output path, making sure the '#num#' string is included
-     * when required by given options, and fixing the path extension based on
-     * given output format.
+     * @param string|array $format
      *
-     * @param string $format
-     * @param string $path
-     * @param string $options
-     *
-     * @return string
+     * @return string|null
      */
 
-    public static function formatPath( string $format, string $path = '', string $options = null )
+    public static function formatExtension( $format )
     {
-        // default to the format segment
-        if (empty($path)) {
-            $path = static::getFormatSegment($format);
+        $container = null;
+
+        if (is_string($format)) {
+            $container = explode(':', $format)[0] ;
         }
 
-        $suffix = '.' . static::getFormatExtension($format);
-
-        // @todo: support other printf sequence formats
-        if ($options && strpos($options, 'number') !== false
-            && strpos($path, '#num#') === false)
-        {
-            $suffix = '-#num#' . $suffix;
+        else if (is_array($format)) {
+            $container = $format['container'] ?? null;
         }
 
-        // make sure path ends with suffix (while avoiding double extensions)
-        $path = preg_replace(self::FILE_EXTENSION_PATTERN, '', $path);
-        $path .= $suffix;
+        if (empty($container)) {
+            throw new InvalidArgumentException(
+                "Could not determine file container for given `format` argument");
+        }
 
-        return $path;
+        return static::containerExtension($container);
     }
 
     /**
-     * Resolve the config output for given output format, url, options and config vars.
+     * @param string $container
      *
-     * @param string $format
-     * @param string $url
-     * @param string $options
-     * @param array $variables
-     *
-     * @return string
+     * @return string|null
      */
 
-    public static function resolveOutput( string $format, string $url, string $options = null, array $variables = [] ): string
+    public static function containerExtension( string $container )
     {
-        // add options to the end of the url
-        $output = empty($options) ? $url : ($url . ', ' . $options);
-        // parse variables in options
-        $output = static::parseVariables($output, $variables);
-
-        return $output;
-    }
-
-    /**
-     * @param string $outputUrl
-     * @param array $variables
-     *
-     * @return string | array
-     *
-     * @todo: Support 'every' and 'offsets' via "output_duration" variable (use getid3 package)
-     */
-
-    public static function resolveOutputUrls( string $format, string $url, string $options = null, array $variables = [] )
-    {
-        // parse variables in options
-        if (!empty($options)) {
-            $options = static::parseVariables($options, $variables);
-        }
-
-        // apply number sequence option
-        $numberMatch = [];
-        if (preg_match(self::NUMBER_URL_OPTION_PATTERN, $options, $numberMatch))
-        {
-            $urls = [];
-
-            $url = str_replace('#num#','%02d', $url);
-            $count = (int)$numberMatch[1];
-            $index = 0;
-
-            while ($index++ < $count)
-            {
-                $indexUrl = sprintf($url, $index);
-                $urls[] = trim(explode(',', $indexUrl)[0]);
-            }
-
-            return $urls;
-        }
-
-        // apply every sequence option
-        $everyMatch = [];
-        if (preg_match(self::EVERY_URL_OPTION_PATTERN, $options, $everyMatch))
-        {
-            throw new InvalidArgumentException('Can not parse output urls with the "every" option');
-            // $every = (int)$numberMatch[2];
-        }
-
-        // apply offsets sequence option
-        $offsetsMatch = [];
-        if (preg_match(self::OFFSETS_URL_OPTION_PATTERN, $options, $offsetsMatch))
-        {
-            throw new InvalidArgumentException('Can not parse output urls with the "offsets" option');
-            // $offsets = explode(',', $numberMatch[2]);
-        }
-
-        return static::parseVariables($url, $variables);
-    }
-
-    /**
-     *
-     */
-
-    public static function getFormatSegment( string $format )
-    {
-        return str_replace([':', '*', '=', ','], ['-', '', '_', ''], $format);
-    }
-
-    /**
-     * @param string $format
-     *
-     * @return string
-     */
-
-    public static function getFormatExtension( string $format ): string
-    {
-        $container = explode(':', $format)[0] ;
+        $extension = null;
 
         switch ($container)
         {
             case 'divx':
             case 'xvid':
-                $container = 'avi';
+                $extension = 'avi';
                 break;
             case 'wmv':
-                $container = 'asf';
+                $extension = 'asf';
                 break;
             case 'flash':
-                $container = 'flv';
+                $extension = 'flv';
                 break;
             case 'theora':
-                $container = 'ogv';
+                $extension = 'ogv';
                 break;
         }
 
-        return $container;
+        return $extension ?? $container;
     }
 
     /**
-     * @param string $format
-     *
+     * Turns given volume path private, so Craft-CMS does not index it as an asset
+     * 
+     * @param string $path
+     * 
      * @return string
      */
 
-    public static function getFileExtension( string $file )
+    public function privatisePath( string $path ): string
     {
-        $match = [];
-        if (!preg_match(self::FILE_EXTENSION_PATTERN, $filename, $match)) {
-            return null;
-        }
-
-        return $match[1];
-    }
-
-    /**
-     * @param string $str
-     * @param array $variables
-     *
-     * @return string
-     */
-
-    public static function parseVariables( string $str, array $variables = [] ): string
-    {
-        foreach ($variables as $name => $value)
-        {
-            $pattern = '/\$'.preg_quote($name).'/';
-            $str = preg_replace($pattern, $value, $str);        
-        }
-
-        return $str;
+        return preg_replace(self::PATH_PRIVATISATION_PATTERN, '$1_$2', $path);
     }
 }

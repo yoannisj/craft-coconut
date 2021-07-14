@@ -22,11 +22,20 @@ use craft\validators\HandleValidator;
 use craft\volumes\Local as LocalVolume;
 use craft\helpers\StringHelper;
 use craft\helpers\App as AppHelper;
+use craft\helpers\Component as ComponentHelper;
 
 use yoannisj\coconut\models\Config;
+use yoannisj\coconut\models\Storage;
+use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
+ * Model representing and validation Coconut plugin settings
  * 
+ * @property Storage[] $storages
+ * @property Storage|null $defaultStorage
+ * @property VolumeInterface|null $defaultUploadVolume
+ * @property Config[] $configs
+ * @property Config[] $volumeConfigs
  */
 
 class Settings extends Model
@@ -100,10 +109,16 @@ class Settings extends Model
      * @default []
      */
 
-    public $storages = [];
+    private $_storages = [];
 
     /**
-     * @var string|array|\yoannisj\coconut\models\Storage
+     * @var array Container for normalized storages
+     */
+
+    protected $isNormalizedStorages;
+
+    /**
+     * @var string|array|\yoannisj\coconut\models\StorageSettings
      * 
      * The storage name or settings used to store Coconut output files when none
      * is given in transcoding job config parameters.
@@ -111,9 +126,9 @@ class Settings extends Model
      * This can be set to a string which must be either a key from the `storages`
      * setting, or a volume handle.
      * 
-     * If this is set to `null`, it will try to generate storage settings for
-     * the input asset's volume, or fallback to use the HTTP upload method to
-     * store files in the volume defined by the 'defaultUploadVolume' setting.
+     * If this is set to `null`, the plugin will try to generate storage settings
+     * based on the input asset's volume, or fallback to use the HTTP upload method
+     * to store files in the volume defined by the 'defaultUploadVolume' setting.
      * 
      * @default null
      */
@@ -124,14 +139,14 @@ class Settings extends Model
      * @var boolean Whether the `defaultStorage` setting has already been normalized.
      */
 
-    protected $isDefaultStorageNormalized;
+    protected $isNormalizedDefaultStorage;
 
     /**
      * @var string|\craft\models\Volume
      * 
      * The default volume used to store output files when the `storage` parameter
      * was omitted and no asset volume could be determined (.e.g. if the `input`
-     * parameter was not a Craft asset).
+     * parameter was a URL and not a Craft asset).
      * 
      * @default 'coconut'
      */
@@ -142,7 +157,7 @@ class Settings extends Model
      * @var boolean Whether the `defaultUploadVolume` setting has alreay been normalized.
      */
 
-    protected $isDefaultUploadVolumeNormalized;
+    protected $isNormalizedDefaultUploadVolume;
 
     /**
      * @var string Format used to generate default path to output files in storages.
@@ -207,7 +222,13 @@ class Settings extends Model
      * @default []
      */
 
-    public $configs = [];
+    private $_configs = [];
+
+    /**
+     * @var array Container for normalized configs
+     */
+
+    private $_normalizedConfigs = [];
 
     /**
      * @var array Sets default config parameters for craft assets in given volumes.
@@ -219,7 +240,13 @@ class Settings extends Model
      * @var array
      */
 
-    public $volumeConfigs = [];
+    private $_volumeConfigs = [];
+
+    /**
+     * @var array Container for normalized volume configs
+     */
+
+    private $_normalizedVolumeConfigs = [];
 
     /**
      * @var array List of input volumes handles, for which the plugin should
@@ -247,52 +274,294 @@ class Settings extends Model
             $this->apiKey = AppHelper::env('COCONUT_API_KEY');
         }
 
+        if (empty($this->apiKey)) {
+            throw new InvalidConfigException("Missing required `apiKey` config setting");
+        }
+
         parent::init();
+    }
+
+    // =Properties
+    // -------------------------------------------------------------------------
+
+    /**
+     * Setter method for normalized `storages` setting
+     * 
+     * @param array $storages Map of names storages, where each key is a storage name
+     */
+
+    public function setStorages( array $storages )
+    {
+        $this->_storages = $storages;
+        $this->isNormalizedStorages = false;
+    }
+
+    /**
+     * Getter method for normalized `storages` setting
+     * 
+     * @return Storage[]
+     */
+
+    public function getStorages(): array
+    {
+        if (!$this->isNormalizedStorages)
+        {
+            foreach ($this->_storages as $name => $storage)
+            {
+                if (!is_string($name))
+                {
+                    throw new InvalidConfigException(
+                        "Setting `storages` must be an associative array"
+                        ." where keys are storage names");
+                }
+
+                if (is_array($storage))
+                {
+                    if (!array_key_exists('class', $storage)) {
+                        $storage['class'] = Storage::class;
+                    }
+
+                    $storage = Craft::createObject($storage);
+                }
+
+                else if (!$storage instanceof Storage)
+                {
+                    $class = Storage::class;
+                    throw new InvalidConfigException(
+                        "Setting `storages` must resolve to a list of $class models");
+                }
+
+                $this->_storages[$name] = $storage;
+            }
+
+            $this->isNormalizedStorages = true;
+        }
+
+        return $this->_storages;
+    }
+
+    /**
+     * Setter method for normalized `defaultStorage` setting
+     * 
+     * @param string|array|Storage $storage
+     */
+
+    public function setDefaultStorage( $storage )
+    {
+        $this->_storage = $storage;
+        $this->isNormalizedDefaultStorage = false;
+    }
+
+    /**
+     * Getter method for normalized `defaultStorage` setting
+     * 
+     * @return Storage|null
+     */
+
+    public function getDefaultStorage()
+    {
+        if (!isset($this->_defaultStorage)) {
+            return null;
+        }
+
+        if (!$this->isNormalizedDefaultStorage)
+        {
+            $storage = Craft::parseEnv($this->_defaultStorage);
+
+            $this->_defaultStorage = ConfigHelper::parseStorage($storage);
+            $this->isNormalizedDefaultStorage = true;
+        }
+
+        return $this->_defaultStorage;
+    }
+
+    /**
+     * Setter method for normalized `defaultUploadVolume` property
+     * 
+     * @param string|array|Volume
+     */
+
+    public function setDefaultUploadVolume( $volume )
+    {
+        $this->_defaultUploadVolume = null;
+        $this->isNormalizedDefaultUploadVolume = false;
+    }
+
+    /**
+     * @param bool $createMissing Whether to create missing volume based on config settings
+     * 
+     * @return Volume|null
+     */
+
+    public function getDefaultUploadVolume( bool $createMissing = false )
+    {
+        if (!isset($this->_defaultUploadVolume)) {
+            return null;
+        }
+
+        if (!$this->isNormalizedDefaultUploadVolume)
+        {
+            $volume = $this->_defaultUploadVolume;
+
+            if (is_string($volume))
+            {
+                $volume = $this->getVolumeModel([
+                    'handle' => $volume,
+                ], $createMissing);
+            }
+
+            if (is_array($volume)) {
+                $volume = $this->getVolumeModel($volume, $createMissing);
+            }
+
+            else if (!$volume instanceof VolumeInterface)
+            {
+                $class = VolumeInterface::class;
+                throw new InvalidConfigException(
+                    "Setting `defaultUploadVolume` must resolve to a model that implements $class");
+            }
+
+            $this->_defaultUploadVolume = $volume;
+            $this->isNormalizedDefaultUploadVolume = true;
+        }
+
+        return $this->_defaultUploadVolume;
+    }
+
+    /**
+     * Setter method for normalized `configs` setting
+     * 
+     * @param array Map of named configs, where each key is a config name
+     */
+
+    public function setConfigs( array $configs )
+    {
+        $this->_configs = $configs;
+        $this->isNormalizedConfigs = false;
+    }
+
+    /**
+     * Getter method for normalized `configs` setting
+     * 
+     * @return Config[]
+     */
+
+    public function getConfigs()
+    {
+        if (!$this->isNormalizedConfigs)
+        {
+            foreach ($this->_configs as $name => $config)
+            {
+                if (!is_string($name))
+                {
+                    throw new InvalidConfigException(
+                        "Setting `configs` must be an array "
+                        ." where each key is a config name.");
+                }
+
+                if (is_array($config)) {
+                    $config = Craft::configure(new Config(), $config);
+                }
+
+                else if (!$config instanceof Config)
+                {
+                    $class = Config::class;
+                    throw new InvalidConfigException(
+                        "Setting `configs` must resolve to a list of `$class` models");
+                }
+
+                $this->_configs[$name] = $config;
+            }
+
+            $this->isNormalizedConfigs = true;
+        }
+
+        return $this->_configs;
+    }
+
+    /**
+     * Setter method for normalized `volumeConfigs` setting
+     * 
+     * @param array Map of volume configs, where each key is a volume handle
+     */
+
+    public function setVolumeConfigs( array $configs )
+    {
+        $this->_volumeConfigs = $configs;
+        $this->isNormalizedVolumeConfigs = false;
+
+    }
+
+    /**
+     * Getter method for normalized `volumeConfigs` setting
+     * 
+     * @return Config[]
+     */
+
+    public function getVolumeConfigs()
+    {
+        if (!$this->isNormalizedVolumeConfigs)
+        {
+            foreach ($this->_volumeConfigs as $handle => $config)
+            {
+                if (!is_string($handle))
+                {
+                    throw new InvalidConfigException(
+                        "Setting `volumeConfigs` must be an associative array"
+                        ." where each key is a volume handle");
+                }
+
+                if (is_string($config))
+                {
+                    $configs = $this->getConfigs();
+
+                    if (!array_key_exists($config, $configs))
+                    {
+                        throw new InvalidConfigException(
+                            "Could not find config named '$config'.");
+                    }
+
+                    $config = $configs[$config];
+                }
+
+                if (is_array($config)) {
+                    $config = Craft::configure(new Config(), $config);
+                }
+
+                else if (!$config instanceof Config)
+                {
+                    $class = Config::class;
+                    throw new InvalidConfigException(
+                        "Setting `volumeConfigs` must resolve to a list of `$class` models");
+                }
+
+                $this->_volumeConfigs[$name] = $config;
+            }
+
+            $this->isNormalizedConfigs = true;
+        }
+
+        return $this->_volumeConfigs;
     }
 
     // =Attributes
     // -------------------------------------------------------------------------
 
     /**
-     * 
+     * @inheritdoc
      */
 
-    public function setOutputVolume( $value )
+    public function attributes()
     {
-        $this->_outputVolume = $value;
-        $this->_isOutputVolumeNormalized = false;
-    }
+        $attributes = parent::attributes();
 
-    /**
-     * 
-     */
+        $attributes[] = 'storages';
+        $attributes[] = 'defaultStorage';
+        $attributes[] = 'defaultUploadVolume';
+        $attributes[] = 'configs';
+        $attributes[] = 'volumeConfigs';
 
-    public function getOutputVolume()
-    {
-        if (!$this->_isOutputVolumeNormalized)
-        {
-            $volume = $this->_outputVolume;
-
-            if (empty($volume)) {
-                $volume = 'coconut';
-            }
-
-            if (is_numeric($volume)) {
-                $volume = Craft::$app->getVolumes()->getVolumeById($volume);
-            }
-
-            else if (is_string($volume)) {
-                $volume = $this->getOrCreateOutputVolume($volume);
-            }
-
-            if (!$volume instanceof VolumeInterface) {
-                throw new InvalidConfigException('Could not determine output volume.');
-            }
-
-            $this->_outputVolume = $volume;
-        }
-
-        return $this->_outputVolume;
+        return $attributes;
     }
 
     // =Validation
@@ -306,39 +575,122 @@ class Settings extends Model
     {
         $rules = parent::rules();
 
-        $rules['attrsRequired'] = [ ['apiKey', 'outputVolume'], 'required' ];
-        $rules['attrsString'] = [ ['apiKey', 'outputPathFormat'], 'string' ];
-        $rules['attrsHandle'] = [ ['outputVolume'], HandleValidator::class ];
-        $rules['attrsConfigMap'] = [ ['configs', 'volumeConfigs'], 'validateConfigMap', 'baseAttribute' => 'configs' ];
+        $rules['attrsRequired'] = [ ['apiKey', 'defaultUploadVolume', 'defaultPathFormat'], 'required' ];
+        $rules['attrsString'] = [ ['apiKey', 'defaultPathFormat'], 'string' ];
+
+        // $rules['storagesStorageMap'] = [ ['storages'], 'validateStorageMap' ];
+        // $rules['configsConfigMap'] = [ ['configs'], 'validateConfigMap' ];
+        // $rules['volumeConfigsConfigMap'] = [ ['volumeConfigs'], 'validateConfigMap', 'registryAttribute' => 'configs' ];
+        
         $rules['wathVolumesEach'] = [ 'watchVolumes', 'each', 'rule' => HandleValidator::class ];
 
         return $rules;
     }
 
     /**
-     * 
+     * Validation method for maps of storage parameters
+     */
+
+    public function validateStorageMap( $attribute, array $params, InlineValidator $validator )
+    {
+        $storages = $this->$attribute;
+        $registryAttribute = $params['registryAttribute'] ?? null;
+
+        if (!is_array($storages) && !ArrayHelper::isAssociative($storages))
+        {
+            $validator->addError($this, $attribute,
+                "{attribute} must be an array mapping storage names to Coconut storage parameters");
+            return; // no need to continue validation
+        }
+
+        foreach ($storages as $key => $storage)
+        {
+            if (is_string($storage) && $registryAttribute)
+            {
+                $name = $storage;
+                $storage = $this->$registryAttribute[$name] ?? null;
+
+                if (!$storage)
+                {
+                    $label = $this->getAttributeLabel($registryAttribute);
+                    $validator->addError($this, $attribute,
+                        "Could not find {attribute}'s named config '$name' in '$label'");
+                    return; // no need to continue validation
+                }
+            }
+
+            if (is_array($storage) && ArrayHelper::isAssociative($storage))
+            {
+                if (!array_key_exists('class', $storage)) $storage['class'] = Storage::class;
+                $storage = Craft::createObject($storage);
+            }
+
+            if (!$storage instanceof Storage)
+            {
+                $class = Storage::class;
+                $validator->addError($this, $attribute,
+                    "Storage with key '$key' in {attribute} must resolve to a $class model");
+                return; // no need to continue validation
+            }
+
+            else if (!$storage->validate())
+            {
+                $validator->addError($this, $attribute,
+                    "Invalid storage with key '$key' in {attribute}");
+            }
+        }
+    }
+
+    /**
+     * Validation method for maps of config parameters
      */
 
     public function validateConfigMap( $attribute, array $params = [], InlineValidator $validator )
     {
         $configs = $this->$attribute;
-        $baseAttribute = $params['baseAttribute'] ?? null;
+        $registryAttribute = $params['registryAttribute'] ?? null;
 
-        if (!is_array($configs) || !ArrayHelper::isAssociative($configs)) {
+        if (!is_array($configs) || !ArrayHelper::isAssociative($configs))
+        {
             $validator->addError($this, $attribute,
-                '{attribute} must be an array mapping volume handles with config settings');
+                '{attribute} must be an array mapping volume handles to Coconut config parameters');
+            return; // no need to continue validation
         }
 
-        foreach ($configs as $handle => $config)
+        foreach ($configs as $key => $config)
         {
-            if (is_string($config) && $baseAttribute) {
-                $config = $this->$baseAttribute[config] ?? null;
+            if (is_string($config) && $registryAttribute)
+            {
+                $name = $config;
+                $config = $this->$registryAttribute[$name] ?? null;
+                 
+                if (!$config)
+                {
+                    $label = $this->getAttributeLabel($registryAttribute);
+                    $validator->addError($this, $attribute,
+                        "Could not find {attribute}'s named config '$name' in '$label'");
+                    return; // no need to continue validation
+                }
             }
 
-            if (!is_array($config))
+            if (is_array($config) && ArrayHelper::isAssociative($config))
+            {
+                if (!array_key_exists('class', $config)) $config['class'] = $config;
+                $config = Craft::createObject($config);
+            }
+
+            if (!$config instanceof Config)
+            {
+                $class = Config::class;
+                $validator->addError($this, $attribute,
+                    "Config with key '$key' in {attribute} must resolve to a $class model");
+                return; // no need to continue validation
+            }
+
+            if (!$config->validate())
             {
                 $validator->addError($this, $attribute,
-                    'Each value in {attribute} must be a config name, or an array of config params.');
+                    "Invalid config with key '$key' in {attribute}");
             }
         }
     }
@@ -347,79 +699,90 @@ class Settings extends Model
     // -------------------------------------------------------------------------
 
     /**
-     * @return array | false
+     * Returns Coconut storage model with given name
+     * 
+     * @return Storage|null
      */
 
-    public function getConfig( string $name )
+    public function getNamedStorage( string $name )
     {
-        $config = $this->configs[$name] ?? false;
-
-
-        if (is_array($config))
-        {
-            $config['class'] = Config::class;
-            $config = Craft::createObject($config);
-        }
-
-        else if (!($config instanceof Config)) {
-            $this->configs[$name] = false;
-        }
-
-        return $config;
+        $storages = $this->getStorages();
+        return $storages[$name] ?? null;
     }
 
     /**
-     * @return array | false
+     * Returns Coconut config model with given name
+     * 
+     * @return Config|null
      */
 
-    public function getVolumeConfig( string $handle )
+    public function getNamedConfig( string $name )
     {
-        $config = $this->volumeConfigs[$handle] ?? false;
+        $configs = $this->getConfigs();
+        return $configs[$name] ?? null;
+    }
 
-        if (is_string($config)) {
-            $config = $this->getConfig($config);
+    /**
+     * Returns Coconut config model for given assets volume
+     * 
+     * @param VolumeInterface|string $volume
+     * 
+     * @return Config|null
+     */
+
+    public function getVolumeConfig( $volume )
+    {
+        if ($volume instanceof VolumeInterface) {
+            $volume = $volume->handle;
         }
 
-        else if (is_array($config)) {
-            $config['class'] = Config::class;
-            $config = Craft::createObject($config);
-        }
-
-        return $config;
+        $volumeConfigs = $this->getVolumeConfigs();
+        return $volumeConfigs[$volume] ?? null;
     }
 
     // =Protected Methods
     // =========================================================================
 
     /**
+     * @param 
+     * 
      * @return \craft\base\VolumeInterface
      */
 
-    protected function getOrCreateOutputVolume( string $handle )
+    protected function getVolumeModel( array $config = [], bool $createMissing = false )
     {
-        $volumes = Craft::$app->getVolumes();
-        $volume = $volumes->getVolumeByHandle($handle);
+        $config = ComponentHelper::mergeSettings($config);
+        $handle = $config['handle'] ?? 'coconut';
+        
+        $craftVolumes = Craft::$app->getVolumes();
+        $volume = $craftVolumes->getVolumeByHandle($handle);
 
-        if ($volume) {
+        if ($volume || !$createMissing) {
             return $volume;
         }
 
-        // create local volume based on handle
-        $name = $this->humanizeHandle($handle);
-        $slug = StringHelper::toKebabCase($handle);
-        $props = [
-            'type' => LocalVolume::class,
-            'settings' => [
-                'name' => $name,
-                'handle' => $handle,
-                'hasUrls' => true,
-                'url' => '@web/'.$slug,
-                'path' => '@webroot/'.$slug,
-            ],
+        // create missing volume
+        $type = $config['type'] ?? $config['class'] ?? LocalVolume::class;
+
+        $defaults = [
+            'type' => $type,
+            'handle' => $handle,
+            'name'=> $config['name'] ?? $this->humanizeHandle($handle),
         ];
 
-        $volume = $volumes->createVolume($props);
-        if ($volumes->saveVolume($volume)) {
+        if ($type == LocalVolume::class)
+        {
+            $slug = StringHelper::toKebabCase($handle);
+
+            $defaults['hasUrl'] = true;
+            $defaults['url'] = '@web/'.$slug;
+            $defaults['path'] = '@webroot/'.$slug;
+        }
+
+        $config = array_merge($defaults, $config);
+        $volume = $craftVolumes->createVolume($config);
+
+        if ($craftVolumes->saveVolume($volume)) {
             return $volume;
         }
 

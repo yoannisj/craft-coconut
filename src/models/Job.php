@@ -13,6 +13,7 @@
 namespace yoannisj\coconut\models;
 
 use Craft;
+use craft\base\VolumeInterface;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Input;
@@ -21,7 +22,7 @@ use yoannisj\coconut\models\Output;
 use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
- * Model representing a Coconut job and its data
+ * Model representing and validating Coconut jobs and their data
  * 
  * @property Input $input
  * @property integer $inputAssetId
@@ -44,20 +45,30 @@ class Job extends Model
     // =Static
     // =========================================================================
 
+    const STATUS_STARTING = 'job.starting';
+    const STATUS_COMPLETED = 'job.completed';
+    const STATUS_FAILED = 'job.failed';
+
     // =Properties
     // =========================================================================
 
     /**
-     * @var integer
+     * 
      */
 
-    private $_inputAssetId;
+    public $id;
 
     /**
-     * @var integer
+     * 
      */
 
-    private $_inputUrl;
+    public $coconutId;
+
+    /**
+     * @var Config|null
+     */
+
+    private $_config;
 
     /**
      * @var Input|null
@@ -66,52 +77,87 @@ class Job extends Model
     private $_input;
 
     /**
-     * @var integer
+     * @var Output[]
      */
 
-    public $storageVolumeId;
+    private $_outputs;
 
     /**
-     * @var Volume|null
+     * 
      */
 
-    private $_storageVolume;
+    public $status;
 
     /**
-     * @var boolean
+     * 
      */
 
-    protected $isNormalizedStorageVolume;
+    public $progress;
 
     /**
-     * @var string
+     * 
      */
 
-    private $storageHandle;
+    public $createdAt;
 
     /**
-     * @var array|null
+     * 
      */
 
-    private $_storageSettings;
+    public $completedAt;
 
     /**
-     * @var Storage|null
+     * 
      */
 
-    private $_storage;
+    public $dateCreated;
 
     /**
-     * @var boolean
+     * 
      */
 
-    protected $isNormalizedStorage = false;
+    public $dateUpdated;
 
     // =Public Methods
     // =========================================================================
 
+    /**
+     * @inheritdoc
+     */
+
+    public function __construct( $config = [] )
+    {
+        parent::__construct();
+
+        if (is_array($config)) {
+            $config = Craft::configure(new Config(), $config);
+        }
+
+        $this->setConfig($config);
+    }
+
     // =Properties
     // -------------------------------------------------------------------------
+
+    /**
+     * Setter method for normalized `config` property
+     * 
+     * @param Config|null $config
+     */
+
+    public function setConfig( Config $config = null )
+    {
+        $this->_config = $config;
+    }
+
+    /**
+     * Getter method for normalized `config` property
+     */
+
+    public function getConfig()
+    {
+        return $this->_config;
+    }
 
     /**
      * Setter method for nested `input` model property
@@ -140,138 +186,6 @@ class Job extends Model
     }
 
     /**
-     * Setter method for delegated `inputAssetId` property
-     * 
-     * @param integer|null $assetId
-     */
-
-    public function setInputAssetId( int $assetId = null )
-    {
-        $this->getInput()->assetId = $assetId;
-    }
-
-    /**
-     * Getter method for delegated `inputAssetId` property
-     * 
-     * @return integer|null
-     */
-
-    public function getInputAssetId()
-    {
-        return $this->getInput()->assetId ?? null;
-    }
-
-    /**
-     * Setter method for delegated `inputUrl` property
-     * 
-     * @param string|null $url
-     */
-
-    public function setInputUrl( string $url = null )
-    {
-        $this->getInput()->url = $url;
-    }
-
-    /**
-     * Getter method for delegated `inputUrl` property
-     * 
-     * @return string|null
-     */
-
-    public function getInputUrl()
-    {
-        return $this->getInput()->url ?? null;
-    }
-
-    /**
-     * Setter method for delegated `inputUrl` property
-     * 
-     * @param string|null $urlHash
-     */
-
-    public function setInputUrlHash( string $urlHash = null )
-    {
-        $this->getInput()->urlHash = $urlHash;
-    }
-
-    /**
-     * Getter method for delegated `inputUrlHash` property
-     * 
-     * @return string|null
-     */
-
-    public function getInputUrlHash()
-    {
-        return $this->getInput()->urlHash ?? null;
-    }
-
-    /**
-     * Setter method for delegated `inputMetadata` property
-     * 
-     * @param string|null $status
-     */
-
-    public function setInputStatus( string $status = null )
-    {
-        $this->getInput()->status = $status;
-    }
-
-    /**
-     * Getter method for delegated `inputMetadata` property
-     * 
-     * @return string|null
-     */
-
-    public function getInputStatus()
-    {
-        return $this->getInput()->status ?? null;
-    }
-
-    /**
-     * Setter method for delegated `inputMetadata` property
-     * 
-     * @param string|array|null $metadata
-     */
-
-    public function setInputMetadata( $metadata = null )
-    {
-        $this->getInput()->metadata = $metadata;
-    }
-
-    /**
-     * Getter method for delegated `inputMetadata` property
-     * 
-     * @return array|null
-     */
-
-    public function getInputMetadata()
-    {
-        return $this->getInput()->metadata ?? null;
-    }
-
-    /**
-     * Setter method for delegated `inputExpires` property
-     * 
-     * @param string|Datetime $expires
-     */
-
-    public function setInputExpires( $expires = null )
-    {
-        $this->getInput()->expires = $expires;
-    }
-
-    /**
-     * Getter method for delegated `inputExpires` property
-     * 
-     * @return Datetime|null
-     */
-
-    public function getInputExpires()
-    {
-        return $this->getInput()->expires ?? null;
-    }
-
-    /**
      * Setter method for resolved `storageVolume` property
      * 
      * @param string|Volume\null $volume
@@ -289,7 +203,7 @@ class Job extends Model
             $this->isNormalizedStorageVolume = false;
         }
 
-        else if ($volume instanceof Volume)
+        else if ($volume instanceof VolumeInterface)
         {
             $this->storageVolumeId = $volume->id;
             $this->storageHandle = $volume->handle;
@@ -443,10 +357,6 @@ class Job extends Model
     {
         $attributes = parent::attributes();
 
-        $attributes[] = 'inputAssetId';
-        $attributes[] = 'inputUrl';
-        $attributes[] = 'storageVolumeId';
-        $attributes[] = 'storageHandle';
         $attributes[] = 'storageSettings';
 
         return $attributes;
@@ -462,9 +372,6 @@ class Job extends Model
     public function fields()
     {
         $fields = parent::fields();
-
-        $fields[] = 'inputUrlHash';
-
         return $fields;
     }
 

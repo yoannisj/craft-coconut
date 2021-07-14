@@ -25,7 +25,8 @@ use craft\helpers\UrlHelper;
 use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\base\VolumeAdapterInterface;
+use yoannisj\coconut\models\Input;
+use yoannisj\coconut\models\Notification;
 use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
@@ -38,97 +39,80 @@ class Config extends Model
     // =========================================================================
 
     /**
-     * @var array
+     * @var string Public url of input video to transcode
      */
 
-    private $_vars;
+    private $_input;
 
     /**
-     * @var int | null
+     * @var array Variable values that can be using in the config parameters
      */
 
-    private $_sourceAssetId;
+    private $_variables;
 
     /**
-     * @var \craft\elements\Asset
+     * @var string
      */
 
-    private $_sourceAsset;
+    private $_storageHandle;
 
     /**
-     * @var string Public url of source video to transcode
+     * @var integer
      */
 
-    private $_source;
+    private $_storageVolumeId;
 
     /**
-     * @var array
+     * @var VolumeInterface|null
      */
 
-    private $_sourceVariables;
+    private $_storageVolume;
 
     /**
-     * @var string The volume where output files should be stored.
-     *  Defaults to 'auto', which will use same volume as asset sources,
-     *  or the global `outputVolume` setting if the source is a url.
+     * @var Storage|null
      */
 
-    public $outputVolume;
+    private $_fallbackStorage;
 
     /**
-     * @var \craft\base\VolumeInterface
+     * @var boolean
      */
 
-    private $_outputVolumeModel;
+    protected $isFallbackStorage;
 
     /**
-     * @var \yoannisj\coconut\base\VolumeAdapterInterface
+     * @var Storage The storage settings for output files
      */
 
-    private $_outputVolumeAdapter;
+    private $_storage;
 
     /**
-     * @var string The path where output files should be stored in the volume.
-     *  Defaults to the global `outputPath` setting.
+     * @var boolean
+     */
+
+    protected $isNormalizedStorage;
+
+    /**
+     * @var string The format used to generate missing output paths.
+     *  Defaults to the plugin's `defaultOutputPath` setting.
      */
 
     private $_outputPathFormat = null;
 
     /**
-     * @var bool
+     * @var array Raw parameters for Coconut job outputs
      */
 
-    private $_isStaleOutputPath = true;
+    private $_rawOutputs;
 
     /**
-     * @var array
+     * @var array List of normalized output parameters
      */
 
     private $_outputs;
 
-    /**
-     * @var array
-     */
-
-    private $_normalizedOutputs;
-
-    /**
-     * @var aray
-     */
-
-    private $_outputUrls;
-
     // =Public Methods
     // =========================================================================
-
-    /**
-     * 
-     */
-
-    // public function __serialize()
-    // {
-    //     return $this->getAttributes();
-    // }
 
     /**
      * 
@@ -149,7 +133,455 @@ class Config extends Model
         }
 
         return $props;
-        // return $this->toArray();
+    }
+
+    // =Properties
+    // -------------------------------------------------------------------------
+
+    /**
+     * Setter method for normalized `input` property
+     * 
+     * Given `$input` parameter can be an Input model, an array of input properties,
+     * an Asset element, an Asset element ID or a URL to an external input file
+     * 
+     * @param string|array|Input|Asset|null $input
+     */
+
+    public function setInput( $input )
+    {
+        $this->_input = $input;
+
+        if ($input === null || $input instanceof Input) {
+            $this->isNormalizedInput = true;
+        } else {
+            $this->isNormalizedInput = false;
+        }
+
+        // fallback storage depends on input
+        $this->_fallbackStorage = null;
+        if ($this->isFallbackStorage) {
+            $this->isNormalizedStorage = false;
+        }
+    }
+
+    /**
+     * Getter method for normalized `input` property
+     * 
+     * @return Input|null
+     */
+
+    public function getInput()
+    {
+        if (!$this->isNormalizedInput)
+        {
+            $input = $this->_input;
+
+            if (!is_array($input))
+            {
+                if (!array_key_exists('class', $input)) {
+                    $input['class'] = Input::class;
+                }
+
+                $input = Craft::createObject($input);
+            }
+
+            else
+            {
+                $model = new Input();
+
+                if ($input instanceof Asset) {
+                    $model->asset = $input;
+                } else if (is_numeric($input)) {
+                    $model->assetId = (int)$input;
+                } else if (is_string($input)) {
+                    $model->url = $input;
+                }
+
+                $input = $model;
+            }
+
+            $this->_input = $input;
+            $this->isNormalizedInput = true;
+        }
+
+        return $this->_input;
+    }
+
+    /**
+     * Setter method for normalized `storage` property
+     * 
+     * If given $storage is a string, it will first be checked against named storage
+     * settings, or it will be considered a volume handle.
+     * 
+     * @param string|array|Storage|VolumeInterface|null $storage
+     */
+
+    public function setStorage( $storage )
+    {
+        if (empty($storage))
+        {
+            $this->_storage = null;
+            $this->_storageHandle = null;
+            $this->_storageVolumeId = null;
+
+            $this->isNormalizedStorage = false;
+        }
+
+        else if ($storage instanceof Storage)
+        {
+            $this->_storage = $storage;
+            $this->_storageHandle = null;
+            $this->_storageVolumeId = null;
+
+            $this->isNormalizedStorage = true;
+        }
+
+        else if ($storage instanceof VolumeInterface) {
+            $this->setStorageVolume($storage);
+        }
+
+        else if (is_string($storage) && $storage != $this->_storageHandle
+            && (!$this->_storageVolume || $storage != $this->_storageVolume->handle)
+        ) {
+            $this->_storageHandle = $storage;
+            $this->_storageVolume = null;
+            $this->_storageVolumeId = null;
+
+            // force re-calculation next time storage is accessed
+            $this->isNormalizedStorage = false;
+        }
+
+        else {
+            $this->_storage = $storage;
+            $this->_storageHandle = null;
+            $this->_storageVolumeId = null;
+            $this->_storageVolume = null;
+
+            // force re-calculation next time storage is accessed
+            $this->isNormalizedStorage = false;
+        }
+    }
+
+    /**
+     * Getter method for resolved `storage` property
+     * 
+     * @return Storage|null
+     */
+
+    public function getStorage()
+    {
+        if (!$this->isNormalizedStorage)
+        {
+            $storage = $this->_storage;
+
+            // give priority to storage handle
+            if (!empty($this->_storageHandle))
+            {
+                // check named storage settings
+                $storage = Craft::$app->getSettings()
+                    ->getNamedStorage($this->_storageHandle);
+
+                // or check volume by handle
+                if (!$storage && ($volume = $this->getStorageVolume())) {
+                    $storage = Coconut::resolveVolumeStorage($volume);
+                }
+            }
+
+            else if (is_array($storage))
+            {
+                if (!array_key_exists('class', $storage)) {
+                    $storage['class'] = Storage::class;
+                }
+
+                $storage = Craft::createObject($storage);
+            }
+
+            if (!$storage) {
+                $storage = $this->getFallbackStorage();
+                $this->isFallbackStorage = true;
+            } else {
+                $this->isFallbackStorage = false;
+            }
+
+            if (!$storage instanceof Storage)
+            {
+                $class = Storage::class;
+                throw new InvalidConfigException(
+                    "Attribute `storage` must be a valid storage name, volume handle"
+                    ." or instance of $class");
+            }
+
+            $this->_storage = $storage;
+            $this->isNormalizedStorage = true;
+        }
+
+        return $this->_storage;
+    }
+
+        /**
+     * Getter method for reactive `storageVolumeId` property
+     * 
+     * @return integer|null
+     */
+
+    public function getStorageVolumeId()
+    {
+        if (!isset($this->_storageVolumeId)
+            && ($volume = $this->getStorageVolume())
+        )
+        {
+            $this->_storageVolumeId = $volume->id;
+        }
+
+        return $this->_storageVolumeId;
+    }
+
+    /**
+     * Getter method for read-only `storageVolume` property
+     * 
+     * @return VolumeInterface|null
+     */
+
+    public function getStorageVolume()
+    {
+        if (!$this->isNormalizedStorage
+            && !isset($this->_storageVolume))
+        {
+            $volume = null;
+
+            if ($this->_storageHandle)
+            {
+                $volume = Craft::$app->getVolumes()
+                    ->getVolumeByHandle($this->_storageHandle);
+            }
+
+            else if ($this->_storageVolumeId)
+            {
+                $volume = Craft::$app->getVolumes()
+                    ->getVolumeById($this->_storageVolumeId);
+            }
+
+            if ($volume)
+            {
+                $this->_storageVolume = $volume;
+                $this->_storageVolumeId = $volume->id;
+                $this->_storageHandle = $volume->handle;
+            }
+        }
+
+        return $this->_storageVolume;
+    }
+
+    /**
+     * Getter method for read-only `fallbackStorage` property
+     *
+     * Returns fallback storage, used if `storage` property was set to `null`
+     * or could not be resolved
+     * 
+     * @return Storage|null
+     */
+
+    public function getFallbackStorage()
+    {
+        if (!isset($this->_fallbackStorage))
+        {
+            $coconutSettings = Coconut::$plugin->getSettings();
+            $storage = $coconutSettings->getDefaultStorage();
+
+            if (!$storage)
+            {
+                $input = $this->getInput();
+                $inputAsset = $input ? $input->getAsset() : null;
+                $uploadVolume = ($inputAsset ? $inputAsset->getVolume()
+                    : Coconut::$plugin->getSettings()->getDefaultUploadVolume());
+    
+                if ($uploadVolume) {
+                    $storage = Coconut::resolveVolumeStorage($uploadVolume);
+                }
+            }
+
+            $this->_fallbackStorage  = $storage;
+        }
+
+        return $this->_fallbackStorage;
+    }
+
+    /**
+     * Setter method for defaulted `outputPathFormat` property
+     * 
+     * @param string $pathFormat
+     */
+
+    public function setOutputPathFormat( string $pathFormat = null )
+    {
+        $this->_outputPathFormat;
+
+        // update normalized output models
+        foreach ($this->getOutputs() as $key => $output)
+        {
+            // only set path format on outputs that don't have an explicit path
+            $explicitPath = $output->getExplicitPath();
+            if (empty($explicitPath)) $output->setPath($pathFormat);
+
+            $this->_outputs[$key] = $output;
+        }
+    }
+
+    /**
+     * Getter method for defaulte `outputPathFormat` property
+     * 
+     * @return string
+     */
+
+    public function getOutputPathFormat(): string
+    {
+        return ($this->_outputPathFormat ??
+            Coconut::$plugin->getSettings()->defaultPathFormat);
+    }
+
+    /**
+     * @param array $outputs
+     */
+
+    public function setOutputs( array $outputs )
+    {
+        $this->_outputs = $outputs;
+        $this->isNormalizedOutputs = false;
+    }
+
+    /**
+     * @return array | null
+     */
+
+    public function getOutputs()
+    {
+        if (!$this->isNormalizedOutputs || !isset($this->_outputs))
+        {
+            $outputParams = [];
+
+            foreach ($this->_outputs as $key => $params)
+            {
+                // support defining output as format string (no extra params)
+                if (is_numeric($key)) {
+                    $key = $params;
+                    $params = [];
+                }
+
+                // support multiple outputs for 1 format
+                if (array_key_exists($key, $outputParams))
+                {
+                    $keyParams = $outputParams[$key];
+
+                    // @todo: remove duplicate output parameters
+
+                    if (ArrayHelper::isIndexed($keyParams)) {
+                        $keyParams[] = $params;
+                    } else {
+                        $keyParams = [ $keyParams, $params ];
+                    }
+
+                    $outputParams[$key] = $keyParams;
+                }
+
+                // support defining outputs as Output models
+                else if ($params instanceof Output) {
+                    // transforming to an array simplifies normalization happening below
+                    $outputParams[$key] = $params->toArray();
+                }
+
+                else {
+                    $outputParams[$key] = $params;
+                }
+            }
+
+            // resolve Output models from `outputs` config params
+            foreach ($outputParams as $key => $params)
+            {
+                // flatten list of multiple output settings for 1 same format
+                // so we can fill-in missing output keys
+                // @see https://docs.coconut.co/jobs/api#same-output-format-with-different-settings
+                if (ArrayHelper::isIndexed($params))
+                {
+                    $formatIndex = 1; // use index to generate missing `key` param
+                    foreach ($params as $prm)
+                    {
+                        $output = $this->resolveOutput($key, $prm, $formatIndex++);
+
+                        $outputKey = $output->getKey(); // includes index if `key` param was missing
+                        $outputs[$outputKey] = $output;
+                    }
+                }
+
+                else
+                {
+                    $output = $this->resolveOutput($key, $params);
+                    $outputKey = $output->getKey(); // returns format string if `key` param was missing
+
+                    $outputs[$outputKey] = $output;
+                }
+            }
+
+            $this->_outputs = $outputs;
+            $this->isNormalizedOutputs = true;
+        }
+
+        return $this->_outputs;
+    }
+
+    /**
+     * Setter method for the resolved `nofitication` property
+     * 
+     * @param string|Notification|null $notification
+     */
+
+    public function setNotification( $notification )
+    {
+        if ($notification === null) {
+            $this->_notification = null;
+        }
+        
+        else
+        {
+            $model = new Notification([
+                'metadata' => true,
+                'events' => true,
+            ]);
+
+            if (is_array($notification)) {
+                $model = Craft::configure($model, $notification);
+            }
+
+            else if (is_string($notification))
+            {
+                $model->type = 'http';
+                $model->url = $notification;
+            }
+
+            $this->_notification = $model;
+        }
+    }
+
+    /**
+     * @return Notification|null
+     */
+
+    public function getNotification()
+    {
+        if (!Coconut::$plugin->getSettings()->enableNotifications) {
+            return null;
+        }
+
+        if (!isset($this->_notification))
+        {
+            $this->_notification = new Notification([
+                'type' => 'http',
+                'url' => UrlHelper::actionUrl('coconut/jobs/notification'),
+                'metadata' => true,
+                'events' => true,
+            ]);
+        }
+
+        return $this->_notification;
     }
 
     // =Attributes
@@ -163,160 +595,12 @@ class Config extends Model
     {
         $attributes = parent::attributes();
 
-        $attributes[] = 'vars';
-        $attributes[] = 'sourceAssetId';
-        $attributes[] = 'source';
+        $attributes[] = 'input';
+        $attributes[] = 'storage';
         $attributes[] = 'outputs';
-        $attributes[] = 'outputPathFormat';
+        $attributes[] = 'notification';
 
         return $attributes;
-    }
-
-    /**
-     * @param array | null $value
-     */
-
-    public function setVars( array $value = null )
-    {
-        $this->_vars = $value;
-    }
-
-    /**
-     * @return array
-     */
-
-    public function getVars(): array
-    {
-        return $this->_vars ?? [];
-    }
-
-    /**
-     * @param int | null
-     */
-
-    public function setSourceAssetId( int $value = null )
-    {
-        $this->_sourceAssetId = $value;
-        $this->_sourceAsset = null;
-        $this->_source = null;
-
-        if ($this->outputVolume == 'auto') {
-            $this->_outputVolumeModel = null;
-        }
-
-        /* output path depends on source variables */
-        $this->_sourceVariables = null;
-        $this->_isStaleOutputPath = true;
-    }
-
-    /**
-     * @return int | null
-     */
-
-    public function getSourceAssetId()
-    {
-        return $this->_sourceAssetId;
-    }
-
-    /**
-     * @param string | \craft\elements\Asset | int | null $value
-     */
-
-    public function setSource( $value )
-    {
-        if (is_numeric($value))
-        {
-            $this->_sourceAssetId = (int)$value;
-            $this->_sourceAsset = null;
-            $this->_source = null;
-        }
-
-        else if (is_string($value))
-        {
-            $this->_sourceAssetId = null;
-            $this->_sourceAsset = null;
-            $this->_source = $value;
-        }
-
-        else if ($value instanceof Asset)
-        {
-            $this->_sourceAssetId = $value->id;
-            $this->_sourceAsset = $value;
-            $this->_source = $value->url;
-        }
-
-        if ($this->outputVolume == 'auto') {
-            $this->_outputVolumeModel = null;
-        }
-
-        /* output path and urls depend on source variables */
-        $this->_sourceVariables = null;
-        $this->_isStaleOutputPath = true;
-    }
-
-    /**
-     * @return string | null
-     */
-
-    public function getSource()
-    {
-        if (!isset($this->_source)
-            && ($asset = $this->getSourceAsset()))
-        {
-            $this->_source = $asset->url;
-        }
-
-        return $this->_source;
-    }
-
-    /**
-     * @param string $vlaue
-     */
-
-    public function setOutputPathFormat( string $value = null )
-    {
-        if (empty($value)) {
-            $value = Coconut::$plugin->getSettings()->outputPathFormat;
-        }
-
-        $this->_outputPathFormat = $value;
-        $this->_isStaleOutputPath = true;
-    }
-
-    /**
-     * @return string
-     */
-
-    public function getOutputPathFormat(): string
-    {
-        return $this->_outputPathFormat ?? Coconut::$plugin->getSettings()->outputPathFormat;
-    }
-
-    /**
-     * @param array | null $value
-     */
-
-    public function setOutputs( array $value = null )
-    {
-        $this->_outputs = $value;
-        $this->_normalizedOutputs = null;
-        $this->_outputUrls = null;
-    }
-
-    /**
-     * @return array | null
-     */
-
-    public function getOutputs()
-    {
-        if ($this->_isStaleOutputPath
-            || !isset($this->_normalizedOutputs)
-        ) {
-            $outputs = $this->normalizeOutputs($this->_outputs);
-            $this->_normalizedOutputs = $outputs;
-        }
-
-        return $this->_normalizedOutputs;
     }
 
     // =Validation
@@ -330,11 +614,8 @@ class Config extends Model
     {
         $rules = parent::rules();
 
-        $rules['attrsRequired'] = [ ['source', 'outputs'], 'required' ];
-
-        $rules['attrsInteger'] = [ ['sourceAssetId'], 'integer' ];
+        $rules['attrsRequired'] = [ ['input', 'storage', 'outputs'], 'required' ];
         $rules['attrsString'] = [ ['outputPathFormat'], 'string' ];
-        $rules['attrsEachString'] = [ ['vars', 'outputs'], 'each', 'rule' => 'string' ];
 
         return $rules;
     }
@@ -346,152 +627,29 @@ class Config extends Model
      * @inheritdoc
      */
 
-    public function extraFields()
+    public function fields()
     {
-        $fields = parent::extraFields();
+        $fields = parent::fields();
 
-        $fields[] = 'webhook';
-        $fields[] = 'sourceAsset';
-        $fields[] = 'sourceVariables';
-        $fields[] = 'outputVolumeModel';
-        $fields[] = 'outputVolumeAdapter';
-        $fields[] = 'outputUrls';
-        $fields[] = 'jobParams';
-        $fields[] = 'outputCriteria';
+        $fields[] = 'input';
+        $fields[] = 'storage';
+        $fields[] = 'outputs';
+        $fields[] = 'notification';
 
         return $fields;
     }
 
     /**
-     * 
+     * @inheritdoc
      */
 
-    public function getWebhook(): string
+    public function extraFields()
     {
-        return UrlHelper::actionUrl('coconut/jobs/complete');
-    }
+        $fields = parent::extraFields();
 
-    /**
-     * @return \craft\elements\Asset | null
-     */
+        $fields[] = 'outputPathFormat';
 
-    public function getSourceAsset()
-    {
-        if (!isset($this->_sourceAsset))
-        {
-            $asset = null;
-
-            if (isset($this->_sourceAssetId))
-            {
-                $asset = Asset::find()
-                    ->id($this->_sourceAssetId)
-                    ->one();            
-            }
-
-            $this->_sourceAsset = $asset;
-        }
-
-        return $this->_sourceAsset;
-    }
-
-    /**
-     * @return array
-     */
-
-    public function getSourceVariables(): array
-    {
-        if (!isset($this->_sourceVariables))
-        {
-            $this->_sourceVariables = $this->resolveSourceVariables();
-        }
-
-        return $this->_sourceVariables;
-    }
-
-    /**
-     * @return \craft\base\volumeInterface
-     */
-
-    public function getOutputVolumeModel(): VolumeInterface
-    {
-        if (!isset($this->_outputVolumeModel)) {
-            $this->_outputVolumeModel =  $this->resolveOutputVolumeModel();
-        }
-
-        return $this->_outputVolumeModel;
-    }
-
-    /**
-     * 
-     */
-
-    public function getOutputVolumeAdapter(): VolumeAdapterInterface
-    {
-        if (!isset($this->_outputVolumeAdapter))
-        {
-            $volume = $this->getOutputVolumeModel();
-            $adapter = Coconut::$plugin->getVolumeAdapter($volume);
-
-            $this->_outputVolumeAdapter = $adapter;
-        }
-
-        return $this->_outputVolumeAdapter;
-    }
-
-    /**
-     * @return array
-     */
-
-    public function getOutputUrls(): array
-    {
-        if ($this->_isStaleOutputPath
-            || !isset($this->_outputUrls))
-        {
-            $outputs = $this->_outputs;
-            $this->_outputUrls = $this->normalizeOutputUrls($outputs);
-        }
-
-        return $this->_outputUrls;
-    }
-
-    /**
-     * @return array 
-     */
-
-    public function getJobParams(): array
-    {
-        return [
-            'vars' => $this->getVars(),
-            'source' => $this->getSource(),
-            'webhook' => $this->getWebhook(),
-            'outputs' => $this->getOutputs(),
-        ];
-    }
-
-    /**
-     * @return array
-     */
-
-    public function getOutputCriteria(): array
-    {
-        $criteria = [];
-
-        $asset = $this->getSourceAsset();
-
-        if ($asset) {
-            $criteria['sourceAssetId'] = $asset->id;
-        } else {
-            $criteria['source'] = $this->getSource();
-        }
-
-        $volume = $this->getOutputVolumeModel();
-        $criteria['volumeId'] = $volume->id;
-
-        $outputUrls = $this->getOutputUrls();
-        $criteria['format'] = array_keys($outputUrls);
-        // $criteria['url'] = array_values($outputUrls);
-
-        return $criteria;
+        return $fields;
     }
 
     // =Operations
@@ -508,6 +666,14 @@ class Config extends Model
 
     function forFormats( array $formats )
     {
+        $config = clone $this;
+        $outputs = $this->getOutputs();
+
+        foreach ($outputs as $output)
+        {
+
+        }
+
         $rawOutputs = $this->_outputs;
         $formatOutputs = [];
 
@@ -537,167 +703,56 @@ class Config extends Model
     // =========================================================================
 
     /**
-     * @return
+     * Resolves output parameters in Cococnut job config settings, and returns
+     * the corresponding Output model
+     * 
+     * @param string $key The key of the output params in the config's `outputs` list
+     * @param array|Output $output The output params from the config's `outputs` list
+     * @param string|null $formatIndex The output index when one format key was used to define multiple outputs
+     * 
+     * @return Output
      */
 
-    protected function resolveOutputVolumeModel(): VolumeInterface
+    protected function resolveOutput( string $key, $output, string $formatIndex = null ): Output
     {
-        $model = null;
-        $volume = $this->outputVolume;
-
-        if ($volume === 'auto')
+        if (is_string($output))
         {
-            $asset = $this->getSourceAsset();
-            if ($asset) $model = $asset->getVolume();
-        }
+            $output = JsonHelper::decodeIfJson($output);
 
-        else if (is_numeric($volume)) {
-            $model = Craft::$app->getVolumes()->getVolumeById($volume);
-        } else if (is_string($volume)) {
-            $model = Craft::$app->getVolumes()->getVolumeByHandle($volume);
-        }
-
-        if (!$model) {
-            $model = Coconut::$plugin->getSettings()->getOutputVolume();
-        }
-
-        return $model;
-    }
-
-    /**
-     * @return array
-     */
-
-    protected function resolveSourceVariables(): array
-    {
-        $sourceUrl = $this->getSource();
-        $sourceAsset = $this->getSourceAsset();
-
-        if (empty($sourceUrl)) {
-            return [];
-        }
-
-        if ($sourceAsset)
-        {
-            $volume = $sourceAsset->getVolume()->handle;
-            $folderPath = $sourceAsset->folderPath;
-            $filename = $sourceAsset->getFilename(false);
-        }
-
-        else
-        {
-            $host = parse_url($sourceUrl, PHP_URL_HOST);
-            $path = parse_url($sourceUrl, PHP_URL_PATH);
-            $parts = explode('/', $path);
-
-            $count = count($parts);
-
-            $volume = str_replace('.', '_', $host);
-            $folderPath = implode('/', array_slice($parts, 0, $count - 1));
-            $filename = $parts[$count - 1];
-        }
-
-        return [
-            'volume' => $volume,
-            'folderPath' => $folderPath,
-            'filename' => $filename,
-            'hash' => md5($sourceUrl),
-        ];
-    }
-
-    /**
-     * @return array
-     */
-
-    protected function normalizeOutputs( array $value = null ): array
-    {
-        $outputs = [];
-
-        if (empty($value)) {
-            return $outputs;
-        }
-
-        $vars = $this->getVars();
-        $volume = $this->getOutputVolumeModel();
-        $adapter = $this->getOutputVolumeAdapter();
-
-        foreach ($value as $format => $options)
-        {
-            if (is_numeric($format))
-            {
-                $format = $options;
-                $options = null;
+            if (is_string($output)) {
+                $output = ConfigHelper::decodeOutput($output);
             }
-
-            // render and output path template
-            $outputPath = $this->renderOutputPath($format, $options);
-
-            // transform path into public url
-            $output = $adapter::outputUploadUrl($volume, $outputPath);
-            $output = ConfigHelper::resolveOutput($format, $output, $options, $vars);
-
-            $outputs[$format] = $output;
         }
 
-        return $outputs;
-    }
-
-    /**
-     * @return array
-     */
-
-    protected function normalizeOutputUrls( array $value = null ): array
-    {
-        $urls = [];
-
-        if (empty($value)) {
-            return $urls;
-        }
-
-        $vars = $this->getVars();
-        $volume = $this->getOutputVolumeModel();
-        $adapter = $this->getOutputVolumeAdapter();
-
-        foreach ($value as $format => $options)
+        else if ($output instanceof Output)
         {
-            if (is_numeric($format))
-            {
-                $format = $options;
-                $options = null;
-            }
-
-            // render and output path template
-            $outputPath = $this->renderOutputPath($format, $options);
-            // transform path into public url
-            $url = $adapter::outputPublicUrl($volume, $outputPath);
-
-            // resolve public url into resulting output urls
-            $urls[$format] = ConfigHelper::resolveOutputUrls($format, $url, $options, $vars);
+            $output->scenario = Output::SCENARIO_CONFIG;
+            $output = $output->toArray();
         }
 
-        return $urls;
-    }
+        else if (!is_array($output))
+        {
+            throw new InvalidArgumentException(
+                "Output must be an array of parameters, a format string, or an ".Output::class." instance");
+        }
 
-    /**
-     * @return string
-     */
+        // get parsed format specs from output params key
+        $formatSpecs = ConfigHelper::decodeFormat($key);
 
-    protected function renderOutputPath( string $format, string $options = null ): string
-    {
-        // 1. render path based on config template
-        $pathFormat = $this->getOutputPathFormat();
-        $sourceVariables = $this->getSourceVariables();
+        // merge-in specs from 'format' parameter
+        if (array_key_exists('format', $output)) {
+            $formatSpecs = array_merge($formatSpecs, $output['format']);
+        }
 
-        $props = (object)array_merge($sourceVariables, [
-            'format' => ConfigHelper::getFormatSegment($format),
-            'ext' => ConfigHelper::getFormatExtension($format),
-        ]);
-
-        $path = Craft::$app->getView()->renderObjectTemplate($pathFormat, $props);
-
-        // 2. Remove references to vars and fix missing `#num#`, extension, etc.
-        $path = ConfigHelper::formatPath($format, $path, $options);
-
-        return $path;
+        // default to output path format to resolve output paths
+        $path = ArrayHelper::getValue($output, 'path') ?? $this->_outputPathFormat;
+    
+        // create output model, and merge in normalized/default params
+        return new Output(array_merge([
+            'scenario' => Output::SCENARIO_CONFIG,
+            'format' => $formatSpecs,
+            'formatIndex' => $formatIndex,
+            'path' => $path,
+        ], $params));
     }
 }

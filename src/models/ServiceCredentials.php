@@ -148,7 +148,7 @@ class ServiceCredentials extends Model
 
     public function fields()
     {
-        $fields = parent::fields();
+        $fields = [];
 
         if (in_array($this->service, Coconut::S3_COMPATIBLE_SERVICES)) {
             $fields[] = 'access_key_id'; // `keyId` alias

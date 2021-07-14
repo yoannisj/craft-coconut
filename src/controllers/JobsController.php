@@ -44,15 +44,14 @@ class JobsController extends Controller
      * Pushes a new coconut job to the queue
      */
 
-    public function actionComplete()
+    public function actionNotification()
     {
         $request = Craft::$app->getRequest();
 
+        $jobInfo = $this->getJobInfoFromPayload($request);
 
-        $jobInfo = $this->getJobInfoFromWebhook($request);
-
-        Craft::error('WEBHOOK');
-        Craft::error($jobInfo);
+        Craft::error('NOTIFICATION', __METHOD__);
+        Craft::error($jobInfo, __METHOD__);
 
         Coconut::$plugin->getJobs()->updateJob($jobInfo, true);
     }
@@ -94,24 +93,10 @@ class JobsController extends Controller
      *
      */
 
-    protected function getJobInfoFromWebhook( Request $request )
+    protected function getJobInfoFromPayload( Request $request )
     {
         $params = $request->getBodyParams();
-        $status = $params['event'] == 'job.completed' ? 'completed' : 'error';
-
-        $jobInfo = (object)[
-            'id' => $params['id'],
-            'status' => $status,
-            'output_urls' => [],
-            'errors' => [],
-            'metadata' => [],
-        ];
-
-        $jobInfo->outputUrls = $params['output_urls'];
-        $jobInfo->errors = $params['errors'];
-        $jobInfo->metadata = $params['metadata'];
-
-        return (object)$jobInfo;
+        return $params['data'] ?? [];
     }
 
     /**

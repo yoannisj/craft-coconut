@@ -12,15 +12,11 @@
 
 namespace yoannisj\coconut\models;
 
-use Coconut\Job as CoconutJob;
-
 use yii\base\InvalidArgumentException;
 use yii\validators\InlineValidator;
-use yii\queue\Job;
 
 use Craft;
 use craft\base\Model;
-use craft\base\VolumeInterface;
 use craft\db\Query;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
@@ -30,11 +26,22 @@ use craft\helpers\Json as JsonHelper;
 use yoannisj\coconut\Coconut;
 
 /**
- *
+ * Model representing and validation Coconut inputs
  */
 
 class Input extends Model
 {
+    // =Static
+    // =========================================================================
+
+    const SCENARIO_DEFAULT = 'default';
+    const SCENARIO_CONFIG = 'config';
+
+    const STATUS_STARTING = 'input.starting';
+    const STATUS_TRANSFERRING = 'input.transferring';
+    const STATUS_TRANSFERRED = 'input.transferred';
+    const STATUS_FAILED = 'input.failed';
+
     // =Properties
     // =========================================================================
 
@@ -130,7 +137,11 @@ class Input extends Model
 
     public function setUrl( string $url = null )
     {
-        $this->_url = $url ?? '';
+        if ($url !== $this->getUrl())
+        {
+            $this->_url = $url ?? '';
+            $this->_urlHash = null;
+        }
     }
 
     /**
@@ -163,6 +174,8 @@ class Input extends Model
             $url = $this->getUrl();
             $this->_urlHash = $url ? md5($url) : '';
         }
+
+        return $this->_urlHash;
     }
 
     /**
@@ -233,7 +246,8 @@ class Input extends Model
     {
         $fields = parent::fields();
 
-        unset($fields['metadata']); // this is an attribute, but should be an extraField
+        // this is an attribute, but should be an extraField
+        $fields = ArrayHelper::withoutValue($fields, 'metadata');
 
         return $fields;
     }

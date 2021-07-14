@@ -14,11 +14,13 @@ namespace yoannisj\coconut;
 
 use yii\base\Event;
 use yii\base\InvalidArgumentException;
+use yii\base\InvalidValueException;
 
 use Craft;
 use craft\base\VolumeInterface;
 use craft\base\Plugin;
 use craft\base\Element;
+use craft\models\Volume;
 use craft\elements\Asset;
 use craft\services\Elements;
 use craft\services\Assets;
@@ -27,12 +29,11 @@ use craft\events\RegisterElementActionsEvent;
 use craft\events\ElementEvent;
 use craft\events\AssetEvent;
 use craft\helpers\ArrayHelper;
+use craft\helpers\UrlHelper;
 use craft\helpers\ElementHelper;
 
 use yoannisj\coconut\services\Jobs;
 use yoannisj\coconut\services\Outputs;
-use yoannisj\coconut\base\VolumeAdapterInterface;
-use yoannisj\coconut\base\VolumeAdapter;
 use yoannisj\coconut\models\Settings;
 use yoannisj\coconut\models\Config;
 use yoannisj\coconut\models\Storage;
@@ -40,7 +41,7 @@ use yoannisj\coconut\elements\actions\TranscodeVideo;
 use yoannisj\coconut\elements\actions\ClearVideoOutputs;
 use yoannisj\coconut\queue\jobs\TranscodeSourceJob;
 use yoannisj\coconut\variables\CoconutVariable;
-use yoannisj\coconut\events\VolumeAdaptersEvent;
+use yoannisj\coconut\events\VolumeStorageEvent;
 
 /**
  * Coconut plugin class for Craft
@@ -50,6 +51,9 @@ class Coconut extends Plugin
 {
     // =Static
     // =========================================================================
+
+    // =Tables (DB)
+    // -------------------------------------------------------------------------
 
     /**
      * Name of database table used to store references to coconut inputs
@@ -62,18 +66,6 @@ class Coconut extends Plugin
      */
 
     const TABLE_OUTPUTS = '{{%coconut_outputs}}';
-
-    /**
-     * @var array [ 'class' => \yoannisj\coconut\base\VolumeAdapterInterface ]
-     */
-
-    const DEFAULT_VOLUME_ADAPTERS = [];
-
-    /**
-     * @var string
-     */
-
-    const EVENT_REGISTER_VOLUME_ADAPTERS = 'registerVolumeAdapters';
 
     // =Services
     // -------------------------------------------------------------------------
@@ -111,14 +103,11 @@ class Coconut extends Plugin
         self::SERVICE_S3OTHER,
     ];
 
-    /**
-     * 
-     */
+    // =Events
+    // -------------------------------------------------------------------------
 
-    public static function volumeStorage($volume)
-    {
-        return [];
-    }
+    const BEFORE_RESOLVE_VOLUME_STORAGE = 'beforeResolveVolumeStorage';
+    const AFTER_RESOLVE_VOLUME_STORAGE = 'afterResolveVolumeStorage';
 
     // =Properties
     // =========================================================================
@@ -137,10 +126,10 @@ class Coconut extends Plugin
     public $schemaVersion = '1.1.0';
 
     /**
-     * @var array
+     * @var array List of resolved volume storages
      */
 
-    private $_defaultVolumeAdapters;
+    private $_volumeStorages = [];
 
     // =Public Methods
     // =========================================================================
@@ -218,8 +207,6 @@ class Coconut extends Plugin
             }
         );
     }
-
-    /**
 
     // =Services
     // -------------------------------------------------------------------------
@@ -313,49 +300,70 @@ class Coconut extends Plugin
     }
 
     /**
-     * @return array
+     * @param Volume $volume
+     * 
+     * @return Storage|null
+     * 
+     * @throws InvalidValueException If another module/plugin resolves to storage settings
+     *  that are not an instance of \yoannisj\coconut\models\Storage
      */
 
-    public function getDefaultVolumeAdapters(): array
+    public function resolveVolumeStorage( Volume $volume )
     {
-        if (!isset($this->_defaultVolumeAdapters))
+        if (!array_key_exists($volume->id, $this->_volumeStorages))
         {
-            $adapters = $this->resolveDefaultVolumeAdapters();
-            $this->_defaultVolumeAdapters = $adapters;
+            $storage = null;
+
+            // allow modules/plugins to define storage settings
+            if ($this->hasEventHandlers(self::BEFORE_RESOLVE_VOLUME_STORAGE))
+            {
+                $event = new VolumeStorageEvent([
+                    'volume' => $volume,
+                    'storage' => $storage,
+                ]);
+    
+                $this->trigger(self::BEFORE_RESOLVE_VOLUME_STORAGE, $event);
+                $storage = $event->storage;
+            }
+
+            // no need to resolve volume storage if module/plugin already did
+            if (!$storage)
+            {
+                // @todo: resolve storage settings for service Volumes supported by Coconut
+                $uploadUrl = UrlHelper::actionUrl('coconut/jobs/upload', [
+                    'volumeId' => $volume->id,
+                ]);
+
+                $storage = new Storage([
+                    'service' => self::SERVICE_COCONUT,
+                    'url' => $uploadUrl,
+                ]);
+            }
+
+            // allow modules/plugins to further customise storage settings
+            if ($this->hasEventHandlers(self::AFTER_RESOLVE_VOLUME_STORAGE))
+            {
+                // allow modules/plugins to modify storage settings
+                $event = new VolumeStorageEvent([
+                    'volume' => $volume,
+                    'storage' => $storage,
+                ]);
+
+                $this->trigger(self::AFTER_RESOLVE_VOLUME_STORAGE, $event);
+                $storage = $event->storage;
+            }
+
+            // validate storage before continuing
+            if (!$storage instanceof Storage)
+            {
+                throw new InvalidValueException(
+                    'Resolved volume storage must be an instance of '.Storage::class);
+            }
+    
+            $this->_volumeStorages[$volume->id] = $storage;
         }
 
-        return $this->_defaultVolumeAdapters;
-    }
-
-    /**
-     * @return \yoannisj\coconut\base\VolumeAdapterInterface[]
-     */
-
-    public function getAllVolumeAdapters(): array
-    {
-        $defaultAdapters = $this->getDefaultVolumeAdapters();
-        $event = new VolumeAdaptersEvent([
-            'adapters' => $defaultAdapters
-        ]);
-
-        $this->trigger(self::EVENT_REGISTER_VOLUME_ADAPTERS, $event);
-
-        return $event->adapters;
-    }
-
-    /**
-     * @param \craft\base\VolumeInterface $volume
-     *
-     * @return \yoannisj\coconut\base\VolumeAdapterInterface
-     */
-
-    public function getVolumeAdapter( VolumeInterface $volume ): VolumeAdapterInterface
-    {
-        $volumeType = get_class($volume);
-        $adapters = $this->getAllVolumeAdapters();
-        $adapter = $adapters[$volumeType] ?? VolumeAdapter::class;
-
-        return Craft::createObject($adapter);
+        return $this->_volumeStorages[$volume->id];
     }
 
     // =Protected Methods
@@ -368,26 +376,6 @@ class Coconut extends Plugin
     protected function createSettingsModel()
     {
         return new Settings();
-    }
-
-    /**
-     *
-     */
-
-    protected function resolveDefaultVolumeAdapters(): array
-    {
-        $plugins = Craft::$app->getPlugins();
-
-        // add base volume adapter for completeness
-        $adapters = [
-            \craft\volumes\Local::class => VolumeAdapter::class,
-        ];
-
-        if ($plugins->isPluginInstalled('aws-s3')) {
-            $adapters[\craft\awss3\Volume::class] = \yoannisj\coconut\base\AwsS3VolumeAdapter::class;
-        }
-
-        return $adapters;
     }
 
     /**
