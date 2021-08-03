@@ -1,0 +1,159 @@
+version: '3.7'
+services:
+  httpd:
+    image: yoannisj/craftcms-tests-nginx:${NGINX_VERSION:-stable}
+    build:
+      context: .
+      dockerfile: ./docker/httpd/nginx/Dockerfile
+      args:
+        NGINX_VERSION: ${NGINX_VERSION:-latest}
+    environment:
+      NGINX_VERSION: ${NGINX_VERSION:-stable}
+      WEB_PORT: ${WEB_PORT:-8080}
+      WEB_HOSTNAME: ${WEB_HOSTNAME:-localhost}
+    volumes:
+      - ./docker/httpd/nginx/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - cpresources:/app/web/cpresources
+    networks:
+      - craftcms_tests_net
+    ports:
+      - target: '${WEB_PORT:-8080}'
+        published: '${PUBLIC_PORT_PREFIX}${WEB_PORT:-8080}'
+    init: true
+    depends_on:
+      - craft-web
+    profiles:
+      - manual
+      - functional
+      - acceptance
+  craft-web: &craft-service
+    image: yoannisj/craftcms-tests:${PHP_VERSION:-7.4}-php-fpm
+    build:
+      context: .
+      dockerfile: ./docker/craftcms/Dockerfile
+      args: &craft-service-build-args
+        PHP_VERSION: ${PHP_VERSION:-7.4}
+        CRAFT_APP_TYPE: php-fpm
+        CRAFT_VERSION: ${CRAFT_VERSION:-3.7}
+        PACKAGE_NAME: $PACKAGE_NAME
+    environment: &craft-service-environment
+      NGINX_VERSION: ${NGINX_VERSION:-7.4}
+      PHP_VERSION: ${PHP_VERSION:-7.4}
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-256M}
+      PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-120}
+      PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE:-20M}
+      PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-1000}
+      PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-8M}
+      PHP_OPCACHE_ENABLE: ${PHP_OPCACHE_ENABLE:-1}
+      PHP_OPCACHE_REVALIDATE_FREQ: ${PHP_OPCACHE_REVALIDATE_FREQ:-0}
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: ${PHP_OPCACHE_VALIDATE_TIMESTAMPS:-0}
+      PHP_OPCACHE_MAX_ACCELERATED_FILES: ${PHP_OPCACHE_MAX_ACCELERATED_FILES:-10000}
+      PHP_OPCACHE_MEMORY_CONSUMPTION: ${PHP_OPCACHE_MEMORY_CONSUMPTION:-256}
+      PHP_OPCACHE_MAX_WASTED_PERCENTAGE: ${PHP_OPCACHE_MAX_WASTED_PERCENTAGE:-10}
+      PHP_OPCACHE_INTERNED_STRINGS_BUFFER: ${PHP_OPCACHE_INTERNED_STRINGS_BUFFER:-16}
+      PHP_OPCACHE_FAST_SHUTDOWN: ${PHP_OPCACHE_FAST_SHUTDOWN:-1}
+      DB_HOST: database
+      DB_USER: ${DB_USER:-craftcms}
+      DB_PASSWORD: ${DB_PASSWORD:-SecretPassword}
+      DB_NAME: ${DB_NAME:-craftcms}
+      DB_SCHEMA: ${DB_SCHEMA:-public}
+      DB_TABLE_PREFIX: ${DB_TABLE_PREFIX:-craft_}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_VERSION: ${REDIS_VERSION:-5}
+      CRAFT_VERSION: ${CRAFT_VERSION:-3.7}
+      CRAFT_EDITION: ${CRAFT_EDITION:-solo}
+      WEB_URL: http://localhost:${WEB_PORT:-8080}
+      PRIMARY_SITE_URL: http://localhost:${WEB_PORT:-8080} # used by Craft >= 3.5
+      DEFAULT_SITE_URL: http://localhost:${WEB_PORT:-8080} # used by Craft < 3.5
+      SECURITY_KEY: $SECURITY_KEY
+      PACKAGE_NAME: $PACKAGE_NAME
+    volumes: &craft-service-volumes
+      - cpresources:/app/web/cpresources
+      - ./src:/app/packages/$PACKAGE_NAME/src
+      - ./composer.json:/app/packages/$PACKAGE_NAME/composer.json
+      - ./tests/_craft/config:/app/config
+      - ./tests/_craft/migrations:/app/migrations
+      - ./tests/_craft/storage:/app/storage
+      - ./tests/_craft/templates:/app/templates
+      - ./tests/_craft/translations:/app/translations
+    networks:
+      - craftcms_tests_net
+    expose:
+      - 9000 # exposed to internal networks only
+    init: true
+    depends_on:
+      - database
+      - redis
+    profiles:
+      - manual
+      - functional
+      - acceptance
+  craft-cli: &craft-cli-service
+    <<: *craft-service
+    image: yoannisj/craftcms-tests:${PHP_VERSION:-7.4}-cli
+    build:
+      context: .
+      dockerfile: ./docker/craftcms/Dockerfile
+      args:
+        <<: *craft-service-build-args
+        CRAFT_APP_TYPE: cli
+    environment:
+      <<: *craft-service-environment
+      CRAFT_APP_TYPE: cli
+    entrypoint: [ "php", "./craft" ]
+    command: [ "help" ]
+    init: true
+    profiles:
+      - manual
+  craft-queue:
+    <<: *craft-cli-service
+    entrypoint: [ "/bin/sh" ]
+    command: [ "./craft_queue_listen.sh" ]
+    profiles:
+      - manual
+      - functional
+      - acceptance
+  codecept:
+    <<: *craft-cli-service
+    volumes_from:
+      - craft-web
+    volumes:
+      - ./tests:/app/tests
+      - ./codeception.yml:/app/codeception.yml
+    entrypoint: [ "php", "vendor/bin/codecept" ]
+    profiles:
+      - unit
+      - functional
+      - acceptance
+  database:
+    # environment defined in ./docker/database/<db-driver>/docker-compose.override.yml
+    # volumes defined in ./docker/database/<db-driver>/docker-compose.override.yml
+    init: true
+    networks:
+      - craftcms_tests_net
+    # ports defined in ./docker/database/<db-driver>/docker-compose.override.yml
+    profiles:
+      - manual
+      - unit
+      - functional
+      - acceptance
+  redis:
+    image: redis:${REDIS_VERSION:-5}-alpine
+    init: true
+    networks:
+      - craftcms_tests_net
+    ports:
+      - target: '${REDIS_PORT:-6379}'
+        published: '${PUBLIC_PORT_PREFIX}${REDIS_PORT:-6379}'
+    profiles:
+      - manual
+      - unit
+      - functional
+      - acceptance
+volumes: # docker internal networks
+  cpresources:
+    driver: local
+networks: # docker internal networks
+  craftcms_tests_net:
+    driver: bridge # default docker network driver

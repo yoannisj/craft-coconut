@@ -49,7 +49,7 @@ class Install extends Migration
                 'inputMetadata' => $this->longText()->null(),
                 'inputExpires' => $this->dateTime()->null(),
                 'storageHandle' => $this->string()->notNull(),
-                'storageVolumeId' => $this->text()->null(),
+                'storageVolumeId' => $this->integer()->null(),
                 'storageSettings' => $this->text()->null(),
                 'createdAt' => $this->dateTime()->notNull(),
                 'completedAt' => $this->dateTime()->null(),
@@ -82,7 +82,7 @@ class Install extends Migration
                 'jobId' => $this->integer()->null(),
                 'key' => $this->string()->notNull(),
                 'type' => $this->string()->notNull(),
-                'format' => $this->text()->notNull(),
+                'format' => $this->string(255)->notNull(),
                 'url' => $this->string()->notNull(),
                 'metadata' => $this->longText()->null(),
                 'status' => $this->string()->null(),
@@ -94,13 +94,8 @@ class Install extends Migration
             $this->addForeignKey('craft_coconut_outputs_jobId_fk',
                 Coconut::TABLE_OUTPUTS, ['jobId'], Coconut::TABLE_JOBS, ['id'], null, null);
 
-            $this->addForeignKey('craft_coconut_outputs_volumeId_fk',
-                Coconut::TABLE_OUTPUTS, ['volumeId'], Table::VOLUMES, ['id'], 'CASCADE', null);
-
             $this->createIndex('craft_outputs_format_idx',
                 Coconut::TABLE_OUTPUTS, 'format', false);
-            $this->createIndex('craft_outputs_coconutJobId_idx',
-                Coconut::TABLE_OUTPUTS, 'coconutJobId', false);
         }
 
         // refresh database schema if any of the tables were created

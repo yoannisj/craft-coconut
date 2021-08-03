@@ -1,0 +1,27 @@
+services:
+  craft-web: &craft-service-mysql
+    environment:
+      DB_DRIVER: mysql
+      DB_VERSION: ${MYSQL_VERSION:-8.0}
+      DB_PORT: ${MYSQL_PORT:-3306}
+  craft-cli:
+    <<: *craft-service-mysql
+  craft-queue:
+    <<: *craft-service-mysql
+  codecept:
+    <<: *craft-service-mysql
+  database:
+    image: mysql:${MYSQL_VERSION:-8.0}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-SuperPassword123456!}
+      MYSQL_USER: ${DB_USER:-craftcms}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-SecretPassword}
+      MYSQL_DATABASE: ${DB_NAME:-craftcms}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - target: '${MYSQL_PORT:-3306}'
+        published: '${PUBLIC_PORT_PREFIX}${MYSQL_PORT:-3306}'
+volumes:
+  mysql_data:
+    driver: local

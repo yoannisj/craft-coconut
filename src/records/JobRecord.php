@@ -24,6 +24,8 @@ use yoannisj\coconut\Coconut;
  * 
  * @property integer id
  * @property string coconutId
+ * @property string configParams
+ * @property Config config
  * @property string status
  * @property string progress
  * @property integer inputAssetId
@@ -64,17 +66,17 @@ class JobRecord extends ActiveRecord
      * @param string|array|Config|null $config
      */
 
-    public function setConfig( $config )
+    public function setConfig( Config $config = null )
     {
-        if ($config instanceof Config) {
-            $config = $config->toArray();
+        if (!$config) {
+            $this->_config = null;
+            $this->configParams = null;
         }
 
-        if (is_array($config)) {
-            $config = JsonHelper::encode($config);
+        else {
+            $this->_config = $config;
+            $this->configParams = JsonHelper::encode($config->toArray());
         }
-
-        $this->config = $config;
     }
 
     /**
@@ -85,29 +87,34 @@ class JobRecord extends ActiveRecord
 
     public function getConfig()
     {
-        $config = $this->config;
-
-        if (is_string($config)) {
-            $config = JsonHelper::decode($config);
-        }
-
-        if (is_array($config))
+        if (!isset($this->_config))
         {
-            if (!array_key_exists('class', $config)) {
-                $config['class'] = Config::class;
+            $config = $this->configParams;
+
+            if (is_string($config)) {
+                $config = JsonHelper::decode($config);
             }
 
-            $config = Craft::createObject($config);
+            if (is_array($config))
+            {
+                if (!array_key_exists('class', $config)) {
+                    $config['class'] = Config::class;
+                }
+
+                $config = Craft::createObject($config);
+            }
+
+            if ($config && !$config instanceof Config)
+            {
+                $class = Config::class;
+                throw new InvalidConfigException(
+                    "Attribute `config` must be `null` or a $class representation (properties, JSON or instance)");
+            }
+
+            $this->_config = $config;
         }
 
-        if ($config && !$config instanceof Config)
-        {
-            $class = Config::class;
-            throw new InvalidConfigException(
-                "Attribute `config` must be `null` or a $class representation (properties, JSON or instance)");
-        }
-
-        return $config;
+        return $this->_config;
     }
 
     /**

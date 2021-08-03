@@ -301,9 +301,9 @@ class Coconut extends Plugin
 
     /**
      * @param Volume $volume
-     * 
+     *
      * @return Storage|null
-     * 
+     *
      * @throws InvalidValueException If another module/plugin resolves to storage settings
      *  that are not an instance of \yoannisj\coconut\models\Storage
      */
@@ -321,7 +321,7 @@ class Coconut extends Plugin
                     'volume' => $volume,
                     'storage' => $storage,
                 ]);
-    
+
                 $this->trigger(self::BEFORE_RESOLVE_VOLUME_STORAGE, $event);
                 $storage = $event->storage;
             }
@@ -359,7 +359,7 @@ class Coconut extends Plugin
                 throw new InvalidValueException(
                     'Resolved volume storage must be an instance of '.Storage::class);
             }
-    
+
             $this->_volumeStorages[$volume->id] = $storage;
         }
 

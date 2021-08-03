@@ -21,8 +21,17 @@
   },
   "autoload": {
     "psr-4": {
-      "yoannisj\\coconut\\": "src/"
+      "yoannisj\\coconut\\": "./src/"
     }
+  },
+  "archive": {
+    "exclude": [
+      "tests",
+      "docker",
+      "docker-compose.yml",
+      ".env.example",
+      ".editorconfig"
+    ]
   },
   "extra": {
     "handle": "coconut",
