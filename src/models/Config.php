@@ -30,7 +30,7 @@ use yoannisj\coconut\models\Notification;
 use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
- * 
+ *
  */
 
 class Config extends Model
@@ -43,12 +43,6 @@ class Config extends Model
      */
 
     private $_input;
-
-    /**
-     * @var array Variable values that can be using in the config parameters
-     */
-
-    private $_variables;
 
     /**
      * @var string
@@ -115,7 +109,7 @@ class Config extends Model
     // =========================================================================
 
     /**
-     * 
+     *
      */
 
     public function __sleep()
@@ -140,10 +134,10 @@ class Config extends Model
 
     /**
      * Setter method for normalized `input` property
-     * 
+     *
      * Given `$input` parameter can be an Input model, an array of input properties,
      * an Asset element, an Asset element ID or a URL to an external input file
-     * 
+     *
      * @param string|array|Input|Asset|null $input
      */
 
@@ -166,7 +160,7 @@ class Config extends Model
 
     /**
      * Getter method for normalized `input` property
-     * 
+     *
      * @return Input|null
      */
 
@@ -209,10 +203,10 @@ class Config extends Model
 
     /**
      * Setter method for normalized `storage` property
-     * 
+     *
      * If given $storage is a string, it will first be checked against named storage
      * settings, or it will be considered a volume handle.
-     * 
+     *
      * @param string|array|Storage|VolumeInterface|null $storage
      */
 
@@ -264,7 +258,7 @@ class Config extends Model
 
     /**
      * Getter method for resolved `storage` property
-     * 
+     *
      * @return Storage|null
      */
 
@@ -320,7 +314,7 @@ class Config extends Model
 
         /**
      * Getter method for reactive `storageVolumeId` property
-     * 
+     *
      * @return integer|null
      */
 
@@ -338,7 +332,7 @@ class Config extends Model
 
     /**
      * Getter method for read-only `storageVolume` property
-     * 
+     *
      * @return VolumeInterface|null
      */
 
@@ -377,7 +371,7 @@ class Config extends Model
      *
      * Returns fallback storage, used if `storage` property was set to `null`
      * or could not be resolved
-     * 
+     *
      * @return Storage|null
      */
 
@@ -394,7 +388,7 @@ class Config extends Model
                 $inputAsset = $input ? $input->getAsset() : null;
                 $uploadVolume = ($inputAsset ? $inputAsset->getVolume()
                     : Coconut::$plugin->getSettings()->getDefaultUploadVolume());
-    
+
                 if ($uploadVolume) {
                     $storage = Coconut::resolveVolumeStorage($uploadVolume);
                 }
@@ -408,7 +402,7 @@ class Config extends Model
 
     /**
      * Setter method for defaulted `outputPathFormat` property
-     * 
+     *
      * @param string $pathFormat
      */
 
@@ -429,7 +423,7 @@ class Config extends Model
 
     /**
      * Getter method for defaulte `outputPathFormat` property
-     * 
+     *
      * @return string
      */
 
@@ -530,7 +524,7 @@ class Config extends Model
 
     /**
      * Setter method for the resolved `nofitication` property
-     * 
+     *
      * @param string|Notification|null $notification
      */
 
@@ -539,7 +533,7 @@ class Config extends Model
         if ($notification === null) {
             $this->_notification = null;
         }
-        
+
         else
         {
             $model = new Notification([
@@ -705,11 +699,11 @@ class Config extends Model
     /**
      * Resolves output parameters in Cococnut job config settings, and returns
      * the corresponding Output model
-     * 
+     *
      * @param string $key The key of the output params in the config's `outputs` list
      * @param array|Output $output The output params from the config's `outputs` list
      * @param string|null $formatIndex The output index when one format key was used to define multiple outputs
-     * 
+     *
      * @return Output
      */
 
@@ -746,7 +740,7 @@ class Config extends Model
 
         // default to output path format to resolve output paths
         $path = ArrayHelper::getValue($output, 'path') ?? $this->_outputPathFormat;
-    
+
         // create output model, and merge in normalized/default params
         return new Output(array_merge([
             'scenario' => Output::SCENARIO_CONFIG,

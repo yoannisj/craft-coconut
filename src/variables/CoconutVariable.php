@@ -18,7 +18,7 @@ use craft\base\Component;
 use yoannisj\coconut\Coconut;
 
 /**
- * 
+ *
  */
 
 class CoconutVariable extends Component

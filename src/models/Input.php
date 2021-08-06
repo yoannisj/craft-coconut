@@ -102,7 +102,7 @@ class Input extends Model
 
     /**
      * Setter method for the resolved `asset` property
-     * 
+     *
      * @param Asset|null $asset
      */
 
@@ -114,7 +114,7 @@ class Input extends Model
 
     /**
      * Getter method for the resolved `asset` property
-     * 
+     *
      * @return \craft\elements\Asset|null
      */
 
@@ -131,7 +131,7 @@ class Input extends Model
 
     /**
      * Setter for normalizd `url` property
-     * 
+     *
      * @param string|null $url
      */
 
@@ -139,14 +139,14 @@ class Input extends Model
     {
         if ($url !== $this->getUrl())
         {
-            $this->_url = $url ?? '';
+            $this->_url = $url;
             $this->_urlHash = null;
         }
     }
 
     /**
      * Getter for normalizd `url` property
-     * 
+     *
      * @return string
      */
 
@@ -158,12 +158,12 @@ class Input extends Model
             $this->_url = $asset ? $asset->url : '';
         }
 
-        return $this->_url;
+        return $this->_url ?? '';
     }
 
     /**
      * Getter method for readonly `urlHash` property
-     * 
+     *
      * @return string
      */
 
@@ -180,7 +180,7 @@ class Input extends Model
 
     /**
      * Setter method for the normalized `metadata` property
-     * 
+     *
      * @param string|array|null $metadata
      */
 
@@ -195,7 +195,7 @@ class Input extends Model
 
     /**
      * Getter merhod for the normalized `metadata` property
-     * 
+     *
      * @return array|null
      */
 

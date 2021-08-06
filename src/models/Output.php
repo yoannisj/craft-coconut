@@ -12,11 +12,9 @@
 
 namespace yoannisj\coconut\models;
 
-use Coconut\Job as CoconutJob;
-
 use yii\base\InvalidArgumentException;
+use yii\base\InvalidConfigException;
 use yii\validators\InlineValidator;
-use yii\queue\Job;
 
 use Craft;
 use craft\base\Model;
@@ -29,16 +27,17 @@ use craft\helpers\FileHelper;
 use craft\helpers\Assets as AssetsHelper;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\models\Job;
+use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
  * Model representing Coconut job outputs
- * 
+ *
  * @property Job $job
  * @property array $format
  * @property string $formatString
  * @property string $explicitPath
  * @property string $type
- * @property string $mimeType
  */
 
 class Output extends Model
@@ -109,6 +108,12 @@ class Output extends Model
     public $formatIndex;
 
     /**
+     * @var string Output format container
+     */
+
+    private $_container;
+
+    /**
      * @var string
      */
 
@@ -127,27 +132,15 @@ class Output extends Model
     private $_pathFormat;
 
     /**
-     * @var string Result of resolving output path
-     */
-
-    private $_resolvedPath;
-
-    /**
-     * @var string
-     */
-
-    private $_mimeType;
-
-    /**
      * @var array|null
      */
 
     private $_metadata;
 
     /**
-     * @var string Conditional expression to determine whether the 
+     * @var string Conditional expression to determine whether the
      *  output should be created or not
-     * 
+     *
      * @see https://docs.coconut.co/jobs/api#conditional-outputs
      */
 
@@ -173,7 +166,7 @@ class Output extends Model
 
     /**
      * @var integer The rotation to apply to the output
-     * 
+     *
      * Supports values:
      * - `0` => 90CounterCLockwise and Vertical Flip (default)
      * - `1` => 90Clockwise
@@ -251,7 +244,7 @@ class Output extends Model
      *  Format width must be <= 500px. Supported keys are:
      * - 'number' => The number of images in the GIF animation (default is `1,` max 10)
      * - 'duration' => The duration (in seconds) of the resulting GIF animation (default is `5`)
-     * 
+     *
      * @see https://docs.coconut.co/jobs/outputs-images#gif-animation
      */
 
@@ -262,7 +255,7 @@ class Output extends Model
      *  Supported keys are:
      * - 'url' => URL to the PNG watermark image file (transparency supported)
      * - `position` => Either 'topleft', 'topright', 'bottomleft' or 'bottomright'
-     * 
+     *
      * @see https://docs.coconut.co/jobs/outputs-videos#watermark
      */
 
@@ -324,66 +317,78 @@ class Output extends Model
 
     /**
      * Returns Coconut job that generates this output
-     * 
+     *
      * @return Job|null
      */
 
     public function getJob()
     {
-        if ($this->jobId) {
-            return Coconut::$plugin->getJobs()->getJobById($this->jobId);
+        if (!$this->_job && $this->jobId)
+        {
+            $this->_job = Coconut::$plugin->getJobs()
+                ->getJobById($this->jobId);
         }
 
-        return null;
+        return $this->_job;
     }
 
     /**
      * Setter method for normalized `format` property
-     * 
+     *
      * @param string|array|null $format
      */
 
     public function setFormat( $format )
     {
+        $isString = is_string($format);
+
         // support getting format as a JSON string
-        if (is_string($format)) {
+        if ($isString) {
             $format = JsonHelper::decodeIfJson($format);
         }
 
-        // support getting format as a Coconut format string
-        if (is_string($format)) {
+        if (!empty($format)) {
+            // Parse given format string or array of format specs
             $format = ConfigHelper::parseFormat($format);
         }
 
-        // normalize array of format specs
-        else if (is_array($format)) {
-            $format = ConfigHelper::normalizeFormatSpecs($format);
-        }
-
-        if (array_key_exists('container', $format))
+        else if (!$isString && !is_array($format) && !is_null($format))
         {
-            $this->_container = $format['container'];
-            unset($format['container']);
+            throw new InvalidConfigException(
+                "Property `format` must be set to a format string, an array of format specs or `null`");
         }
 
         $this->_format = $format;
         $this->_formatString = null;
+        $this->_container = null;
     }
 
     /**
      * Getter method for normalized `format` property
-     * 
+     *
      * @return array
      */
 
     public function getFormat(): array
     {
+        if (empty($this->_format))
+        {
+            if ($this->_key)
+            {
+                try {
+                    $this->_format = ConfigHelper::parseFormat($this->_key);
+                } catch (\Throwable $e) {
+                    $this->_format = [];
+                }
+            }
+        }
+
         return $this->_format ?? [];
     }
 
     /**
      * Setter method for normalized `key` property
-     * 
+     *
      * @param string|null $key
      */
 
@@ -394,26 +399,26 @@ class Output extends Model
 
     /**
      * Getter method for normalized `key` string
-     * 
-     * @return string|null
+     *
+     * @return string
      */
 
-    public function getKey()
+    public function getKey(): string
     {
-        if (empty($this->_key)) {
+        if (empty($this->_key) && !empty($this->_format)) {
             $this->_key = $this->getFormatString();
         }
 
         if ($this->formatIndex) {
-            return $this->_key . $this->formatIndex;
+            return ltrim($this->_key . ':'.$this->formatIndex, ':');
         }
 
-        return $this->_key;        
+        return $this->_key ?? '';
     }
 
     /**
      * Setter method for resolved `path` property
-     * 
+     *
      * @param string|null $path
      */
 
@@ -430,35 +435,37 @@ class Output extends Model
         {
             $this->_explicitPath = null;
             $this->_pathFormat = $path;
-            $this->_resolvedPath = null;
         }
 
         else // this is an explicit path
         {
-            $this->_explicitPath = ConfigHelper::privatisePath($path);
+            $this->_explicitPath = $path;
             $this->_pathFormat = null;
-            $this->_resolvedPath = null;
         }
     }
 
     /**
      * Getter method for resolved `path` property
-     * 
-     * @return string
+     *
+     * @return string|null
      */
 
-    public function getPath(): string
+    public function getPath()
     {
-        // raw path has priority and should be returned as is
-        if (!empty($this->_explicitPaths)) return $this->_explicitPaths;
+        $path = null;
 
-        // is current path a template that needs to be resolved,
-        // and can be actually be resolved ?
-        if ($this->_pathFormat && empty($this->_resolvedPath)
-            && !empty($vars = $this->getPathVars())
-        ) {
+        // raw path has priority and should be returned as is
+        if (!empty($this->_explicitPath)) {
+            $path = $this->_explicitPath;
+        }
+
+        // is current path a template?
+        else if ($this->_pathFormat)
+        {
             // @todo: support resolving Coconut input variables in paths
             // @see: https://docs.coconut.co/jobs/api#built-in-variables
+
+            $vars = $this->pathVars();
 
             $path = preg_replace_callback(
                 ConfigHelper::PATH_EXPRESSION_PATTERN,
@@ -468,45 +475,42 @@ class Output extends Model
                 $this->_pathFormat
             );
 
-            // make sure paths for image sequence outputs include a number placeholder
-            if ($this->getType() == 'image'
-                && ($this->number|| $this->interval || !empty($this->offsets))
-            ) {
-                $basename = pathinfo($path, PATHINFO_BASENAME);
-                if (!preg_match(ConfigHelper::SEQUENTIAL_PLACEHOLDER_PATTERN, $path))
-                {
-                    $path = (
-                        pathinfo($path, PATHINFO_DIRNAME).
-                        $basename.'-%.2d'.
-                        pathinfo($path, PATHINFO_EXTENSION)
-                    );
-                }
-            }
-
             // reduce conflicts if two outputs are resolved to the same path
             // by including the formatIndex in the filename
             if (!empty($this->formatIndex))
             {
-                $basename = pathinfo($path, PATHINFO_BASENAME);
-                if (strpos($basename, $keyAsPath) === false)
+                $extension = pathinfo($path, PATHINFO_EXTENSION);
+                $pattern = '/\-'.$this->formatIndex.'\.'.$extension.'$/';
+
+                if (!preg_match($pattern, $path))
                 {
                     $path = (
-                        pathinfo($path, PATHINFO_DIRNAME).
-                        $basename.'-'.$this->formatIndex.
-                        pathinfo($path, PATHINFO_EXTENSION)
+                        pathinfo($path, PATHINFO_DIRNAME).'/'.
+                        pathinfo($path, PATHINFO_FILENAME).
+                        '-'.$this->formatIndex.'.'.$extension
                     );
                 }
             }
-
-            $this->_resolvedPath = ConfigHelper::privatisePath($path);
         }
 
-        return $this->_resolvedPath;
+        // make sure paths for image sequence outputs include a numbering placeholder
+        if ($this->getType() == 'image'
+            && ($this->number || $this->interval || !empty($this->offsets))
+            && !preg_match(ConfigHelper::SEQUENTIAL_PLACEHOLDER_PATTERN, $path)
+        ) {
+            $path = (
+                pathinfo($path, PATHINFO_DIRNAME).'/'.
+                pathinfo($path, PATHINFO_FILENAME).
+                '-%.2d.'.pathinfo($path, PATHINFO_EXTENSION)
+            );
+        }
+
+        return ConfigHelper::privatisePath($path);
     }
 
     /**
      * Setter method for the normalized `metadata` property
-     * 
+     *
      * @param string|array|null $metadata
      */
 
@@ -521,7 +525,7 @@ class Output extends Model
 
     /**
      * Getter method for the normalized `metadata` property
-     * 
+     *
      * @return array|null
      */
 
@@ -532,16 +536,23 @@ class Output extends Model
 
     /**
      * Getter method for read-only `container` property
-     * 
+     *
      * @return string|null
      */
 
     public function getContainer()
     {
-        if (!isset($this->_container)
-            && !empty($path = $this->getPath())
-        ) {
-            $this->_container = pathinfo($path, PATHINFO_EXTENSION);
+        if (!isset($this->_container))
+        {
+            $format = $this->_format ?? [];
+
+            if (array_key_exists('container', $format)) {
+                $this->_container = $format['container'];
+            }
+
+            else if ($this->_explicitPath) {
+                $this->_container = pathinfo($this->_explicitPath, PATHINFO_EXTENSION);
+            }
         }
 
         return $this->_container;
@@ -549,7 +560,7 @@ class Output extends Model
 
     /**
      * Getter method for the read-only `type` property
-     * 
+     *
      * @return string|null
      */
 
@@ -558,7 +569,7 @@ class Output extends Model
         if (!isset($this->_type)
             && !empty($container = $this->getContainer())
         ) {
-            $this->_type = ConfigHelper::outputContainerType($container);
+            $this->_type = ConfigHelper::containerType($container);
         }
 
         return $this->_type;
@@ -566,29 +577,28 @@ class Output extends Model
 
     /**
      * Getter for read-only `formatString` property
-     * 
+     *
      * @return string|null
      */
 
-    public function getFormatString()
+    public function getFormatString(): string
     {
-        if (!isset($this->_formatString)
-            && !empty($container = $this->getContainer())
-        ) {
-            $format = array_merge([
-                'container' => $container
-            ], $this->getFormat());
-
-            $this->_formatString =  ConfigHelper::encodeFormat($format);
+        if (!isset($this->_formatString))
+        {
+            try {
+                $this->_formatString =  ConfigHelper::encodeFormat($this->getFormat());
+            } catch (\Throwable $e) {
+                $this->_formatString = '';
+            }
         }
 
-        return $this->_formatString;
+        return $this->_formatString ?? '';
     }
 
     /**
      * Getter method for read-only `explicitPath` property
-     * 
-     * @return boolean
+     *
+     * @return string|null
      */
 
     public function getExplicitPath()
@@ -597,20 +607,14 @@ class Output extends Model
     }
 
     /**
-     * Getter method for the read-only `mimeType` property
-     * 
-     * @return string
+     * Getter method for read-only `pathFormat` property
+     *
+     * @return string|null
      */
 
-    public function getMimeType(): string
+    public function getPathFormat()
     {
-        if (!isset($this->_mimeType))
-        {
-            $file = parse_url($this->url, PHP_URL_PATH);
-            $this->_mimeType = FileHelper::getMimeTypeByExtension($file);
-        }
-
-        return $this->_mimeType;
+        return $this->_pathFormat;
     }
 
     // =Attributes
@@ -624,6 +628,7 @@ class Output extends Model
     {
         $attributes = parent::attributes();
 
+        $attributes[] = 'format';
         $attributes[] = 'key';
         $attributes[] = 'path';
 
@@ -641,23 +646,6 @@ class Output extends Model
     {
         $rules = parent::rules();
 
-        // =requirements and defaults
-        $rules['attrsRequired'] = [ ['format', 'url'], 'required' ];
-        $rules['sourceRequired'] = [ 'source', 'required', 'when' => function($model) {
-            return !isset($model->sourceAssetId);
-        }];
-        $rules['coconutJobIdRequired'] = [ 'coconutJobId', 'required', 'when' => function($model) {
-            return $model->inProgress;
-        }];
-
-        // =formatting
-        $rules['attrsInteger'] = [ ['id', 'volumeId', 'sourceAssetId', 'coconutJobId'], 'integer' ];
-        $rules['attrsUrl'] = [ ['url', 'source'], 'url' ];
-        $rules['inProgressBoolean'] = [ 'inProgress', 'boolean' ];
-
-        // =safe attributes
-        $rules['attrsSafe'] = [ ['metadata'], 'safe' ];
-
         return $rules;
     }
 
@@ -668,59 +656,64 @@ class Output extends Model
      * @inheritdoc
      */
 
-    public function extraFields()
+    public function fields()
     {
-        $fields = parent::extraFields();
-
-        $fields[] = 'job';
-        $fields[] = 'format';
-        $fields[] = 'explicitPath';
-        $fields[] = 'pathFormat';
-        $fields[] = 'type';
-        $fields[] = 'mimeType';
-        $fields[] = 'metadata';
-        $fields[] = 'volume';
+        $fields = parent::fields();
 
         return $fields;
     }
 
     /**
-     * @return array|null
+     * @inheritdoc
      */
 
-    public function getCoconutJobInfo()
+    public function extraFields()
     {
-        return null;
-    }
+        $fields = parent::extraFields();
 
+        $fields[] = 'job';
+        $fields[] = 'explicitPath';
+        $fields[] = 'pathFormat';
+        $fields[] = 'container';
+        $fields[] = 'type';
+        $fields[] = 'metadata';
+
+        return $fields;
+    }
 
     // =Protected Methods
     // ========================================================================
 
     /**
-     * @return array|null
+     * @return array
      */
 
-    protected function getPathVars()
+    protected function pathVars(): array
     {
-        $vars = [];
+        $key = $this->getKey();
+        $format = $this->getFormat();
+        $job = $this->getJob();
 
-        if ($this->format
-            && ($key = $this->getKey())
-            && ($job = $this->getJob())
-            && ($input = $job->getInput())
-            && ($inputUrl = $input->getUrl())
-        ) {
-            return [
-                'path' => parse_url($inputUrl, PHP_URL_PATH),
-                'filename' => pathinfo($path, PATHINFO_FILENAME),
-                'hash' => $input->getUrlHash(), // @todo: add support for '{shortHash}' in `defaultPathFormat`
-                'key' => ConfigHelper::keyAsPath($key),
-                'ext' => ConfigHelper::formatExtension($this->format),
-            ];
+        $input = $job ? $job->getInput() : null;
+        $inputUrl = $input ? $input->getUrl() : null;
+        $inputPath = null;
+
+        if ($inputUrl)
+        {
+            $inputPath = parse_url($inputUrl, PHP_URL_PATH);
+            $inputPath = trim((
+                pathinfo($inputPath, PATHINFO_DIRNAME).'/'.
+                pathinfo($inputPath, PATHINFO_FILENAME)
+            ), '/');
         }
 
-        return null;
+        return [
+            'key' => ConfigHelper::keyAsPath($key),
+            'ext' => $format ? ConfigHelper::formatExtension($format) : null,
+            'path' => $inputPath,
+            'filename' => ($inputPath ? pathinfo($inputPath, PATHINFO_FILENAME) : null),
+            'hash' => $input ? $input->getUrlHash() : null,
+        ];
     }
 
 }

@@ -13,6 +13,7 @@
 namespace yoannisj\coconut\models;
 
 use Craft;
+use craft\base\Model;
 use craft\base\VolumeInterface;
 
 use yoannisj\coconut\Coconut;
@@ -23,7 +24,7 @@ use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
  * Model representing and validating Coconut jobs and their data
- * 
+ *
  * @property Input $input
  * @property integer $inputAssetId
  * @property string $inputUrl
@@ -53,13 +54,13 @@ class Job extends Model
     // =========================================================================
 
     /**
-     * 
+     *
      */
 
     public $id;
 
     /**
-     * 
+     *
      */
 
     public $coconutId;
@@ -83,37 +84,37 @@ class Job extends Model
     private $_outputs;
 
     /**
-     * 
+     *
      */
 
     public $status;
 
     /**
-     * 
+     *
      */
 
     public $progress;
 
     /**
-     * 
+     *
      */
 
     public $createdAt;
 
     /**
-     * 
+     *
      */
 
     public $completedAt;
 
     /**
-     * 
+     *
      */
 
     public $dateCreated;
 
     /**
-     * 
+     *
      */
 
     public $dateUpdated;
@@ -125,43 +126,23 @@ class Job extends Model
      * @inheritdoc
      */
 
-    public function __construct( $config = [] )
-    {
-        parent::__construct();
+    // public function __construct( $config = [] )
+    // {
+    //     parent::__construct();
 
-        if (is_array($config)) {
-            $config = Craft::configure(new Config(), $config);
-        }
+    //     if (is_array($config)) {
+    //         $config = Craft::configure(new Config(), $config);
+    //     }
 
-        $this->setConfig($config);
-    }
+    //     $this->setConfig($config);
+    // }
 
     // =Properties
     // -------------------------------------------------------------------------
 
     /**
-     * Setter method for normalized `config` property
-     * 
-     * @param Config|null $config
-     */
-
-    public function setConfig( Config $config = null )
-    {
-        $this->_config = $config;
-    }
-
-    /**
-     * Getter method for normalized `config` property
-     */
-
-    public function getConfig()
-    {
-        return $this->_config;
-    }
-
-    /**
      * Setter method for nested `input` model property
-     * 
+     *
      * @param Input|null $input;
      */
 
@@ -172,7 +153,7 @@ class Job extends Model
 
     /**
      * Getter method for nested `input` model property
-     * 
+     *
      * @return Input
      */
 
@@ -187,7 +168,7 @@ class Job extends Model
 
     /**
      * Setter method for resolved `storageVolume` property
-     * 
+     *
      * @param string|Volume\null $volume
      */
 
@@ -221,7 +202,7 @@ class Job extends Model
 
     /**
      * Getter method for resolved `storageVolume` property
-     * 
+     *
      * @return Volume|null
      */
 
@@ -279,7 +260,7 @@ class Job extends Model
 
     /**
      * Getter method for computed `storage` property
-     * 
+     *
      * @return Storage|null
      */
 
@@ -293,7 +274,7 @@ class Job extends Model
             if (!empty($this->storageHandle)) {
                 $storage = ConfigHelper::parseStorage($this->storageHandle);
             }
-            
+
             // than check if storage settings were set directly
             else if (!empty($this->_storageSettings)) {
                 $storage = new Storage($this->_storageSettings);
@@ -313,7 +294,7 @@ class Job extends Model
 
     /**
      * Getter method for read-only `outputs` property
-     * 
+     *
      * @return Output[]
      */
 
@@ -328,7 +309,7 @@ class Job extends Model
 
     /**
      * Getter method for read-only `config` property
-     * 
+     *
      * @return Config
      */
 

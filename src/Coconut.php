@@ -52,6 +52,13 @@ class Coconut extends Plugin
     // =Static
     // =========================================================================
 
+    /**
+     * reference to the plugin's instance
+     * @var Plugin
+     */
+
+    public static $plugin;
+
     // =Tables (DB)
     // -------------------------------------------------------------------------
 
@@ -113,11 +120,10 @@ class Coconut extends Plugin
     // =========================================================================
 
     /**
-     * reference to the plugin's instance
-     * @var Plugin
+     *
      */
 
-    public static $plugin;
+    public $demoProp = 'coconut_demoValue';
 
     /**
      * @inheritdoc
