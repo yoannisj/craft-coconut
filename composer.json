@@ -29,7 +29,8 @@
   },
   "autoload": {
     "psr-4": {
-      "yoannisj\\coconut\\": "./src/"
+      "yoannisj\\coconut\\": "./src/",
+      "yoannisj\\coconuttests\\fixtures\\": "./tests/fixtures/"
     }
   },
   "archive": {

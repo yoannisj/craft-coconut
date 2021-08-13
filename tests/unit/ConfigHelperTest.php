@@ -1,6 +1,6 @@
 <?php
 
-namespace yoannisj\coconut\tests\unit;
+namespace yoannisj\coconuttests\unit;
 
 use Codeception\Specify;
 use Codeception\Test\Unit as UnitTest;
@@ -37,14 +37,16 @@ class ConfigHelperTest extends UnitTest
     /**
      * Method ran before each test to setup test context
      */
-    protected function _before()
+
+    public function _before()
     {
     }
 
     /**
      * Method ran after each test to clean up side effects
      */
-    protected function _after()
+
+    public function _after()
     {
     }
 

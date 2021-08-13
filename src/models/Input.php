@@ -108,7 +108,7 @@ class Input extends Model
 
     public function setAsset( Asset $asset = null )
     {
-        if ($asset) $this->assetId = $asset->id;
+        $this->assetId = $asset ? $asset->id : null;
         $this->_asset = $asset;
     }
 
@@ -122,8 +122,15 @@ class Input extends Model
     {
         if (isset($this->assetId) && !isset($this->_asset))
         {
-            $this->_asset = Craft::$app->getAssets()
-                ->getAssetById($this->_assetId);
+            $asset = Craft::$app->getAssets()->getAssetById($this->_assetId);
+
+            if ($asset && $asset->kind != 'video')
+            {
+                throw new InvalidConfigException(
+                    "Property `asset` must be of kind 'video'.");
+            }
+
+            $this->_asset = $asset;
         }
 
         return $this->_asset;

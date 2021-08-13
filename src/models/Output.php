@@ -304,15 +304,8 @@ class Output extends Model
 
     public function setJob( Job $job = null )
     {
-        if ($job instanceof Job) {
-            $this->jobId = $job->id;
-            $this->_job = $job;
-        }
-
-        else {
-            $this->jobId = null;
-            $this->_job = null;
-        }
+        $this->jobId = $job ? $job->id : null;
+        $this->_job = $job;
     }
 
     /**
