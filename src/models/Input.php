@@ -13,6 +13,7 @@
 namespace yoannisj\coconut\models;
 
 use yii\base\InvalidArgumentException;
+use yii\base\InvalidConfigException;
 use yii\validators\InlineValidator;
 
 use Craft;
@@ -122,15 +123,14 @@ class Input extends Model
     {
         if (isset($this->assetId) && !isset($this->_asset))
         {
-            $asset = Craft::$app->getAssets()->getAssetById($this->_assetId);
-
-            if ($asset && $asset->kind != 'video')
-            {
-                throw new InvalidConfigException(
-                    "Property `asset` must be of kind 'video'.");
-            }
-
+            $asset = Craft::$app->getAssets()->getAssetById($this->assetId);
             $this->_asset = $asset;
+        }
+
+        if ($this->_asset && $this->_asset->kind != 'video')
+        {
+            throw new InvalidConfigException(
+                "Property `asset` must be of kind 'video'.");
         }
 
         return $this->_asset;
@@ -195,6 +195,12 @@ class Input extends Model
     {
         if (is_string($metadata)) {
             $metadata = JsonHelper::decodeIfJson($metadata) ?? [];
+        }
+
+        if ($metadata !== null && !is_array($metadata))
+        {
+            throw new InvalidConfigException(
+                "Property `metadata` must be an array or a JSON string representing an array");
         }
 
         $this->_metadata = $metadata;

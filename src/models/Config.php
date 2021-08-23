@@ -45,6 +45,12 @@ class Config extends Model
     private $_input;
 
     /**
+     * @var boolean Whether the input property value has been normalized
+     */
+
+    protected $isNormalizedInput;
+
+    /**
      * @var string
      */
 
