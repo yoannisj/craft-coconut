@@ -22,10 +22,6 @@ services:
     init: true
     depends_on:
       - craft-web
-    profiles:
-      - manual
-      - functional
-      - acceptance
   craft-web: &craft-service
     image: yoannisj/craftcms-tests:${PHP_VERSION:-7.4}-php-fpm
     build:
@@ -36,6 +32,8 @@ services:
         CRAFT_APP_TYPE: php-fpm
         CRAFT_VERSION: ${CRAFT_VERSION:-3.7}
         PACKAGE_NAME: $PACKAGE_NAME
+    env_file:
+      - coconut.env
     environment: &craft-service-environment
       NGINX_VERSION: ${NGINX_VERSION:-7.4}
       PHP_VERSION: ${PHP_VERSION:-7.4}
@@ -72,11 +70,8 @@ services:
       - cpresources:/app/web/cpresources
       - ./src:/app/packages/$PACKAGE_NAME/src
       - ./composer.json:/app/packages/$PACKAGE_NAME/composer.json
-      - ./tests/_craft/config:/app/config
-      - ./tests/_craft/migrations:/app/migrations
-      - ./tests/_craft/storage:/app/storage
-      - ./tests/_craft/templates:/app/templates
-      - ./tests/_craft/translations:/app/translations
+      - ./tests:/app/packages/$PACKAGE_NAME/tests
+      - ./codeception.yml:/app/packages/$PACKAGE_NAME/codeception.yml
     networks:
       - craftcms_tests_net
     expose:
@@ -85,10 +80,6 @@ services:
     depends_on:
       - database
       - redis
-    profiles:
-      - manual
-      - functional
-      - acceptance
   craft-cli: &craft-cli-service
     <<: *craft-service
     image: yoannisj/craftcms-tests:${PHP_VERSION:-7.4}-cli
@@ -104,16 +95,10 @@ services:
     entrypoint: [ "php", "./craft" ]
     command: [ "help" ]
     init: true
-    profiles:
-      - manual
   craft-queue:
     <<: *craft-cli-service
     entrypoint: [ "/bin/sh" ]
     command: [ "./craft_queue_listen.sh" ]
-    profiles:
-      - manual
-      - functional
-      - acceptance
   codecept:
     <<: *craft-cli-service
     volumes_from:
@@ -121,11 +106,8 @@ services:
     volumes:
       - ./tests:/app/tests
       - ./codeception.yml:/app/codeception.yml
-    entrypoint: [ "php", "vendor/bin/codecept" ]
-    profiles:
-      - unit
-      - functional
-      - acceptance
+    working_dir: /app/packages/$PACKAGE_NAME
+    entrypoint: [ "php", "/app/vendor/bin/codecept" ]
   database:
     # environment defined in ./docker/database/<db-driver>/docker-compose.override.yml
     # volumes defined in ./docker/database/<db-driver>/docker-compose.override.yml
@@ -133,11 +115,6 @@ services:
     networks:
       - craftcms_tests_net
     # ports defined in ./docker/database/<db-driver>/docker-compose.override.yml
-    profiles:
-      - manual
-      - unit
-      - functional
-      - acceptance
   redis:
     image: redis:${REDIS_VERSION:-5}-alpine
     init: true
@@ -146,11 +123,6 @@ services:
     ports:
       - target: '${REDIS_PORT:-6379}'
         published: '${PUBLIC_PORT_PREFIX}${REDIS_PORT:-6379}'
-    profiles:
-      - manual
-      - unit
-      - functional
-      - acceptance
 volumes: # docker internal networks
   cpresources:
     driver: local

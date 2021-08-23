@@ -5,11 +5,11 @@
 actor: UnitTester
 modules:
   config:
-    \craft\test\Craft:
-      dbSetup:
-        clean: false # whether to delete all existing table before running the tests
-        setupCraft: false # whether to install craft-cms in db before running the tests
-        applyMigrations: false # whether to apply migration files in migrations folder before running the tests
+    # \craft\test\Craft:
+    #   dbSetup:
+    #     clean: false # whether to delete all existing table before running the tests
+    #     setupCraft: false # whether to install craft-cms in db before running the tests
+    #     applyMigrations: false # whether to apply migration files in migrations folder before running the tests
   enabled:
     - Asserts
     - \Helper\Unit

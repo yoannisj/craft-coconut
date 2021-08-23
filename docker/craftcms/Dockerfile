@@ -29,13 +29,11 @@ COPY --chown=www-data:www-data ./docker/craftcms/craft_queue_listen.sh ./craft_q
 COPY --chown=www-data:www-data ./docker/craftcms/composer.json ./composer.json
 COPY --chown=www-data:www-data ./docker/craftcms/web ./web
 
-# Bring over test files
-COPY --chown=www-data:www-data ./tests ./tests
-COPY --chown=www-data:www-data ./codeception.yml ./codeception.yml
-
 # Bring over package files into local packages directory
 COPY --chown=www-data:www-data ./composer.json ./packages/${PACKAGE_NAME}/composer.json
 COPY --chown=www-data:www-data ./src ./packages/${PACKAGE_NAME}/src
+COPY --chown=www-data:www-data ./codeception.yml ./packages/${PACKAGE_NAME}/codeception.yml
+COPY --chown=www-data:www-data ./tests ./packages/${PACKAGE_NAME}/tests
 
 # @todo: install and run envsubst to
 # @see https://github.com/nginxinc/docker-nginx/blob/f3fe494531f9b157d9c09ba509e412dace54cd4f/stable/alpine/Dockerfile#L87-L103

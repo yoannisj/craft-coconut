@@ -3,16 +3,18 @@
  * Craft web bootstrap file
  */
 
+$packageName = getenv('PACKAGE_NAME');
+
 // Define path constants
-define('CRAFT_BASE_PATH', dirname(__DIR__).'/tests/_craft');
-// define('CRAFT_CONFIG_PATH', CRAFT_BASE_PATH . '/config');
-// define('CRAFT_CONTENT_MIGRATIONS_PATH', CRAFT_BASE_PATH . '/migrations');
-// define('CRAFT_STORAGE_PATH', CRAFT_BASE_PATH . '/storage');
-// define('CRAFT_TEMPLATES_PATH', CRAFT_BASE_PATH . '/templates');
-// define('CRAFT_TRANSLATIONS_PATH', CRAFT_BASE_PATH . '/translations');
 define('CRAFT_COMPOSER_PATH', dirname(__DIR__).'/composer.json');
 define('CRAFT_VENDOR_PATH', dirname(__DIR__).'/vendor');
-// define('CRAFT_LICENSE_KEY_PATH', CRAFT_CONFIG_PATH.'/license.key');
+define('CRAFT_BASE_PATH', dirname(__DIR__)."/packages/$packageName/tests/_craft");
+define('CRAFT_CONFIG_PATH', CRAFT_BASE_PATH . '/config');
+define('CRAFT_CONTENT_MIGRATIONS_PATH', CRAFT_BASE_PATH . '/migrations');
+define('CRAFT_STORAGE_PATH', CRAFT_BASE_PATH . '/storage');
+define('CRAFT_TEMPLATES_PATH', CRAFT_BASE_PATH . '/templates');
+define('CRAFT_TRANSLATIONS_PATH', CRAFT_BASE_PATH . '/translations');
+define('CRAFT_LICENSE_KEY_PATH', CRAFT_CONFIG_PATH.'/license.key');
 
 // Load Composer's autoloader
 require_once CRAFT_VENDOR_PATH . '/autoload.php';

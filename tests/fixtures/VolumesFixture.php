@@ -28,7 +28,7 @@ use craft\helpers\App as AppHelper;
  *
  */
 
-class VolumeFixture extends ActiveFixture
+class VolumesFixture extends ActiveFixture
 {
     // =Properties
     // ========================================================================
@@ -38,6 +38,12 @@ class VolumeFixture extends ActiveFixture
      */
 
     public $modelClass = VolumeRecord::class;
+
+    /**
+     * @inheritdoc
+     */
+
+    public $dataFile = __DIR__.'/data/volumes.php';
 
     /**
      * @inheritdoc
@@ -59,7 +65,7 @@ class VolumeFixture extends ActiveFixture
     {
         parent::load();
 
-        // Create the dirs
+        // Create the volume directories
         foreach ($this->getData() as $data) {
             $settings = JsonHelper::decodeIfJson($data['settings']);
             FileHelper::createDirectory($settings['path']);
@@ -76,7 +82,7 @@ class VolumeFixture extends ActiveFixture
 
     public function unload()
     {
-        // Remove the dirs
+        // Remove the volume directories
         foreach ($this->getData() as $data) {
             $settings = JsonHelper::decodeIfJson($data['settings']);
             FileHelper::removeDirectory($settings['path']);
@@ -85,45 +91,22 @@ class VolumeFixture extends ActiveFixture
         parent::unload();
     }
 
+    /**
+     *
+     */
+
+    // protected function getData()
+    // {
+    //     $data = parent::getData();
+
+    //     var_dump($this->dataFile);
+    //     var_dump($data);
+
+    //     die();
+    // }
+
+
     // =Protected Methods
     // ========================================================================
 
-    /**
-     * @inheritdoc
-     */
-
-    protected function getData()
-    {
-        $localUploadsPath = rtrim(AppHelper::env('WEB_ROOT'), '/').'/uploads';
-        $localUploadsUrl = rtrim(AppHelper::env('WEB_URL'), '/').'/uploads';
-
-        return [
-            'localImagesVolume' => [
-                'name' => 'Local Images Volume',
-                'handle' => 'localImagesVolume',
-                'type' => LocalVolume::class,
-                'url' => null,
-                'settings' => JsonHelper::encode([
-                    'path' => $localUploadsPath,
-                    'url' => $localUploadsUrl,
-                ]),
-                'hasUrls' => true,
-                'sortOrder' => 1,
-                // 'uid' => 'volume-1001----------------------uid',
-            ],
-
-            'localVideosVolume' => [
-                'name' => 'Local Images Volume',
-                'handle' => 'localImagesVolume',
-                'type' => LocalVolume::class,
-                'url' => null,
-                'settings' => JsonHelper::encode([
-                    'path' => $localUploadsPath.'/videos',
-                    'url' => $localUploadsUrl.'/videos',
-                ]),
-                'hasUrls' => true,
-                'sortOrder' => 1,
-            ],
-        ];
-    }
 }
