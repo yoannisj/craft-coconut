@@ -32,6 +32,7 @@ use craft\helpers\ArrayHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\ElementHelper;
 
+use yoannisj\coconut\services\Storages;
 use yoannisj\coconut\services\Jobs;
 use yoannisj\coconut\services\Outputs;
 use yoannisj\coconut\models\Settings;
@@ -110,20 +111,8 @@ class Coconut extends Plugin
         self::SERVICE_S3OTHER,
     ];
 
-    // =Events
-    // -------------------------------------------------------------------------
-
-    const BEFORE_RESOLVE_VOLUME_STORAGE = 'beforeResolveVolumeStorage';
-    const AFTER_RESOLVE_VOLUME_STORAGE = 'afterResolveVolumeStorage';
-
     // =Properties
     // =========================================================================
-
-    /**
-     *
-     */
-
-    public $demoProp = 'coconut_demoValue';
 
     /**
      * @inheritdoc
@@ -154,6 +143,7 @@ class Coconut extends Plugin
 
         // register plugin services as components
         $this->setComponents([
+            'storages' => Storages::class,
             'jobs' => Jobs::class,
             'outputs' => Outputs::class,
         ]);
@@ -216,6 +206,15 @@ class Coconut extends Plugin
 
     // =Services
     // -------------------------------------------------------------------------
+
+    /**
+     * @return \yoannisj\coconut\services\Storages
+     */
+
+    public function getStorages()
+    {
+        return $this->get('storages');
+    }
 
     /**
      * @return \yoannisj\coconut\services\Jobs
@@ -305,73 +304,6 @@ class Coconut extends Plugin
         return $config;
     }
 
-    /**
-     * @param Volume $volume
-     *
-     * @return Storage|null
-     *
-     * @throws InvalidValueException If another module/plugin resolves to storage settings
-     *  that are not an instance of \yoannisj\coconut\models\Storage
-     */
-
-    public function resolveVolumeStorage( Volume $volume )
-    {
-        if (!array_key_exists($volume->id, $this->_volumeStorages))
-        {
-            $storage = null;
-
-            // allow modules/plugins to define storage settings
-            if ($this->hasEventHandlers(self::BEFORE_RESOLVE_VOLUME_STORAGE))
-            {
-                $event = new VolumeStorageEvent([
-                    'volume' => $volume,
-                    'storage' => $storage,
-                ]);
-
-                $this->trigger(self::BEFORE_RESOLVE_VOLUME_STORAGE, $event);
-                $storage = $event->storage;
-            }
-
-            // no need to resolve volume storage if module/plugin already did
-            if (!$storage)
-            {
-                // @todo: resolve storage settings for service Volumes supported by Coconut
-                $uploadUrl = UrlHelper::actionUrl('coconut/jobs/upload', [
-                    'volumeId' => $volume->id,
-                ]);
-
-                $storage = new Storage([
-                    'service' => self::SERVICE_COCONUT,
-                    'url' => $uploadUrl,
-                ]);
-            }
-
-            // allow modules/plugins to further customise storage settings
-            if ($this->hasEventHandlers(self::AFTER_RESOLVE_VOLUME_STORAGE))
-            {
-                // allow modules/plugins to modify storage settings
-                $event = new VolumeStorageEvent([
-                    'volume' => $volume,
-                    'storage' => $storage,
-                ]);
-
-                $this->trigger(self::AFTER_RESOLVE_VOLUME_STORAGE, $event);
-                $storage = $event->storage;
-            }
-
-            // validate storage before continuing
-            if (!$storage instanceof Storage)
-            {
-                throw new InvalidValueException(
-                    'Resolved volume storage must be an instance of '.Storage::class);
-            }
-
-            $this->_volumeStorages[$volume->id] = $storage;
-        }
-
-        return $this->_volumeStorages[$volume->id];
-    }
-
     // =Protected Methods
     // =========================================================================
 
@@ -390,11 +322,11 @@ class Coconut extends Plugin
 
     protected function onAfterSaveElement( ElementEvent $e )
     {
-        if ($e->isNew && $e->element instanceof Asset
-            && !ElementHelper::isDraftOrRevision($e->element)
-        ) {
-            $this->checkWatchAsset($e->element);
-        }
+        // if ($e->isNew && $e->element instanceof Asset
+        //     && !ElementHelper::isDraftOrRevision($e->element)
+        // ) {
+        //     $this->checkWatchAsset($e->element);
+        // }
     }
 
     /**
@@ -403,11 +335,11 @@ class Coconut extends Plugin
 
     protected function onAfterDeleteElement( ElementEvent $e )
     {
-        if ($e->element instanceof Asset
-            && !ElementHelper::isDraftOrRevision($e->element)
-        ) {
-            $this->getOutputs()->clearSourceOutputs($e->element);
-        }
+        // if ($e->element instanceof Asset
+        //     && !ElementHelper::isDraftOrRevision($e->element)
+        // ) {
+        //     $this->getOutputs()->clearSourceOutputs($e->element);
+        // }
     }
 
     /**
@@ -416,11 +348,11 @@ class Coconut extends Plugin
 
     protected function onAfterRestoreElement( ElementEvent $e )
     {
-        if ($e->isNew && $e->element instanceof Asset
-            && !ElementHelper::isDraftOrRevision($e->element)
-        ) {
-            $this->checkWatchAsset($e->element);
-        }
+        // if ($e->isNew && $e->element instanceof Asset
+        //     && !ElementHelper::isDraftOrRevision($e->element)
+        // ) {
+        //     $this->checkWatchAsset($e->element);
+        // }
     }
 
     /**
@@ -429,7 +361,7 @@ class Coconut extends Plugin
 
     protected function onAfterReplaceAsset( AssetEvent $e )
     {
-        $this->checkWatchAsset($e->asset);
+        // $this->checkWatchAsset($e->asset);
     }
 
     /**

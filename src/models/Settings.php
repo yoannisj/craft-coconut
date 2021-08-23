@@ -24,13 +24,14 @@ use craft\helpers\StringHelper;
 use craft\helpers\App as AppHelper;
 use craft\helpers\Component as ComponentHelper;
 
+use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Config;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
  * Model representing and validation Coconut plugin settings
- * 
+ *
  * @property Storage[] $storages
  * @property Storage|null $defaultStorage
  * @property VolumeInterface|null $defaultUploadVolume
@@ -45,10 +46,10 @@ class Settings extends Model
 
     /**
      * @var string The API key of the Coconut.co account used to convert videos.
-     * 
+     *
      * If this is not set, the plugin will check for an environment variable
      * named `COCONUT_API_KEY` (using `\craft\helper\App::env()`).
-     * 
+     *
      * @default null
      */
 
@@ -62,7 +63,7 @@ class Settings extends Model
      *
      * More info on how to run queued jobs in the background:
      *  https://nystudio107.com/blog/robust-queue-job-handling-in-craft-cms
-     * 
+     *
      * @default true
      */
 
@@ -78,7 +79,7 @@ class Settings extends Model
      *
      * More info:
      *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
-     * 
+     *
      * @default 900
      */
 
@@ -86,10 +87,10 @@ class Settings extends Model
 
     /**
      * @var array Named storage settings to use in Coconut transcoding configs.
-     * 
+     *
      * Each key defines a named storage, and its value should be an array of
      * storage settings as defined here: https://docs.coconut.co/jobs/storage
-     * 
+     *
      * @example [
      *      'myS3Bucket' => [
      *          'service' => 's3',
@@ -105,63 +106,57 @@ class Settings extends Model
      *          'url' => 'https://remote.server.com/coconut/upload',
      *      ],
      * ]
-     * 
+     *
      * @default []
      */
 
     private $_storages = [];
 
     /**
-     * @var array Container for normalized storages
-     */
-
-    protected $isNormalizedStorages;
-
-    /**
      * @var string|array|\yoannisj\coconut\models\StorageSettings
-     * 
+     *
      * The storage name or settings used to store Coconut output files when none
      * is given in transcoding job config parameters.
-     * 
+     *
      * This can be set to a string which must be either a key from the `storages`
      * setting, or a volume handle.
-     * 
+     *
      * If this is set to `null`, the plugin will try to generate storage settings
      * based on the input asset's volume, or fallback to use the HTTP upload method
      * to store files in the volume defined by the 'defaultUploadVolume' setting.
-     * 
+     *
      * @default null
      */
 
     private $_defaultStorage = null;
 
     /**
-     * @var boolean Whether the `defaultStorage` setting has already been normalized.
+     * @var bool
      */
 
     protected $isNormalizedDefaultStorage;
 
     /**
      * @var string|\craft\models\Volume
-     * 
+     *
      * The default volume used to store output files when the `storage` parameter
      * was omitted and no asset volume could be determined (.e.g. if the `input`
      * parameter was a URL and not a Craft asset).
-     * 
+     *
      * @default 'coconut'
      */
 
     private $_defaultUploadVolume = 'coconut';
 
     /**
-     * @var boolean Whether the `defaultUploadVolume` setting has alreay been normalized.
+     * @var boolean
      */
 
     protected $isNormalizedDefaultUploadVolume;
 
     /**
      * @var string Format used to generate default path to output files in storages.
-     * 
+     *
      * Supports the following placeholder strings:
      * - '{path}' the input folder path, relative to the volume base path (asset input),
      *      or the URL path (external URL input)
@@ -170,10 +165,10 @@ class Settings extends Model
      * - '{shortHash}' a shortened version of the unique md5 hash
      * - '{key}' the outputs `key` parameter (a path-friendly version of it)
      * - '{ext}' the output file extension
-     * 
+     *
      * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
      * the path will be prefixed with an '_' (if it is not already).
-     * 
+     *
      * @default '_coconut/{path}/{key}.{ext}'
      */
 
@@ -181,29 +176,29 @@ class Settings extends Model
 
     /**
      * @var array Named coconut job config settings.
-     * 
+     *
      * Each key defines a named config, and its value should be an array setting
      * the 'storage' and 'outputs' parameters.
-     * 
+     *
      * The 'storage' parameter can be a string, which will be matched against
      * one of the named storages defined, or a volume handle.
-     * 
+     *
      * If the 'storage' parameter is omitted, to plugin wil try to generate store
      * settings for the input asset's volume, or fallback to use the HTTP upload method
      * to store files in the volume defined by the 'defaultUploadVolume' setting.
-     * 
+     *
      * The 'outputs' parameter can have indexed string items, in which case the string
      * will be used as `format` parameter, and the `path` parameter will be generated
      * based on the `defaultPathFormat` setting.
-     * 
+     *
      * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
      * their `path` parameter will be prefixed with an '_' (if it is not already).
      * This can be disabled if the storage is not a volume by adding the custom
      * 'isVolumeStorage' parameter, although it is not recommended.
-     * 
+     *
      * The 'input' and 'notification' parameters are not supported, as the plugin will
      * set those programatically.
-     * 
+     *
      * @example [
      *      'videoSources' => [
      *          'storage' => 'coconut', // assuming there is a volume with handle 'coconut'
@@ -218,7 +213,7 @@ class Settings extends Model
      *          ],
      *      ],
      * ]
-     * 
+     *
      * @default []
      */
 
@@ -232,11 +227,11 @@ class Settings extends Model
 
     /**
      * @var array Sets default config parameters for craft assets in given volumes.
-     * 
+     *
      * Each key should match the handle of a craft volume, and the its value should
      * be either a key from the `configs` setting, or an array of parameters (in the
      * same format as the `configs` setting).
-     * 
+     *
      * @var array
      */
 
@@ -252,7 +247,7 @@ class Settings extends Model
      * @var array List of input volumes handles, for which the plugin should
      *  automatically create a Coconut conversion job every time a video asset is
      *  added or updated.
-     * 
+     *
      * @default `[]`
      */
 
@@ -286,7 +281,7 @@ class Settings extends Model
 
     /**
      * Setter method for normalized `storages` setting
-     * 
+     *
      * @param array $storages Map of names storages, where each key is a storage name
      */
 
@@ -342,7 +337,7 @@ class Settings extends Model
 
     /**
      * Setter method for normalized `defaultStorage` setting
-     * 
+     *
      * @param string|array|Storage $storage
      */
 
@@ -354,7 +349,7 @@ class Settings extends Model
 
     /**
      * Getter method for normalized `defaultStorage` setting
-     * 
+     *
      * @return Storage|null
      */
 
@@ -430,7 +425,7 @@ class Settings extends Model
 
     /**
      * Setter method for normalized `configs` setting
-     * 
+     *
      * @param array Map of named configs, where each key is a config name
      */
 
@@ -442,7 +437,7 @@ class Settings extends Model
 
     /**
      * Getter method for normalized `configs` setting
-     * 
+     *
      * @return Config[]
      */
 
@@ -481,7 +476,7 @@ class Settings extends Model
 
     /**
      * Setter method for normalized `volumeConfigs` setting
-     * 
+     *
      * @param array Map of volume configs, where each key is a volume handle
      */
 
@@ -494,7 +489,7 @@ class Settings extends Model
 
     /**
      * Getter method for normalized `volumeConfigs` setting
-     * 
+     *
      * @return Config[]
      */
 
@@ -581,7 +576,7 @@ class Settings extends Model
         // $rules['storagesStorageMap'] = [ ['storages'], 'validateStorageMap' ];
         // $rules['configsConfigMap'] = [ ['configs'], 'validateConfigMap' ];
         // $rules['volumeConfigsConfigMap'] = [ ['volumeConfigs'], 'validateConfigMap', 'registryAttribute' => 'configs' ];
-        
+
         $rules['wathVolumesEach'] = [ 'watchVolumes', 'each', 'rule' => HandleValidator::class ];
 
         return $rules;
@@ -663,7 +658,7 @@ class Settings extends Model
             {
                 $name = $config;
                 $config = $this->$registryAttribute[$name] ?? null;
-                 
+
                 if (!$config)
                 {
                     $label = $this->getAttributeLabel($registryAttribute);
@@ -700,7 +695,7 @@ class Settings extends Model
 
     /**
      * Returns Coconut storage model with given name
-     * 
+     *
      * @return Storage|null
      */
 
@@ -712,7 +707,7 @@ class Settings extends Model
 
     /**
      * Returns Coconut config model with given name
-     * 
+     *
      * @return Config|null
      */
 
@@ -724,9 +719,9 @@ class Settings extends Model
 
     /**
      * Returns Coconut config model for given assets volume
-     * 
+     *
      * @param VolumeInterface|string $volume
-     * 
+     *
      * @return Config|null
      */
 
@@ -744,8 +739,8 @@ class Settings extends Model
     // =========================================================================
 
     /**
-     * @param 
-     * 
+     * @param
+     *
      * @return \craft\base\VolumeInterface
      */
 
@@ -753,7 +748,7 @@ class Settings extends Model
     {
         $config = ComponentHelper::mergeSettings($config);
         $handle = $config['handle'] ?? 'coconut';
-        
+
         $craftVolumes = Craft::$app->getVolumes();
         $volume = $craftVolumes->getVolumeByHandle($handle);
 

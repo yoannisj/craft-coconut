@@ -10,22 +10,15 @@
  *
  */
 
-namespace yoannisj\coconut\models;
+namespace yoannisj\coconut\behaviors;
 
 use yii\base\InvalidConfigException;
 use yii\base\Behavior;
 
 use craft\helpers\StringHelper;
 
-use yoannisj\coconut\models\ServiceCredentials;
-
 /**
- * Model representing and validating settings for Cococnut storage method
- * 
- * @property ServiceCredentials $credentials Credentials used for storage service
- * @property string $bucket_id Alias for 'bucket' property
- * @property string $container Alias for 'bucket' property
- * 
+ *
  */
 
 class PropertyAliasBehavior extends Behavior
@@ -35,7 +28,7 @@ class PropertyAliasBehavior extends Behavior
 
     /**
      * @var boolean|string[] Whether properties can be aliased by their camelCase counterpart
-     * 
+     *
      * This can be set to a list of non-camelcase property names
      */
 
@@ -49,7 +42,7 @@ class PropertyAliasBehavior extends Behavior
 
     /**
      * @var array Map of property aliases
-     * 
+     *
      * Each key is the target property name, and its value can be an alias property name (string),
      * or a list of alias property names (array)
      */
@@ -64,7 +57,7 @@ class PropertyAliasBehavior extends Behavior
 
     // =Public Methods
     // =========================================================================
-    
+
     /**
      * @inheritdoc
      */
@@ -161,9 +154,9 @@ class PropertyAliasBehavior extends Behavior
     /**
      * Transforms given property name into camel case format if it should be
      * aliases as such.
-     * 
+     *
      * @param string $name
-     * 
+     *
      * @return string
      */
 

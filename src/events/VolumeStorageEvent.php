@@ -17,7 +17,7 @@ use craft\models\Volume;
 use yoannisj\coconut\models\Storage;
 
 /**
- * Event 
+ * Event
  */
 
 class VolumeStorageEvent extends Event

@@ -344,42 +344,6 @@ class ConfigHelper
     // =========================================================================
 
     /**
-     * @param string|array|VolumeInterface $storage
-     *
-     * @return Storage|null
-     */
-
-    public static function parseStorage( $storage )
-    {
-        if (is_string($storage))
-        {
-            // check if this is a named storage handle
-            $storage = Coconut::$plugin->getSettings()
-                ->getNamedStorage($storage);
-
-            if (!$storage) { // or, assume this is a volume handle
-                $storage = Craft::$app->getVolumes()
-                    ->getVolumeByHandle($storage);
-            }
-        }
-
-        if ($storage instanceof VolumeInterface) {
-            return Coconut::$plugin->resolveVolumeStorage($storage);
-        }
-
-        if (is_array($storage))
-        {
-            if (!array_key_exists('class', $storage)) {
-                $storage['class'] = Storage::class;
-            }
-
-            return Craft::createObject($storage);
-        }
-
-        return null;
-    }
-
-    /**
      * Parses given format string or array of format specs, by
      * analyzing and validating spec values against the format container,
      * and discarding invalid and irrelevant values.

@@ -135,7 +135,7 @@ class m210704_132000_api_v2_data extends Migration
     // =========================================================================
 
     /**
-     * 
+     *
      */
 
     protected function migrateDataUp()
@@ -192,7 +192,8 @@ class m210704_132000_api_v2_data extends Migration
 
                 $inputHash = empty($inputUrl) ? null : md5($inputUrl);
                 $storageHandle = $storageVolume ? $storageVolume->handle : null;
-                $storage = ConfigHelper::parseStorage($storageHandle);
+                $storage = $storageVolume ? Coconut::$plugin->getStorages()
+                    ->getVolumeStorage($storageVolume) : null;
                 $storageSettings = $storage ? $storage->toArray() : null;
                 $status =  $inProgress ? 'job.failed' : 'job.completed';
 
@@ -241,7 +242,7 @@ class m210704_132000_api_v2_data extends Migration
     }
 
     /**
-     * 
+     *
      */
 
     protected function migrateDataDown()

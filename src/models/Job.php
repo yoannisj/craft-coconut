@@ -271,8 +271,10 @@ class Job extends Model
             $storage = null;
 
             // prioritize storage handle (could be a named storage handle or a volume handle)
-            if (!empty($this->storageHandle)) {
-                $storage = ConfigHelper::parseStorage($this->storageHandle);
+            if (!empty($this->storageHandle))
+            {
+                $storage = Coconut::$plugin->getStorages()
+                    ->parseStorage($this->storageHandle);
             }
 
             // than check if storage settings were set directly
@@ -280,9 +282,14 @@ class Job extends Model
                 $storage = new Storage($this->_storageSettings);
             }
 
-            else { // or check if a storage volume was set
+            else
+            { // or check if a storage volume was set
                 $storageVolume = $this->getStorageVolume();
-                if ($storageVolume) $storage = Coconut::volumeStorage($storageVolume);
+                if ($storageVolume)
+                {
+                    $storage = Coconut::$plugin->getStorages()
+                        ->getVolumeStorage($this->storageVolume);
+                }
             }
 
             $this->_storage = $storage;

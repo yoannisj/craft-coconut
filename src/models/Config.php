@@ -393,10 +393,12 @@ class Config extends Model
                 $input = $this->getInput();
                 $inputAsset = $input ? $input->getAsset() : null;
                 $uploadVolume = ($inputAsset ? $inputAsset->getVolume()
-                    : Coconut::$plugin->getSettings()->getDefaultUploadVolume());
+                    : $coconutSettings->getDefaultUploadVolume());
 
-                if ($uploadVolume) {
-                    $storage = Coconut::resolveVolumeStorage($uploadVolume);
+                if ($uploadVolume)
+                {
+                    $storage = Coconut::$plugin->getStorages()
+                        ->getVolumeStorage($uploadVolume);
                 }
             }
 

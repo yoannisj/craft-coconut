@@ -24,11 +24,11 @@ use yoannisj\coconut\models\ServiceCredentials;
 
 /**
  * Model representing and validating settings for Cococnut storage method
- * 
+ *
  * @property ServiceCredentials $credentials Credentials used for storage service
  * @property string $bucket_id Alias for 'bucket' property
  * @property string $container Alias for 'bucket' property
- * 
+ *
  */
 
 class Storage extends Model
@@ -73,7 +73,7 @@ class Storage extends Model
     public $container;
 
     /**
-     * @var string Region of storage service bucket/volume 
+     * @var string Region of storage service bucket/volume
      */
 
     public $region;
@@ -155,7 +155,7 @@ class Storage extends Model
 
     /**
      * Setter method for normalized `credentials` property
-     * 
+     *
      * @param array|ServiceCredentials|null $credentials
      */
 
@@ -166,7 +166,7 @@ class Storage extends Model
 
     /**
      * Getter method for normalized `credentials` property
-     * 
+     *
      * @return ServiceCredentials|null
      */
 
@@ -236,7 +236,7 @@ class Storage extends Model
             'service',
             'bucket',
             'path',
-            'acl', 
+            'acl',
             'storageClass',
             'endpoint',
             'expires',
@@ -250,7 +250,7 @@ class Storage extends Model
 
     /**
      * Validation method for the `credentials` property
-     * 
+     *
      * @param string $attribute
      * @param array $params
      * @param InlineValidator $validator
@@ -279,6 +279,11 @@ class Storage extends Model
         // no service? use HTTP, (S)FTP protocol with `url` only
         if (empty($this->service)) {
             return [ 'url' ];
+        }
+
+        // coconut test storage only supports the 'service' field
+        else if ($this->service == 'coconut') {
+            return ['service'];
         }
 
         // =common
