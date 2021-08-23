@@ -21,7 +21,7 @@ use yoannisj\coconut\Coconut;
 use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
- * 
+ *
  */
 
 class TranscodeVideo extends ElementAction

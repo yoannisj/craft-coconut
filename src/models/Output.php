@@ -62,6 +62,14 @@ class Output extends Model
     const STATUS_IMAGE_FAILED = 'image.failed';
     const STATUS_IMAGE_SKIPPED = 'image.skipped';
 
+    const STATUS_HTTPSTREAM_WAITING = 'httpstream.variants.waiting';
+    const STATUS_HTTPSTREAM_QUEUED = 'httpstream.variants.queued';
+    const STATUS_HTTPSTREAM_VARIANTS_ENCODING = 'httpstream.variants.encoding';
+    const STATUS_HTTPSTREAM_PACKAGING = 'httpstream.packaging';
+    const STATUS_HTTPSTREAM_PACKAGED = 'httpstream.packaged';
+    const STATUS_HTTPSTREAM_FAILED = 'httpstream.failed';
+    const STATUS_HTTPSTREAM_SKIPPED = 'httpstream.skipped';
+
     // =Properties
     // =========================================================================
 

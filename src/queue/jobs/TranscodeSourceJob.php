@@ -24,22 +24,23 @@ use craft\helpers\StringHelper;
 use craft\helpers\UrlHelper;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\models\Job;
 use yoannisj\coconut\records\OutputRecord;
 
 /**
- * 
+ *
  */
 
-class TranscodeSourceJob extends BaseJob implements RetryableJobInterface
+class transcodeSourceJob extends BaseJob implements RetryableJobInterface
 {
     // =Properties
     // =========================================================================
 
     /**
-     * @var \yoannisj\coconut\models\Config
+     * @var Job
      */
 
-    public $config;
+    public $job;
 
     /**
      * @var int
@@ -61,7 +62,7 @@ class TranscodeSourceJob extends BaseJob implements RetryableJobInterface
     // {
     //     $data = [
     //         'description' => $this->getDescription(),
-    //         'config' => $this->config->toArray(),
+    //         'job' => $this->job->toArray(),
     //     ];
 
     //     return $data;
@@ -77,8 +78,8 @@ class TranscodeSourceJob extends BaseJob implements RetryableJobInterface
     public function getDescription()
     {
         $sourceTitle = null;
-        $sourceAsset = $this->config->getSourceAsset();
-        $source = $this->config->getSource();
+        $sourceAsset = $this->job->getSourceAsset();
+        $source = $this->job->getSource();
 
         if ($sourceAsset) {
             $sourceTitle = $sourceAsset->title;
@@ -124,7 +125,7 @@ class TranscodeSourceJob extends BaseJob implements RetryableJobInterface
         $service = Coconut::$plugin->getJobs();
 
         $service->runJob(
-            $this->config,
+            $this->job,
             $this->checkJobInterval,
             function($jobInfo) use ($queue) {
                 $progress = $jobInfo->status == 'completed' ? 1 : ((int)$jobInfo->progress / 100);

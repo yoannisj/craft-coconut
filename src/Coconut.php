@@ -32,15 +32,17 @@ use craft\helpers\ArrayHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\ElementHelper;
 
+use opencoconut\Coconut\Client as CoconutClient;
+
 use yoannisj\coconut\services\Storages;
 use yoannisj\coconut\services\Jobs;
 use yoannisj\coconut\services\Outputs;
 use yoannisj\coconut\models\Settings;
-use yoannisj\coconut\models\Config;
+use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\elements\actions\TranscodeVideo;
 use yoannisj\coconut\elements\actions\ClearVideoOutputs;
-use yoannisj\coconut\queue\jobs\TranscodeSourceJob;
+use yoannisj\coconut\queue\jobs\transcodeSourceJob;
 use yoannisj\coconut\variables\CoconutVariable;
 use yoannisj\coconut\events\VolumeStorageEvent;
 
@@ -59,6 +61,17 @@ class Coconut extends Plugin
      */
 
     public static $plugin;
+
+
+    /**
+     *
+     */
+
+    public static function createClient()
+    {
+        $apiKey = $this->getSettings()->apiKey;
+        return new CoconutClient($apiKey);
+    }
 
     // =Tables (DB)
     // -------------------------------------------------------------------------
@@ -238,70 +251,73 @@ class Coconut extends Plugin
     // -------------------------------------------------------------------------
 
     /**
-     * @param string | \craft\elements\Asset $source
-     * @param string | array | \yoannisj\coconut\models\Config $config
-     * @param bool | null $useQueue
+     * @param string|Asset $source
+     * @param string|array|Job $job
+     * @param bool|null $useQueue
      * @param int $checkInterval
      *
      * @throws JobException if job errored
      * @return array
      */
 
-    public function transcodeSource( $source, $config = null, bool $useQueue = null, int $checkInterval = 0 )
+    public function transcodeSource( $source, $job = null, bool $useQueue = null, int $checkInterval = 0 )
     {
         // default to global useQueue value
         if ($useQueue === null) $useQueue = $this->getSettings()->preferQueue;
         // normalize and fill in config attributes based on source
-        $config = $this->normalizeSourceConfig($source, $config);
+        $job = $this->normalizeSourceConfig($source, $job);
 
         if ($useQueue)
         {
             // add job to the queue
-            $queueJob = new TranscodeSourceJob([ 'config' => $config ]);
+            $queueJob = new transcodeSourceJob([ 'config' => $job ]);
             Craft::$app->getQueue()->push($queueJob);
 
             // return initialized outputs for job config
-            $outputs = $this->getOutputs()->initConfigOutputs($config);
+            $outputs = $this->getOutputs()->initJobOutputs($job);
         }
 
         else {
             // synchronous use of the coconut job api
-            $outputs = $this->getJobs()->runJob($config);
+            $outputs = $this->getJobs()->runJob($job);
         }
 
         return ArrayHelper::index($outputs, 'format');
     }
 
     /**
-     * @param string | int | \craft\elements\Asset $source
-     * @param string | array | yoannisj\coconut\models\Config | null $config
-     * @param bool $strict Whether no config is allowed or not
+     * @param string|int|Asset $source
+     * @param string|array|Job|null $job
+     * @param bool $strict Whether no job parameters is allowed or not
      *
-     * @return yoannisj\coconut\models\Config
+     * @return Job
      */
 
-    public function normalizeSourceConfig( $source, $config = null, bool $strict = true )
+    public function normalizeSourceConfig( $source, $job = null, bool $strict = true )
     {
-        if (is_array($config)) {
-            $config = new Config($config);
+        if (is_array($job)) {
+            $job = new Job($job);
         }
 
-        else if (is_string($config)) {
-            $config = $this->getSettings()->getConfig($config);
+        else if (is_string($job)) {
+            $job = $this->getSettings()->getNamedJob($job);
         }
 
-        else if (!$config && $source instanceof Asset)
+        else if (!$job && $source instanceof Asset)
         {
             $volume = $source->getVolume();
-            $config = $this->getSettings()->getVolumeConfig($volume->handle);
+            $job = $this->getSettings()->getVolumeJob($volume->handle);
         }
 
-        if ($strict && !($config instanceof Config)) {
-            throw new InvalidArgumentException('Could not determine transcode config.');
+        if ($strict && !($job instanceof Job))
+        {
+            throw new InvalidArgumentException(
+                'Could not resolve given job into a `'.Job::class.'` instance');
         }
 
-        $config->setSource($source);
-        return $config;
+        $job->setSource($source);
+
+        return $job;
     }
 
     // =Protected Methods

@@ -25,9 +25,8 @@ use craft\helpers\App as AppHelper;
 use craft\helpers\Component as ComponentHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\models\Config;
+use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Storage;
-use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
  * Model representing and validation Coconut plugin settings
@@ -36,8 +35,8 @@ use yoannisj\coconut\helpers\ConfigHelper;
  * @property Storage[] $storages
  * @property Storage|null $defaultStorage
  * @property VolumeInterface|null $defaultUploadVolume
- * @property Config[] $configs
- * @property Config[] $volumeConfigs
+ * @property Job[] $jobs
+ * @property Job[] $volumeJobs
  */
 
 class Settings extends Model
@@ -73,10 +72,10 @@ class Settings extends Model
     /**
      * @var integer
      *
-     * Depending on your Coconut plan and the config you are using to transcode
-     * your video, Transcoding jobs can take a long time. To avoid jobs to fail
-     * with a timeout error, this plugin sets a high `Time to Reserve` on the
-     * jobs it pushes to Craft's queue.
+     * Depending on your Coconut plan and the parameters you are using to transcode
+     * your video, jobs can take a long time. To avoid jobs to fail with a timeout
+     * error, this plugin sets a high `Time to Reserve` on the jobs it pushes to
+     * Craft's queue.
      *
      * More info:
      *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
@@ -87,7 +86,7 @@ class Settings extends Model
     public $transcodeJobTtr = 900;
 
     /**
-     * @var array Named storage settings to use in Coconut transcoding configs.
+     * @var array Named storage settings to use in Coconut transcoding jobs.
      *
      * Each key defines a named storage, and its value should be an array of
      * storage settings as defined here: https://docs.coconut.co/jobs/storage
@@ -117,7 +116,7 @@ class Settings extends Model
      * @var string|array|\yoannisj\coconut\models\StorageSettings
      *
      * The storage name or settings used to store Coconut output files when none
-     * is given in transcoding job config parameters.
+     * is given in transcoding job parameters.
      *
      * This can be set to a string which must be either a key from the `storages`
      * setting, or a volume handle.
@@ -176,9 +175,9 @@ class Settings extends Model
     public $defaultPathFormat = '_coconut/{path}/{key}.{ext}';
 
     /**
-     * @var array Named coconut job config settings.
+     * @var array Named coconut job settings.
      *
-     * Each key defines a named config, and its value should be an array setting
+     * Each key defines a named job, and its value should be an array setting
      * the 'storage' and 'outputs' parameters.
      *
      * The 'storage' parameter can be a string, which will be matched against
@@ -218,31 +217,31 @@ class Settings extends Model
      * @default []
      */
 
-    private $_configs = [];
+    private $_jobs = [];
 
     /**
-     * @var array Container for normalized configs
+     * @var array Container for normalized jobs
      */
 
-    private $_normalizedConfigs = [];
+    private $_normalizedJobs = [];
 
     /**
-     * @var array Sets default config parameters for craft assets in given volumes.
+     * @var array Sets default job parameters for craft assets in given volumes.
      *
      * Each key should match the handle of a craft volume, and the its value should
-     * be either a key from the `configs` setting, or an array of parameters (in the
-     * same format as the `configs` setting).
+     * be either a key from the `jobs` setting, or an array of parameters (in the
+     * same format as the `jobs` setting).
      *
      * @var array
      */
 
-    private $_volumeConfigs = [];
+    private $_volumeJobs = [];
 
     /**
-     * @var array Container for normalized volume configs
+     * @var array Container for normalized volume jobs
      */
 
-    private $_normalizedVolumeConfigs = [];
+    private $_normalizedvolumeJobs = [];
 
     /**
      * @var array List of input volumes handles, for which the plugin should
@@ -254,7 +253,7 @@ class Settings extends Model
 
     public $watchVolumes = [];
 
-    // @todo: add `fieldConfigs` and `watchFields` settings to automatically
+    // @todo: add `fieldJobs` and `watchFields` settings to automatically
     // transcode video assets in asset fields when saving a Craft element.
 
     // =Public Methods
@@ -283,7 +282,7 @@ class Settings extends Model
         }
 
         if (empty($this->_apiKey)) {
-            throw new InvalidConfigException("Missing required `apiKey` config setting");
+            throw new InvalidConfigException("Missing required `apiKey` setting");
         }
 
         return $this->_apiKey;
@@ -426,119 +425,116 @@ class Settings extends Model
     }
 
     /**
-     * Setter method for normalized `configs` setting
+     * Setter method for normalized `jobs` setting
      *
-     * @param array Map of named configs, where each key is a config name
+     * @param array Map of named jobs where each key is a job name
      */
 
-    public function setConfigs( array $configs )
+    public function setJobs( array $jobs )
     {
-        $this->_configs = $configs;
-        $this->isNormalizedConfigs = false;
+        $this->_jobs = $jobs;
+        $this->isNormalizedJobs = false;
     }
 
     /**
-     * Getter method for normalized `configs` setting
+     * Getter method for normalized `jobs` setting
      *
-     * @return Config[]
+     * @return Job[]
      */
 
-    public function getConfigs()
+    public function getJobs()
     {
-        if (!$this->isNormalizedConfigs)
+        if (!$this->isNormalizedJobs)
         {
-            foreach ($this->_configs as $name => $config)
+            foreach ($this->_jobs as $name => $job)
             {
                 if (!is_string($name))
                 {
                     throw new InvalidConfigException(
-                        "Setting `configs` must be an array "
-                        ." where each key is a config name.");
+                        'Setting `jobs` must be an array where each key is a job name.');
                 }
 
-                if (is_array($config)) {
-                    $config = Craft::configure(new Config(), $config);
+                if (is_array($job)) {
+                    $job = Craft::configure(new Job(), $job);
                 }
 
-                else if (!$config instanceof Config)
+                else if (!$job instanceof Job)
                 {
-                    $class = Config::class;
                     throw new InvalidConfigException(
-                        "Setting `configs` must resolve to a list of `$class` models");
+                        'Setting `jobs` must resolve to a list of `'.Job::class.'` models');
                 }
 
-                $this->_configs[$name] = $config;
+                $this->_jobs[$name] = $job;
             }
 
-            $this->isNormalizedConfigs = true;
+            $this->isNormalizedJobs = true;
         }
 
-        return $this->_configs;
+        return $this->_jobs;
     }
 
     /**
-     * Setter method for normalized `volumeConfigs` setting
+     * Setter method for normalized `volumeJobs` setting
      *
-     * @param array Map of volume configs, where each key is a volume handle
+     * @param array Map of volume jobs, where each key is a volume handle
      */
 
-    public function setVolumeConfigs( array $configs )
+    public function setVolumeJobs( array $jobs )
     {
-        $this->_volumeConfigs = $configs;
-        $this->isNormalizedVolumeConfigs = false;
+        $this->_volumeJobs = $jobs;
+        $this->isNormalizedVolumeJobs = false;
 
     }
 
     /**
-     * Getter method for normalized `volumeConfigs` setting
+     * Getter method for normalized `volumeJobs` setting
      *
-     * @return Config[]
+     * @return Job[]
      */
 
-    public function getVolumeConfigs()
+    public function getVolumeJobs()
     {
-        if (!$this->isNormalizedVolumeConfigs)
+        if (!$this->isNormalizedVolumeJobs)
         {
-            foreach ($this->_volumeConfigs as $handle => $config)
+            foreach ($this->_volumeJobs as $handle => $job)
             {
                 if (!is_string($handle))
                 {
                     throw new InvalidConfigException(
-                        "Setting `volumeConfigs` must be an associative array"
+                        "Setting `volumeJobs` must be an associative array"
                         ." where each key is a volume handle");
                 }
 
-                if (is_string($config))
+                if (is_string($job))
                 {
-                    $configs = $this->getConfigs();
+                    $jobs = $this->getJobs();
 
-                    if (!array_key_exists($config, $configs))
+                    if (!array_key_exists($job, $jobs))
                     {
                         throw new InvalidConfigException(
-                            "Could not find config named '$config'.");
+                            "Could not find job named '$job'.");
                     }
 
-                    $config = $configs[$config];
+                    $job = $jobs[$job];
                 }
 
-                if (is_array($config)) {
-                    $config = Craft::configure(new Config(), $config);
+                if (is_array($job)) {
+                    $job = new Job($job);
                 }
 
-                else if (!$config instanceof Config)
+                else if (!$job instanceof Job)
                 {
-                    $class = Config::class;
                     throw new InvalidConfigException(
-                        "Setting `volumeConfigs` must resolve to a list of `$class` models");
+                        'Setting `volumeJobs` must resolve to a list of `'.Job::class.'` models');
                 }
 
-                $this->_volumeConfigs[$name] = $config;
+                $this->_volumeJobs[$name] = $job;
             }
 
-            $this->isNormalizedConfigs = true;
+            $this->isNormalizedJobs = true;
         }
 
-        return $this->_volumeConfigs;
+        return $this->_volumeJobs;
     }
 
     // =Attributes
@@ -555,8 +551,8 @@ class Settings extends Model
         $attributes[] = 'storages';
         $attributes[] = 'defaultStorage';
         $attributes[] = 'defaultUploadVolume';
-        $attributes[] = 'configs';
-        $attributes[] = 'volumeConfigs';
+        $attributes[] = 'jobs';
+        $attributes[] = 'volumeJobs';
 
         return $attributes;
     }
@@ -576,8 +572,8 @@ class Settings extends Model
         $rules['attrsString'] = [ ['apiKey', 'defaultPathFormat'], 'string' ];
 
         // $rules['storagesStorageMap'] = [ ['storages'], 'validateStorageMap' ];
-        // $rules['configsConfigMap'] = [ ['configs'], 'validateConfigMap' ];
-        // $rules['volumeConfigsConfigMap'] = [ ['volumeConfigs'], 'validateConfigMap', 'registryAttribute' => 'configs' ];
+        // $rules['configsConfigMap'] = [ ['configs'], 'validateJobsMap' ];
+        // $rules['volumeJobsConfigMap'] = [ ['volumeJobs'], 'validateJobsMap', 'registryAttribute' => 'configs' ];
 
         $rules['wathVolumesEach'] = [ 'watchVolumes', 'each', 'rule' => HandleValidator::class ];
 
@@ -639,55 +635,54 @@ class Settings extends Model
     }
 
     /**
-     * Validation method for maps of config parameters
+     * Validation method for maps of job parameters
      */
 
-    public function validateConfigMap( $attribute, array $params = [], InlineValidator $validator )
+    public function validateJobsMap( $attribute, array $params = [], InlineValidator $validator )
     {
-        $configs = $this->$attribute;
+        $jobs = $this->$attribute;
         $registryAttribute = $params['registryAttribute'] ?? null;
 
-        if (!is_array($configs) || !ArrayHelper::isAssociative($configs))
+        if (!is_array($jobs) || !ArrayHelper::isAssociative($jobs))
         {
             $validator->addError($this, $attribute,
-                '{attribute} must be an array mapping volume handles to Coconut config parameters');
+                '{attribute} must be an array mapping volume handles to Coconut job parameters');
             return; // no need to continue validation
         }
 
-        foreach ($configs as $key => $config)
+        foreach ($jobs as $key => $job)
         {
-            if (is_string($config) && $registryAttribute)
+            if (is_string($job) && $registryAttribute)
             {
-                $name = $config;
-                $config = $this->$registryAttribute[$name] ?? null;
+                $name = $job;
+                $job = $this->$registryAttribute[$name] ?? null;
 
-                if (!$config)
+                if (!$job)
                 {
                     $label = $this->getAttributeLabel($registryAttribute);
                     $validator->addError($this, $attribute,
-                        "Could not find {attribute}'s named config '$name' in '$label'");
+                        "Could not find {attribute}'s named job '$name' in '$label'");
                     return; // no need to continue validation
                 }
             }
 
-            if (is_array($config) && ArrayHelper::isAssociative($config))
+            if (is_array($job) && ArrayHelper::isAssociative($job))
             {
-                if (!array_key_exists('class', $config)) $config['class'] = $config;
-                $config = Craft::createObject($config);
+                if (!array_key_exists('class', $job)) $job['class'] = $job;
+                $job = Craft::createObject($job);
             }
 
-            if (!$config instanceof Config)
+            if (!$job instanceof Job)
             {
-                $class = Config::class;
                 $validator->addError($this, $attribute,
-                    "Config with key '$key' in {attribute} must resolve to a $class model");
+                    "Job with key '$key' in {attribute} must resolve to a `".Job::class."` instance");
                 return; // no need to continue validation
             }
 
-            if (!$config->validate())
+            if (!$job->validate())
             {
                 $validator->addError($this, $attribute,
-                    "Invalid config with key '$key' in {attribute}");
+                    "Invalid job with key '$key' in {attribute}");
             }
         }
     }
@@ -708,33 +703,33 @@ class Settings extends Model
     }
 
     /**
-     * Returns Coconut config model with given name
+     * Returns Coconut job model with given name
      *
-     * @return Config|null
+     * @return Job|null
      */
 
-    public function getNamedConfig( string $name )
+    public function getNamedJob( string $name )
     {
-        $configs = $this->getConfigs();
-        return $configs[$name] ?? null;
+        $jobs = $this->getJobs();
+        return $jobs[$name] ?? null;
     }
 
     /**
-     * Returns Coconut config model for given assets volume
+     * Returns Coconut job model for given assets volume
      *
      * @param VolumeInterface|string $volume
      *
-     * @return Config|null
+     * @return Job|null
      */
 
-    public function getVolumeConfig( $volume )
+    public function getVolumeJob( $volume )
     {
         if ($volume instanceof VolumeInterface) {
             $volume = $volume->handle;
         }
 
-        $volumeConfigs = $this->getVolumeConfigs();
-        return $volumeConfigs[$volume] ?? null;
+        $volumeJobs = $this->getvolumeJobs();
+        return $volumeJobs[$volume] ?? null;
     }
 
     // =Protected Methods
@@ -764,7 +759,7 @@ class Settings extends Model
         $defaults = [
             'type' => $type,
             'handle' => $handle,
-            'name'=> $config['name'] ?? $this->humanizeHandle($handle),
+            'name'=> ($config['name'] ?? $this->humanizeHandle($handle)),
         ];
 
         if ($type == LocalVolume::class)

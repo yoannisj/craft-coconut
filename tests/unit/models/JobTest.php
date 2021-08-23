@@ -1,28 +1,25 @@
 <?php
 
-namespace yoannisj\coconuttests\unit;
+namespace yoannisj\coconuttests\unit\models;
 
-use Codeception\Specify;
 use Codeception\Test\Unit as UnitTest;
 use UnitTester;
 
 use Craft;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\models\Config;
+use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\helpers\ConfigHelper;
 
 /**
- * Unit tests for Config model
+ * Unit tests for Job model
  */
 
-class ConfigTest extends UnitTest
+class JobTest extends UnitTest
 {
-    use Specify;
-
     // =Properties
     // ========================================================================
 
@@ -85,23 +82,23 @@ class ConfigTest extends UnitTest
             ->getElement('localMp4VideoAsset');
 
         // when
-        $config = new Config();
-        $config->input = [ 'assetId' => $asset->id ];
+        $job = new Job();
+        $job->input = [ 'assetId' => $asset->id ];
 
         // then
-        $this->assertInstanceOf(Input::class, $config->input);
-        $this->assertSame($asset->id, $config->input->assetId);
+        $this->assertInstanceOf(Input::class, $job->input);
+        $this->assertSame($asset->id, $job->input->assetId);
 
 
         // given
         $inputUrl = 'https://www.example.com/videos/video.mp4';
 
         // when
-        $config = new Config();
-        $config->input = [ 'url' => $inputUrl ];
+        $job = new Job();
+        $job->input = [ 'url' => $inputUrl ];
 
-        $this->assertInstanceOf(Input::class, $config->input);
-        $this->assertSame($inputUrl, $config->input->url);
+        $this->assertInstanceOf(Input::class, $job->input);
+        $this->assertSame($inputUrl, $job->input->url);
     }
 
     /**
@@ -116,12 +113,12 @@ class ConfigTest extends UnitTest
             ->getElement('localMp4VideoAsset');
 
         // when
-        $config = new Config();
-        $config->input = $asset;
+        $job = new Job();
+        $job->input = $asset;
 
         // then
-        $this->assertInstanceOf(Input::class, $config->input);
-        $this->assertEquals($asset, $config->input->asset);
+        $this->assertInstanceOf(Input::class, $job->input);
+        $this->assertEquals($asset, $job->input->asset);
     }
 
     /**
@@ -135,12 +132,12 @@ class ConfigTest extends UnitTest
         $inputUrl = 'https://www.example.com/videos/video.mp4';
 
         // when
-        $config = new Config();
-        $config->input = $inputUrl;
+        $job = new Job();
+        $job->input = $inputUrl;
 
         // then
-        $this->assertInstanceOf(Input::class, $config->input);
-        $this->assertSame($inputUrl, $config->input->url);
+        $this->assertInstanceOf(Input::class, $job->input);
+        $this->assertSame($inputUrl, $job->input->url);
     }
 
     /**
@@ -152,8 +149,8 @@ class ConfigTest extends UnitTest
 
     public function outputsPropertyMapsIndexedListOfOutputsByTheirOutputKey()
     {
-        $config = new Config();
-        $config->outputs = [
+        $job = new Job();
+        $job->outputs = [
             new Output([
                 'key' => 'mp4_hd',
                 'format' => [ 'container' => 'mp4', 'resolution' => '1080p' ],
@@ -167,7 +164,7 @@ class ConfigTest extends UnitTest
             ])
         ];
 
-        foreach ($config->outputs as $key => $output) {
+        foreach ($job->outputs as $key => $output) {
             $this->assertSame($key, $output->key);
         }
     }
@@ -194,11 +191,11 @@ class ConfigTest extends UnitTest
             ]),
         ];
 
-        $config = new Config();
-        $config->outputs = $outputParams;
+        $job = new Job();
+        $job->outputs = $outputParams;
 
         foreach ($outputParams as $key => $params) {
-            $this->assertArrayHasKey($key, $config->outputs);
+            $this->assertArrayHasKey($key, $job->outputs);
         }
     }
 
@@ -215,10 +212,10 @@ class ConfigTest extends UnitTest
             [ 'format' => 'jpg:240p', 'number' => 3 ],
         ];
 
-        $config = new Config();
-        $config->outputs = $outputs;
+        $job = new Job();
+        $job->outputs = $outputs;
 
-        foreach ($config->outputs as $key => $output)
+        foreach ($job->outputs as $key => $output)
         {
             $this->assertInstanceOf(Output::class, $output);
             $this->assertSame($key, $output->key);
@@ -238,11 +235,11 @@ class ConfigTest extends UnitTest
             'jpg:240p'
         ];
 
-        $config = new Config();
-        $config->outputs = $outputFormats;
+        $job = new Job();
+        $job->outputs = $outputFormats;
 
         $index = 0;
-        foreach ($config->outputs as $key => $output)
+        foreach ($job->outputs as $key => $output)
         {
             $parsedFormat = ConfigHelper::parseFormat($outputFormats[$index++]);
 
@@ -269,8 +266,8 @@ class ConfigTest extends UnitTest
 
     public function outputsPropertyMergesFormatSpecs()
     {
-        $config = new Config();
-        $config->outputs = [
+        $job = new Job();
+        $job->outputs = [
             'mp4' => [
                 'format' => [
                     'video_codec' => 'hevc',
@@ -278,7 +275,7 @@ class ConfigTest extends UnitTest
             ]
         ];
 
-        $outputFormatSpecs = $config->outputs['mp4']->format;
+        $outputFormatSpecs = $job->outputs['mp4']->format;
 
         $this->assertArrayHasKey('container', $outputFormatSpecs);
         $this->assertSame('mp4', $outputFormatSpecs['container']);
@@ -293,8 +290,8 @@ class ConfigTest extends UnitTest
 
     public function outputsPropertyPrefersFormatContainerFromIndex()
     {
-        $config = new Config();
-        $config->outputs = [
+        $job = new Job();
+        $job->outputs = [
             'mp4:hevc' => [
                 'format' => [
                     'container' => 'webm',
@@ -302,7 +299,7 @@ class ConfigTest extends UnitTest
             ],
         ];
 
-        $outputContainer = $config->outputs['mp4:hevc']['format']['container'];
+        $outputContainer = $job->outputs['mp4:hevc']['format']['container'];
         $this->assertSame('mp4', $outputContainer);
     }
 
@@ -324,10 +321,10 @@ class ConfigTest extends UnitTest
         $settings->defaultStorage = $defaultStorage;
 
         // when
-        $config = new Config();
+        $job = new Job();
 
         // then
-        $this->assertSame($defaultStorage, $config->storage);
+        $this->assertSame($defaultStorage, $job->storage);
 
         // cleanup
         $settings->defaultStorage = $originalDefaultStorage;
@@ -350,10 +347,10 @@ class ConfigTest extends UnitTest
         $inputVolumeStorage = Coconut::$plugin->getStorages()
             ->getVolumeStorage($inputAsset->getVolume());
 
-        $config = new Config();
-        $config->input = $inputAsset;
+        $job = new Job();
+        $job->input = $inputAsset;
 
-        $this->assertEquals($inputVolumeStorage, $config->storage);
+        $this->assertEquals($inputVolumeStorage, $job->storage);
 
         // cleanup
         $settings->defaultStorage = $originalDefaultStorage;
@@ -380,11 +377,11 @@ class ConfigTest extends UnitTest
             ->getVolumeStorage($settings->defaultUploadVolume);
 
         // when
-        $config = new Config();
-        $config->input = 'https://www.example.com/videos/video.mp4';
+        $job = new Job();
+        $job->input = 'https://www.example.com/videos/video.mp4';
 
         // then
-        $this->assertEquals($volumeStorage, $config->storage);
+        $this->assertEquals($volumeStorage, $job->storage);
 
         // cleanup
         $settings->defaultUploadVolume = $originaldefaultUploadVolume;
@@ -400,10 +397,10 @@ class ConfigTest extends UnitTest
     {
         $storage = new Storage([ 'service' => 'coconut' ]);
 
-        $config = new Config();
-        $config->storage = $storage;
+        $job = new Job();
+        $job->storage = $storage;
 
-        $this->assertSame($storage, $config->storage);
+        $this->assertSame($storage, $job->storage);
     }
 
     /**
@@ -413,11 +410,11 @@ class ConfigTest extends UnitTest
 
     public function storagePropertyResolvesStorageConfigArray()
     {
-        $config = new Config();
-        $config->storage = [ 'service' => 'coconut' ];
+        $job = new Job();
+        $job->storage = [ 'service' => 'coconut' ];
 
-        $this->assertInstanceOf(Storage::class, $config->storage);
-        $this->assertSame('coconut', $config->storage->service);
+        $this->assertInstanceOf(Storage::class, $job->storage);
+        $this->assertSame('coconut', $job->storage->service);
     }
 
     /**
@@ -427,10 +424,10 @@ class ConfigTest extends UnitTest
 
     public function storagePropertyResolvesNamedStorageHandle()
     {
-        $config = new Config();
-        $config->storage = 'coconutStorage';
+        $job = new Job();
+        $job->storage = 'coconutStorage';
 
-        $this->assertInstanceOf(Storage::class, $config->storage);
+        $this->assertInstanceOf(Storage::class, $job->storage);
     }
 
     /**
@@ -442,10 +439,10 @@ class ConfigTest extends UnitTest
     {
         $volume = Craft::$app->getVolumes()->getVolumeByHandle('localUploads');
 
-        $config = new Config();
-        $config->storage = $volume;
+        $job = new Job();
+        $job->storage = $volume;
 
-        $this->assertInstanceOf(Storage::class, $config->storage);
+        $this->assertInstanceOf(Storage::class, $job->storage);
     }
 
     /**
@@ -455,9 +452,9 @@ class ConfigTest extends UnitTest
 
     public function storagePropertyResolvesVolumeHandle()
     {
-        $config = new Config();
-        $config->storage = 'localUploads';
+        $job = new Job();
+        $job->storage = 'localUploads';
 
-        $this->assertInstanceOf(Storage::class, $config->storage);
+        $this->assertInstanceOf(Storage::class, $job->storage);
     }
 }

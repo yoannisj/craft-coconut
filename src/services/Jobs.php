@@ -22,13 +22,13 @@ use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\models\Config;
-use yoannisj\coconut\exceptions\CoconutRequestException;
+use yoannisj\coconut\models\Job;
+use yoannisj\coconut\exceptions\CoconutApiExeption;
 use yoannisj\coconut\events\JobEvent;
 use yoannisj\coconut\events\CancellableJobEvent;
 
 /**
- *
+ * Singleton service class to work with Coconut Jobs
  */
 
 class Jobs extends Component
@@ -43,7 +43,7 @@ class Jobs extends Component
 
     /**
      * @param JobRecord $record
-     * 
+     *
      * @return Job
      */
 
@@ -69,7 +69,7 @@ class Jobs extends Component
 
     /**
      * @param Job $job
-     * 
+     *
      * @return JobRecord
      */
 
@@ -123,42 +123,11 @@ class Jobs extends Component
     // =========================================================================
 
     /**
-     * @return Job|false
-     * 
-     * @throws CoconutRequestException If there was an error in the request made to the Coconut service
-     */
-
-    public function createJob( Config $config )
-    {
-        // make sure config is valid before creating job
-        if (!$config->validate()) {
-            return false;
-        }
-
-        $client = Coconut::createClient();
-        $data = $client->job->create($config->toArray());
-
-        $status = ArrayHelper::getValue($data, 'status');
-        if ($status == 'error')
-        {
-            throw new CoconutRequestException([
-                'message' => ArrayHelper::getValue($data, 'message'),
-                'errorCode' => ArrayHelper::getValue($data, 'error_code'),
-            ]);
-        }
-
-        $job = new Job($data);
-        $job->setConfig($config);
-
-        return $job;
-    }
-
-    /**
      * Saves given job model to the database
-     * 
+     *
      * @param Job $job
      * @param boolean $runValidation
-     * 
+     *
      * @return boolean
      */
 
@@ -178,8 +147,59 @@ class Jobs extends Component
     }
 
     /**
+     * Runs given job via Coconut's API
+     *
+     * @param Job $job Th job model to run
+     * @param boolean $runValidation Whether to validate given job before submitting it to Coconut
+     * @param boolean $asNew Whether this job should be ran as a new job
+     *
+     * @return Job
+     */
+
+    public function runJob( Job $job, bool $runValidation = true, bool $asNew = false )
+    {
+        // has this job been ran before?
+        if ($job->coconutId)
+        {
+            $job = clone $job;
+            unset($job->coconutId);
+
+            if ($asNew) unset($job->id);
+        }
+
+        if ($runValidation && !$job->validate()) {
+            return false;
+        }
+
+        // use Coconut API to run the job (create a new one)
+        $client = Coconut::createClient();
+        $data = $client->job->create($job->toArray());
+
+        $status = ArrayHelper::getValue($data, 'status');
+        if ($status == 'error')
+        {
+            // @todo: Save failed jobs in the database?
+
+            throw new CoconutApiExeption([
+                'message' => ArrayHelper::getValue($data, 'message'),
+                'errorCode' => ArrayHelper::getValue($data, 'error_code'),
+            ]);
+        }
+
+        // update job with data received from Coconut
+        Craft::configure($job, $data);
+
+        if (!$this->saveJob($job)) {
+            return false;
+        }
+
+        return $job;
+    }
+
+
+    /**
      * @param integer $id
-     * 
+     *
      * @return Job|null
      */
 
@@ -189,7 +209,7 @@ class Jobs extends Component
         {
             $record = JobRecord::findByCondition($id)
                 ->limit(1)->one();
-            
+
             if ($record) {
                 $this->memoizeJobRecord($record);
             } else {
@@ -202,7 +222,7 @@ class Jobs extends Component
 
     /**
      * Retrieves job with given coconut ID
-     * 
+     *
      * @return Job|null
      */
 
@@ -226,6 +246,10 @@ class Jobs extends Component
 
     /**
      * Retrieves list of all jobs for given Asset
+     *
+     * @param Asset $asset
+     *
+     * @return Job[]
      */
 
     public function getJobsForInputAsset( Asset $asset )
@@ -235,7 +259,9 @@ class Jobs extends Component
 
     /**
      * Retrieves list of all jobs for given asset URL
-     * 
+     *
+     * @param int $assetId
+     *
      * @return Job[]
      */
 
@@ -257,7 +283,9 @@ class Jobs extends Component
 
     /**
      * Retrieves list of all jobs for given input url
-     * 
+     *
+     * @param string $url
+     *
      * @return Job[]
      */
 
@@ -288,85 +316,88 @@ class Jobs extends Component
 
 
 
+
+
+
     /**
      * Creates a new Coconut job, runs it synchronously by waiting on its
      * completion, and returns the resulting outputs
      *
-     * @param \yoannisj\coconut\models\Config $config Coconut job config model
+     * @param Job $job Coconut job model
      * @param int $checkInterval Amount of time to wait between each job update (in miliseconds)
      *
      * @throws Job error eception if job's status is "error"
      * @return nul|array List of resulting outputs
      */
 
-    public function runJob( Config $config, int $checkInterval = 0, callable $updateCallback = null )
-    {
-        $jobInfo = $this->createJob($config, true);
-        
-        while ($jobInfo && $jobInfo->status == 'processing')
-        {
-            // wait a certain amount of time before continuing
-            if ($checkInterval) usleep($checkInterval * 1000);
+    // public function runJob( Job $job, int $checkInterval = 0, callable $updateCallback = null )
+    // {
+    //     $jobInfo = $this->createJob($job, true);
 
-            // get updated job info
-            $jobInfo = $this->checkJob($jobInfo->id, false);
+    //     while ($jobInfo && $jobInfo->status == 'processing')
+    //     {
+    //         // wait a certain amount of time before continuing
+    //         if ($checkInterval) usleep($checkInterval * 1000);
 
-            if ($updateCallback) { // optionally run update callback
-                call_user_func($updateCallback, $jobInfo);
-            }
-        }
+    //         // get updated job info
+    //         $jobInfo = $this->checkJob($jobInfo->id, false);
 
-        // job is completed: update job and return resulting outputs
-        return $this->updateJob($jobInfo, true);
-    }
+    //         if ($updateCallback) { // optionally run update callback
+    //             call_user_func($updateCallback, $jobInfo);
+    //         }
+    //     }
+
+    //     // job is completed: update job and return resulting outputs
+    //     return $this->updateJob($jobInfo, true);
+    // }
 
     /**
      * Creates a new Coconut job, and optionally updates outputs in the database.
      *
-     * @param \yoannisj\coconut\models\Config $config
+     * @param Job $job
      * @param bool $updateOutputs Whether outputs in the db should be updated
      *
      * @throws Job error exception if job's status is "error"
      * @return object | null Information about the newly created job or null if job creation was cancelled
      */
 
-    public function createJob( Config $config, $updateOutputs = true )
-    {
-        $params = $config->getJobParams();
+    // public function createJob( Config $job, $updateOutputs = true )
+    // {
+    //     $params = $job->getJobParams();
 
-        // trigger EVENT_BEFORE_CREATE_JOB
-        $beforeCreateEvent = new CancellableJobEvent([
-            'config' => $config,
-            'updateOutputs' => $updateOutputs,
-            'jobInfo' => null,
-        ]);
+    //     // trigger EVENT_BEFORE_CREATE_JOB
+    //     $beforeCreateEvent = new CancellableJobEvent([
+    //         'config' => $config,
+    //         'updateOutputs' => $updateOutputs,
+    //         'jobInfo' => null,
+    //     ]);
 
-        $this->trigger(self::EVENT_BEFORE_CREATE_JOB, $beforeCreateEvent);
+    //     $this->trigger(self::EVENT_BEFORE_CREATE_JOB, $beforeCreateEvent);
 
-        // allow event listeners to cancel job creation
-        if ($beforeCreateEvent->isValid === false) {
-            return null;
-        }
+    //     // allow event listeners to cancel job creation
+    //     if ($beforeCreateEvent->isValid === false) {
+    //         return null;
+    //     }
 
-        // create coconut job using Coconut API
-        $jobInfo = CoconutJob::create($params);        
-        $this->updateJob($jobInfo, false); // update jobInfo
+    //     // create coconut job using Coconut API
+    //     $jobInfo = CoconutJob::create($params);
+    //     $this->updateJob($jobInfo, false); // update jobInfo
 
-        // trigger EVENT_AFTER_CREATE_JOB
-        $afterCreateEvent = new JobEvent([
-            'config' => $config,
-            'updateOutputs' => $updateOutputs,
-            'jobInfo' => $jobInfo,
-        ]);
+    //     // trigger EVENT_AFTER_CREATE_JOB
+    //     $afterCreateEvent = new JobEvent([
+    //         'config' => $config,
+    //         'updateOutputs' => $updateOutputs,
+    //         'jobInfo' => $jobInfo,
+    //     ]);
 
-        $this->trigger(self::EVENT_AFTER_CREATE_JOB, $afterCreateEvent);
+    //     $this->trigger(self::EVENT_AFTER_CREATE_JOB, $afterCreateEvent);
 
-        if ($updateOutputs) {
-            $newOutputs = Coconut::$plugin->getOutputs()->initConfigOutputs($config, $jobInfo->id);
-        }
+    //     if ($updateOutputs) {
+    //         $newOutputs = Coconut::$plugin->getOutputs()->initJobOutputs($config, $jobInfo->id);
+    //     }
 
-        return $jobInfo;
-    }
+    //     return $jobInfo;
+    // }
 
     /**
      * Retrieves job information for given Coconut job id, handles job status
@@ -421,7 +452,7 @@ class Jobs extends Component
     // =========================================================================
 
     /**
-     * 
+     *
      */
 
     protected function memoizeJobRecord( JobRecord $record = null )
@@ -444,7 +475,7 @@ class Jobs extends Component
 
 
 
-    
+
     /**
      * Handles errors for given Coconut job.
      *

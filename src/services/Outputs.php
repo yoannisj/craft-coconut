@@ -21,7 +21,7 @@ use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\models\Config;
+use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\records\OutputRecord;
 
@@ -44,7 +44,7 @@ class Outputs extends Component
     // =========================================================================
 
     /**
-     * @param \yoannisj\coconut\models\Output $output
+     * @param Output $output
      * @param bool $runValidation
      *
      * @return bool
@@ -71,7 +71,7 @@ class Outputs extends Component
     }
 
     /**
-     * @param \yoannisj\coconut\models\Output $output
+     * @param Output $output
      *
      * @return bool
      */
@@ -111,26 +111,26 @@ class Outputs extends Component
     }
 
     /**
-     * Initializes outputs for given config
+     * Initializes outputs for given job
      */
 
-    public function initConfigOutputs( Config $config, int $coconutJobId = null )
+    public function initJobOutputs( Job $job )
     {
-        // delete existing config outputs (deletes output files)
-        $this->clearConfigOutputs($config);
+        // delete existing job outputs (deletes output files)
+        $this->clearJobOutputs($job);
 
         // initialize common attributes for new outputs
-        $outputVolume = $config->getOutputVolumeModel();
+        $outputVolume = $job->getOutputVolumeModel();
         $newAttrs = [
-            'sourceAssetId' => $config->getSourceAssetId(),
-            'source' => $config->getSource(),
+            'sourceAssetId' => $job->getSourceAssetId(),
+            'source' => $job->getSource(),
             'volumeId' => (int)$outputVolume->id,
-            'inProgress' => !!($coconutJobId),
-            'coconutJobId' => $coconutJobId,
+            'inProgress' => !!($job->coconutId),
+            'coconutJobId' => $job->coconutId,
         ];
 
-        // create new output for all output urls defined by config
-        $outputUrls = $config->getOutputUrls();
+        // create new output for all output urls defined by job
+        $outputUrls = $job->getOutputUrls();
         $newOutputs = [];
 
         foreach ($outputUrls as $format => $url)
@@ -157,18 +157,18 @@ class Outputs extends Component
     }
 
     /**
-     * Returns existing outputs for given coconut config model
+     * Returns existing outputs for given coconut job
      *
-     * @param \yoannisj\coconut\models\Config $config
+     * @param Job $job
      *
      * @return array
      */
 
-    public function getConfigOutputs( Config $config, array $criteria = [] ): array
+    public function getJobOutputs( Job $job, array $criteria = [] ): array
     {
-        $criteria = array_merge($config->getOutputCriteria(), $criteria);
+        $criteria = array_merge($job->getOutputCriteria(), $criteria);
 
-        // in case config does not define any criteria
+        // in case job does not define any criteria
         if (empty($criteria)) return [];
 
         $sourceAssetId = ArrayHelper::remove($criteria['sourceAssetId']);
@@ -179,42 +179,18 @@ class Outputs extends Component
     }
 
     /**
-     * @param \yoannisj\coconut\models\Config
+     * @param Job
      * @param array $criteria
      *
      * @return bool
      */
 
-    public function clearConfigOutputs( Config $config, array $criteria = [] )
+    public function clearJobOutputs( Job $job, array $criteria = [] )
     {
-        $configCriteria = $config->getOutputCriteria();
-        $criteria = array_merge($criteria, $configCriteria);
+        $jobCriteria = $job->getOutputCriteria();
+        $criteria = array_merge($criteria, $jobCriteria);
 
         return $this->clearOutputs($criteria);
-    }
-
-    /**
-     * 
-     */
-
-    public function getJobOutputs( int $jobId ): array
-    {
-        $criteria = [ 'coconutJobId' => $jobId ];
-        $records = OutputRecord::find()
-            ->where($criteria)
-            ->all();
-
-        $outputs = [];
-
-        foreach ($records as $record)
-        {
-            $output = new Output();
-            $output->setAttributes($record->getAttributes(), false);
-
-            $outputs[] = $output;
-        }
-
-        return $outputs;
     }
 
     /**
@@ -297,13 +273,13 @@ class Outputs extends Component
 
     public function getFormatOutputs( $source, array $formats = null, bool $transcodeMissing = false, bool $useQueue = null )
     {
-        // get source config and outputs
-        $sourceConfig = Coconut::$plugin->normalizeSourceConfig($source, null, false);
+        // get source job and outputs
+        $sourceJob = Coconut::$plugin->normalizeSourceJob($source, null, false);
         $sourceOutputs = $this->getSourceOutputs($source);
 
         // if no formats were specified, use configured formats
-        if (empty($formats) && $sourceConfig) {
-            $formats = array_keys($sourceConfig->getOutputs());
+        if (empty($formats) && $sourceJob) {
+            $formats = array_keys($sourceJob->getOutputs());
         }
 
         // select and index source outputs for formats
@@ -319,19 +295,18 @@ class Outputs extends Component
             $outputs[$output->format][] = $output;
         }
 
-
         if ($transcodeMissing)
         {
             // look for missing output formats
             $missingFormats = array_diff($formats, array_keys($outputs));
-    
+
             if (!empty($missingFormats))
             {
-                // limit config to missing formats only 
-                $config = $sourceConfig->forFormats($missingFormats);
+                // limit job to missing formats only
+                $job = $sourceJob->forFormats($missingFormats);
 
                 // transcode missing output formats, and merge in resulting outputs
-                $newOutputs = Coconut::$plugin->transcodeSource($source, $config, $useQueue);
+                $newOutputs = Coconut::$plugin->transcodeSource($source, $job, $useQueue);
                 $newOutputs = ArrayHelper::index($newOutputs, null, 'format');
 
                 $outputs = array_merge_recursive($outputs, $newOutputs);

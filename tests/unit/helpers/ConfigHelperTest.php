@@ -1,6 +1,6 @@
 <?php
 
-namespace yoannisj\coconuttests\unit;
+namespace yoannisj\coconuttests\unit\helpers;
 
 use Codeception\Specify;
 use Codeception\Test\Unit as UnitTest;

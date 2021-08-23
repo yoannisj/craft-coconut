@@ -15,16 +15,16 @@ namespace yoannisj\coconut\events;
 use yii\base\Event;
 
 /**
- * 
+ *
  */
 
 class JobEvent extends Event
 {
     /**
-     * @var |yoannisj\coconut\models\Config | null
+     * @var |yoannisj\coconut\models\Job | null
      */
 
-    public $config; 
+    public $job;
 
      /**
      * @var bool

@@ -1,6 +1,6 @@
 <?php
 
-namespace yoannisj\coconuttests\unit;
+namespace yoannisj\coconuttests\unit\services;
 
 use Codeception\AssertThrows;
 use Codeception\Test\Unit as UnitTest;
