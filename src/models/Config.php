@@ -22,6 +22,8 @@ use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\elements\Asset;
 use craft\helpers\UrlHelper;
+use craft\helpers\ArrayHelper;
+use craft\helpers\Json as JsonHelper;
 use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
@@ -111,6 +113,12 @@ class Config extends Model
 
     private $_outputs;
 
+    /**
+     * @var boolean Whether outputs property was normalized or not
+     */
+
+    protected $isNormalizedOutputs = false;
+
     // =Public Methods
     // =========================================================================
 
@@ -174,30 +182,27 @@ class Config extends Model
     {
         if (!$this->isNormalizedInput)
         {
-            $input = $this->_input;
+            $input = null;
 
-            if (!is_array($input))
-            {
-                if (!array_key_exists('class', $input)) {
-                    $input['class'] = Input::class;
-                }
-
-                $input = Craft::createObject($input);
+            if ($this->_input instanceof Input) {
+                $input = $this->_input;
             }
 
-            else
+            else if (is_array($this->_input)) {
+                $input = new Input($this->_input);
+            }
+
+            else if ($this->_input)
             {
-                $model = new Input();
+                $input = new Input();
 
-                if ($input instanceof Asset) {
-                    $model->asset = $input;
-                } else if (is_numeric($input)) {
-                    $model->assetId = (int)$input;
-                } else if (is_string($input)) {
-                    $model->url = $input;
+                if ($this->_input instanceof Asset) {
+                    $input->asset = $this->_input;
+                } else if (is_numeric($this->_input)) {
+                    $input->assetId = (int)$this->_input;
+                } else if (is_string($this->_input)) {
+                    $input->url = $this->_input;
                 }
-
-                $input = $model;
             }
 
             $this->_input = $input;
@@ -205,6 +210,98 @@ class Config extends Model
         }
 
         return $this->_input;
+    }
+
+    /**
+     * Setter method for defaulted `outputPathFormat` property
+     *
+     * @param string $pathFormat
+     */
+
+    public function setOutputPathFormat( string $pathFormat = null )
+    {
+        $this->_outputPathFormat = $pathFormat;
+
+        // update normalized output models
+        foreach ($this->getOutputs() as $key => $output)
+        {
+            // only set path format on outputs that don't have an explicit path
+            $explicitPath = $output->getExplicitPath();
+            if (empty($explicitPath)) $output->setPath($pathFormat);
+
+            $this->_outputs[$key] = $output;
+        }
+    }
+
+    /**
+     * Getter method for defaulte `outputPathFormat` property
+     *
+     * @return string
+     */
+
+    public function getOutputPathFormat(): string
+    {
+        return ($this->_outputPathFormat ??
+            Coconut::$plugin->getSettings()->defaultPathFormat);
+    }
+
+    /**
+     * @param Output[]|string[]|array[] $outputs
+     */
+
+    public function setOutputs( array $outputs )
+    {
+        $this->_outputs = $outputs;
+        $this->isNormalizedOutputs = false;
+    }
+
+    /**
+     * @return Output[]
+     */
+
+     public function getOutputs()
+    {
+        if (!$this->isNormalizedOutputs && isset($this->_outputs))
+        {
+            $outputs = [];
+
+            foreach ($this->_outputs as $formatKey => $params)
+            {
+                $output = null;
+
+                // support defining output as a format string (no extra params)
+                // or to define format fully in output's 'format' param (instead of in index)
+                if (is_numeric($formatKey))
+                {
+                    $output = $this->resolveOutputParams($params, null);
+                    $outputs[$output->key] = $output; // use output key as index
+                }
+
+                // support multiple outputs for 1 same format
+                // @see https://docs.coconut.co/jobs/api#same-output-format-with-different-settings
+                else if (is_array($params) && !empty($params)
+                    && ArrayHelper::isIndexed($params)
+                ) {
+                    $formatIndex = 1;
+
+                    foreach ($params as $prm)
+                    {
+                        $output = $this->resolveOutputParams($prm, $formatKey, $formatIndex++);
+                        $outputs[$formatKey][] = $output;
+                    }
+                }
+
+                else {
+                    $output = $this->resolveOutputParams($params, $formatKey);
+                    $outputs[$formatKey] = $output;
+                }
+            }
+
+            $this->_outputs = $outputs;
+            $this->isNormalizedOutputs = true;
+        }
+
+        return $this->_outputs;
     }
 
     /**
@@ -218,11 +315,12 @@ class Config extends Model
 
     public function setStorage( $storage )
     {
-        if (empty($storage))
+        if (!$storage)
         {
             $this->_storage = null;
             $this->_storageHandle = null;
             $this->_storageVolumeId = null;
+            $this->_storageVolume = null;
 
             $this->isNormalizedStorage = false;
         }
@@ -231,18 +329,28 @@ class Config extends Model
         {
             $this->_storage = $storage;
             $this->_storageHandle = null;
+            $this->_storageVolume = null;
             $this->_storageVolumeId = null;
 
             $this->isNormalizedStorage = true;
         }
 
-        else if ($storage instanceof VolumeInterface) {
-            $this->setStorageVolume($storage);
+        else if ($storage instanceof VolumeInterface)
+        {
+            // $this->_storage = null;
+            $this->_storageVolume = $storage;
+            $this->_storageHandle = $storage->handle;
+            $this->_storageVolumeId = $storage->id;
+            // $this->setStorageVolume($storage);
+
+            // force re-calculation next time storage is accessed
+            $this->isNormalizedStorage = false;
         }
 
         else if (is_string($storage) && $storage != $this->_storageHandle
             && (!$this->_storageVolume || $storage != $this->_storageVolume->handle)
         ) {
+            // $this->_storage = null;
             $this->_storageHandle = $storage;
             $this->_storageVolume = null;
             $this->_storageVolumeId = null;
@@ -278,12 +386,14 @@ class Config extends Model
             if (!empty($this->_storageHandle))
             {
                 // check named storage settings
-                $storage = Craft::$app->getSettings()
+                $storage = Coconut::$plugin->getStorages()
                     ->getNamedStorage($this->_storageHandle);
 
                 // or check volume by handle
-                if (!$storage && ($volume = $this->getStorageVolume())) {
-                    $storage = Coconut::resolveVolumeStorage($volume);
+                if (!$storage && ($volume = $this->getStorageVolume()))
+                {
+                    $storage = Coconut::$plugin->getStorages()
+                        ->getVolumeStorage($volume);
                 }
             }
 
@@ -409,128 +519,6 @@ class Config extends Model
     }
 
     /**
-     * Setter method for defaulted `outputPathFormat` property
-     *
-     * @param string $pathFormat
-     */
-
-    public function setOutputPathFormat( string $pathFormat = null )
-    {
-        $this->_outputPathFormat;
-
-        // update normalized output models
-        foreach ($this->getOutputs() as $key => $output)
-        {
-            // only set path format on outputs that don't have an explicit path
-            $explicitPath = $output->getExplicitPath();
-            if (empty($explicitPath)) $output->setPath($pathFormat);
-
-            $this->_outputs[$key] = $output;
-        }
-    }
-
-    /**
-     * Getter method for defaulte `outputPathFormat` property
-     *
-     * @return string
-     */
-
-    public function getOutputPathFormat(): string
-    {
-        return ($this->_outputPathFormat ??
-            Coconut::$plugin->getSettings()->defaultPathFormat);
-    }
-
-    /**
-     * @param array $outputs
-     */
-
-    public function setOutputs( array $outputs )
-    {
-        $this->_outputs = $outputs;
-        $this->isNormalizedOutputs = false;
-    }
-
-    /**
-     * @return array | null
-     */
-
-    public function getOutputs()
-    {
-        if (!$this->isNormalizedOutputs || !isset($this->_outputs))
-        {
-            $outputParams = [];
-
-            foreach ($this->_outputs as $key => $params)
-            {
-                // support defining output as format string (no extra params)
-                if (is_numeric($key)) {
-                    $key = $params;
-                    $params = [];
-                }
-
-                // support multiple outputs for 1 format
-                if (array_key_exists($key, $outputParams))
-                {
-                    $keyParams = $outputParams[$key];
-
-                    // @todo: remove duplicate output parameters
-
-                    if (ArrayHelper::isIndexed($keyParams)) {
-                        $keyParams[] = $params;
-                    } else {
-                        $keyParams = [ $keyParams, $params ];
-                    }
-
-                    $outputParams[$key] = $keyParams;
-                }
-
-                // support defining outputs as Output models
-                else if ($params instanceof Output) {
-                    // transforming to an array simplifies normalization happening below
-                    $outputParams[$key] = $params->toArray();
-                }
-
-                else {
-                    $outputParams[$key] = $params;
-                }
-            }
-
-            // resolve Output models from `outputs` config params
-            foreach ($outputParams as $key => $params)
-            {
-                // flatten list of multiple output settings for 1 same format
-                // so we can fill-in missing output keys
-                // @see https://docs.coconut.co/jobs/api#same-output-format-with-different-settings
-                if (ArrayHelper::isIndexed($params))
-                {
-                    $formatIndex = 1; // use index to generate missing `key` param
-                    foreach ($params as $prm)
-                    {
-                        $output = $this->resolveOutput($key, $prm, $formatIndex++);
-
-                        $outputKey = $output->getKey(); // includes index if `key` param was missing
-                        $outputs[$outputKey] = $output;
-                    }
-                }
-
-                else
-                {
-                    $output = $this->resolveOutput($key, $params);
-                    $outputKey = $output->getKey(); // returns format string if `key` param was missing
-
-                    $outputs[$outputKey] = $output;
-                }
-            }
-
-            $this->_outputs = $outputs;
-            $this->isNormalizedOutputs = true;
-        }
-
-        return $this->_outputs;
-    }
-
-    /**
      * Setter method for the resolved `nofitication` property
      *
      * @param string|Notification|null $notification
@@ -598,8 +586,8 @@ class Config extends Model
         $attributes = parent::attributes();
 
         $attributes[] = 'input';
-        $attributes[] = 'storage';
         $attributes[] = 'outputs';
+        $attributes[] = 'storage';
         $attributes[] = 'notification';
 
         return $attributes;
@@ -705,56 +693,76 @@ class Config extends Model
     // =========================================================================
 
     /**
-     * Resolves output parameters in Cococnut job config settings, and returns
-     * the corresponding Output model
+     * Resolves parameters for single output in Cococnut job config settings,
+     * and returns the corresponding Output model
      *
-     * @param string $key The key of the output params in the config's `outputs` list
-     * @param array|Output $output The output params from the config's `outputs` list
-     * @param string|null $formatIndex The output index when one format key was used to define multiple outputs
+     * @param array|Output $params The output params from the config's list of `outputs`
+     * @param string|null $formatKey The key of the output in the config's list of `outputs`
+     * @param string|null $formatIndex The output params index when more than one was given for this string index
      *
      * @return Output
      */
 
-    protected function resolveOutput( string $key, $output, string $formatIndex = null ): Output
-    {
-        if (is_string($output))
-        {
-            $output = JsonHelper::decodeIfJson($output);
+    /**
+     * @return Output|null
+     */
 
-            if (is_string($output)) {
-                $output = ConfigHelper::decodeOutput($output);
+    protected function resolveOutputParams( $params, $formatKey, int $formatIndex = null )
+    {
+        if (!$formatKey)
+        {
+            if (is_string($params))
+            {
+                $params =[
+                    'format' => ConfigHelper::decodeFormat($params)
+                ];
             }
         }
 
-        else if ($output instanceof Output)
+        $isArray = is_array($params);
+        $isModel = !$isArray && ($params instanceof Output);
+
+        if (!$isArray && !$isModel)
         {
-            $output->scenario = Output::SCENARIO_CONFIG;
-            $output = $output->toArray();
+            // var_dump($formatKey); var_dump($params);
+            // die();
+
+            throw new InvalidConfigException(
+                "Each output must be a format string, an array of output params or an Output model");
         }
 
-        else if (!is_array($output))
+        $output = null;
+
+        // merge format specs from output index with output params
+        $keySpecs = $formatKey ? ConfigHelper::decodeFormat($formatKey) : [];
+        $container = $keySpecs['container'] ?? null; // index should always define a container
+        $paramSpecs = ArrayHelper::getValue($params, 'format');
+
+        if (is_array($paramSpecs))
         {
-            throw new InvalidArgumentException(
-                "Output must be an array of parameters, a format string, or an ".Output::class." instance");
+            if ($container) $paramSpecs['container'] = $container;
+            $paramSpecs = ConfigHelper::parseFormat($paramSpecs);
         }
 
-        // get parsed format specs from output params key
-        $formatSpecs = ConfigHelper::decodeFormat($key);
-
-        // merge-in specs from 'format' parameter
-        if (array_key_exists('format', $output)) {
-            $formatSpecs = array_merge($formatSpecs, $output['format']);
+        else if (is_string($paramSpecs)) { // support defining 'format' param as a JSON or format string
+            $paramSpecs = ConfigHelper::decodeFormat($paramSpecs);
+            if ($container) $paramSpecs['container'] = $container;
         }
 
-        // default to output path format to resolve output paths
-        $path = ArrayHelper::getValue($output, 'path') ?? $this->_outputPathFormat;
+        // @todo: should index specs override param specs?
+        $formatSpecs = array_merge($keySpecs, $paramSpecs);
 
-        // create output model, and merge in normalized/default params
-        return new Output(array_merge([
-            'scenario' => Output::SCENARIO_CONFIG,
-            'format' => $formatSpecs,
-            'formatIndex' => $formatIndex,
-            'path' => $path,
-        ], $params));
+        if ($isArray)
+        {
+            $params['format'] = $formatSpecs;
+            $output = new Output($params);
+        }
+
+        else {
+            $output = $params;
+            $output->format = $formatSpecs;
+        }
+
+        return $output;
     }
 }

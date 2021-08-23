@@ -57,7 +57,7 @@ class OutputTest extends UnitTest
     // ------------------------------------------------------------------------
 
     /**
-     * * =decodeFormat( $format )
+     * =format
      * @test
      */
 

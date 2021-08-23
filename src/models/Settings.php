@@ -32,6 +32,7 @@ use yoannisj\coconut\helpers\ConfigHelper;
 /**
  * Model representing and validation Coconut plugin settings
  *
+ * @property string $apiKey
  * @property Storage[] $storages
  * @property Storage|null $defaultStorage
  * @property VolumeInterface|null $defaultUploadVolume
@@ -53,7 +54,7 @@ class Settings extends Model
      * @default null
      */
 
-    public $apiKey = null;
+    private $_apiKey = null;
 
     /**
      * @var boolean Whether transcoding videos should default to using the queue,
@@ -259,25 +260,34 @@ class Settings extends Model
     // =Public Methods
     // =========================================================================
 
+    // =Properties
+    // -------------------------------------------------------------------------
+
     /**
-     * @inheritdoc
+     * @param string|null $apiKey
      */
 
-    public function init()
+    public function setApiKey( string $apiKey = null )
     {
-        if (!isset($this->apiKey)) {
-            $this->apiKey = AppHelper::env('COCONUT_API_KEY');
+        $this->_apiKey = $apiKey;
+    }
+
+    /**
+     * @return string
+     */
+
+    public function getApiKey(): string
+    {
+        if (!isset($this->_apiKey)) {
+            $this->_apiKey = AppHelper::env('COCONUT_API_KEY');
         }
 
-        if (empty($this->apiKey)) {
+        if (empty($this->_apiKey)) {
             throw new InvalidConfigException("Missing required `apiKey` config setting");
         }
 
-        parent::init();
+        return $this->_apiKey;
     }
-
-    // =Properties
-    // -------------------------------------------------------------------------
 
     /**
      * Setter method for normalized `storages` setting
@@ -287,51 +297,38 @@ class Settings extends Model
 
     public function setStorages( array $storages )
     {
-        $this->_storages = $storages;
-        $this->isNormalizedStorages = false;
+        $this->_storages = [];
+
+        foreach ($storages as $name => $storage)
+        {
+            if (!is_string($name))
+            {
+                throw new InvalidConfigException(
+                    "Setting `storages` must be an associative array where keys are storage names");
+            }
+
+            if (is_array($storage)) {
+                $storage = new Storage($storage);
+            }
+
+            else if (!$storage instanceof Storage)
+            {
+                throw new InvalidConfigException(
+                    'Setting `storages` must resolve to a list of'.Storage::class.' models');
+            }
+
+            $this->_storages[$name] = $storage;
+        }
     }
 
     /**
      * Getter method for normalized `storages` setting
-     * 
+     *
      * @return Storage[]
      */
 
     public function getStorages(): array
     {
-        if (!$this->isNormalizedStorages)
-        {
-            foreach ($this->_storages as $name => $storage)
-            {
-                if (!is_string($name))
-                {
-                    throw new InvalidConfigException(
-                        "Setting `storages` must be an associative array"
-                        ." where keys are storage names");
-                }
-
-                if (is_array($storage))
-                {
-                    if (!array_key_exists('class', $storage)) {
-                        $storage['class'] = Storage::class;
-                    }
-
-                    $storage = Craft::createObject($storage);
-                }
-
-                else if (!$storage instanceof Storage)
-                {
-                    $class = Storage::class;
-                    throw new InvalidConfigException(
-                        "Setting `storages` must resolve to a list of $class models");
-                }
-
-                $this->_storages[$name] = $storage;
-            }
-
-            $this->isNormalizedStorages = true;
-        }
-
         return $this->_storages;
     }
 
@@ -343,7 +340,7 @@ class Settings extends Model
 
     public function setDefaultStorage( $storage )
     {
-        $this->_storage = $storage;
+        $this->_defaultStorage = $storage;
         $this->isNormalizedDefaultStorage = false;
     }
 
@@ -355,15 +352,21 @@ class Settings extends Model
 
     public function getDefaultStorage()
     {
-        if (!isset($this->_defaultStorage)) {
-            return null;
-        }
-
         if (!$this->isNormalizedDefaultStorage)
         {
-            $storage = Craft::parseEnv($this->_defaultStorage);
+            $storage = $this->_defaultStorage;
 
-            $this->_defaultStorage = ConfigHelper::parseStorage($storage);
+            if ($storage)
+            {
+                if (is_string($storage)) {
+                    $storage = Craft::parseEnv($storage);
+                }
+
+                $storage = Coconut::$plugin->getStorages()
+                    ->parseStorage($storage);
+            }
+
+            $this->_defaultStorage = $storage;
             $this->isNormalizedDefaultStorage = true;
         }
 
@@ -372,48 +375,47 @@ class Settings extends Model
 
     /**
      * Setter method for normalized `defaultUploadVolume` property
-     * 
-     * @param string|array|Volume
+     *
+     * @param string|array|VolumeInterfece
      */
 
     public function setDefaultUploadVolume( $volume )
     {
-        $this->_defaultUploadVolume = null;
+        $this->_defaultUploadVolume = $volume;
         $this->isNormalizedDefaultUploadVolume = false;
     }
 
     /**
-     * @param bool $createMissing Whether to create missing volume based on config settings
-     * 
-     * @return Volume|null
+     * @param bool $createMissing Whether to create the volume if it does not exist
+     *
+     * @return VolumeInterface|null
      */
 
-    public function getDefaultUploadVolume( bool $createMissing = false )
+    public function getDefaultUploadVolume( $createMissing = false )
     {
-        if (!isset($this->_defaultUploadVolume)) {
-            return null;
-        }
-
         if (!$this->isNormalizedDefaultUploadVolume)
         {
             $volume = $this->_defaultUploadVolume;
 
-            if (is_string($volume))
+            if (!$volume) {
+                $volume = null;
+            }
+
+            else if (is_array($volume)) {
+                $volume = $this->getVolumeModel($volume, true);
+            }
+
+            else if (is_string($volume))
             {
                 $volume = $this->getVolumeModel([
                     'handle' => $volume,
-                ], $createMissing);
-            }
-
-            if (is_array($volume)) {
-                $volume = $this->getVolumeModel($volume, $createMissing);
+                ], true);
             }
 
             else if (!$volume instanceof VolumeInterface)
             {
-                $class = VolumeInterface::class;
                 throw new InvalidConfigException(
-                    "Setting `defaultUploadVolume` must resolve to a model that implements $class");
+                    "Setting `defaultUploadVolume` must resolve to a model that implements ".VolumeInterface::class);
             }
 
             $this->_defaultUploadVolume = $volume;
@@ -769,9 +771,9 @@ class Settings extends Model
         {
             $slug = StringHelper::toKebabCase($handle);
 
-            $defaults['hasUrl'] = true;
-            $defaults['url'] = '@web/'.$slug;
+            $defaults['hasUrls'] = true;
             $defaults['path'] = '@webroot/'.$slug;
+            $defaults['url'] = '@web/'.$slug;
         }
 
         $config = array_merge($defaults, $config);

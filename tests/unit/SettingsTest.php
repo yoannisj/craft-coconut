@@ -61,6 +61,44 @@ class SettingsTest extends UnitTest
     // ------------------------------------------------------------------------
 
     /**
+     * =apiKey
+     */
+
+    public function testApiKey()
+    {
+        // get original environment variable
+        $envApiKey = AppHelper::env('COCONUT_API_KEY');
+
+        $this->specify('Defaults to the `COCONUT_API_KEY` environment variable',
+            function() use ($envApiKey)
+        {
+            // make sure there is an actual COCONUT_API_KEY environment variable
+            if (empty($envApiKey)) {
+                putenv("COCONUT_API_KEY=coconut----------------------api-key");
+            }
+
+            $settings = new Settings();
+
+            $this->assertSame(AppHelper::env('COCONUT_API_KEY'), $settings->apiKey);
+        });
+
+        $this->specify('Throws an error when accessed and empty',
+            function()
+        {
+            $this->assertThrows(InvalidConfigException::class, function()
+            {
+                $settings = new Settings();
+                $settings->apiKey = '';
+
+                $apiKey = $settings->apiKey;
+            });
+        });
+
+        // restore original environment variable
+        putenv("COCONUT_API_KEY=$envApiKey");
+    }
+
+    /**
      * =storages
      */
 

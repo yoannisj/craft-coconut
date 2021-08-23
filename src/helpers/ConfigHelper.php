@@ -588,7 +588,7 @@ class ConfigHelper
      * @return string|null
      */
 
-    public function containerType( string $container )
+    public static function containerType( string $container )
     {
         if (in_array($container, self::VIDEO_OUTPUT_CONTAINERS)) {
             return 'video';
@@ -609,7 +609,7 @@ class ConfigHelper
      * @return array
      */
 
-    public function containerFormatDefaults( string $container ): array
+    public static function containerFormatDefaults( string $container ): array
     {
         $base = self::CONTAINER_ALIASES[$container] ?? $container;
         $type = static::containerType($container);
@@ -657,7 +657,7 @@ class ConfigHelper
      * @return string
      */
 
-    public function privatisePath( string $path ): string
+    public static function privatisePath( string $path ): string
     {
         return preg_replace(self::PATH_PRIVATISATION_PATTERN, '$1_$2', $path);
     }
@@ -670,7 +670,7 @@ class ConfigHelper
      * @return string
      */
 
-    public function sequencePath( string $path ): string
+    public static function sequencePath( string $path ): string
     {
 
     }
@@ -809,7 +809,7 @@ class ConfigHelper
      * @return array All corresponding audio specification values (implicit and explicit)
      */
 
-    private function _decodeFormatAudioSpecs( string $container, string $segment = null )
+    private static function _decodeFormatAudioSpecs( string $container, string $segment = null )
     {
         // support disabling audio by using 'x'
         if ($segment == 'x') return [ 'audio_disabled' => true ];
