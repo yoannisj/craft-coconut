@@ -18,13 +18,13 @@ use yii\base\Event;
  *
  */
 
-class JobEvent extends Event
+class OutputEvent extends Event
 {
     /**
-     * @var |yoannisj\coconut\models\Job | null
+     * @var Output|null
      */
 
-    public $job;
+    public $output;
 
     /**
      * @var bool|null
@@ -37,10 +37,4 @@ class JobEvent extends Event
      */
 
     public $previousStatus;
-
-    /**
-     * @var string|null
-     */
-
-    public $previousInputStatus;
 }

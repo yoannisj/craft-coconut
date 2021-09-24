@@ -18,7 +18,7 @@ use craft\elements\db\ElementQueryInterface;
 use craft\helpers\Json;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  *
@@ -42,7 +42,7 @@ class TranscodeVideo extends ElementAction
     public function getTriggerHtml()
     {
         $type = Json::encode(static::class);
-        $fileExtensions = implode('|', ConfigHelper::SOURCE_FILE_EXTENSIONS);
+        $fileExtensions = implode('|', JobHelper::SOURCE_FILE_EXTENSIONS);
 
         $js = <<<EOD
 (function()

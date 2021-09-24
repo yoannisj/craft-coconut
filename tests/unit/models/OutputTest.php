@@ -12,7 +12,7 @@ use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Job;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  *
@@ -66,7 +66,7 @@ class OutputTest extends UnitTest
         $this->specify("Is parsed as a format string or array of format specs",
             function( $format )
         {
-            $parsedFormat = ConfigHelper::parseFormat($format);
+            $parsedFormat = JobHelper::parseFormat($format);
 
             $output = new Output();
             $output->format = $format;
@@ -172,7 +172,7 @@ class OutputTest extends UnitTest
         {
             $output = new Output();
             $output->format = $format;
-            $encoded = ConfigHelper::encodeFormat($format);
+            $encoded = JobHelper::encodeFormat($format);
 
             $this->assertEquals( $encoded, $output->formatString );
         }, [
@@ -276,7 +276,7 @@ class OutputTest extends UnitTest
             $output->path = '_coconut/outputs/{key}.mp4';
             $output->key = 'mp4:1080p';
 
-            $keyAsPath = ConfigHelper::keyAsPath($output->key);
+            $keyAsPath = JobHelper::keyAsPath($output->key);
 
             $this->assertSame( '_coconut/outputs/'.$keyAsPath.'.mp4', $output->path );
         });
@@ -288,7 +288,7 @@ class OutputTest extends UnitTest
             $output->path = '_coconut/outputs/video.{ext}';
             $output->format = [ 'container' => 'divx' ];
 
-            $extension = ConfigHelper::containerExtension('divx');
+            $extension = JobHelper::containerExtension('divx');
 
             $this->assertSame( '_coconut/outputs/video.'.$extension, $output->path );
         });

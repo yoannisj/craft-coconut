@@ -15,13 +15,14 @@ namespace yoannisj\coconut\records;
 use yii\base\InvalidConfigException;
 
 use Craft;
+use craft\db\ActiveRecord;
 use craft\helpers\Json as JsonHelper;
 
 use yoannisj\coconut\Coconut;
 
 /**
  * Active record for Job rows in database
- * 
+ *
  * @property integer id
  * @property string coconutId
  * @property string configParams
@@ -36,7 +37,7 @@ use yoannisj\coconut\Coconut;
  * @property Datetime inputExpires
  * @property string storageHandle
  * @property integer storageVolumeId
- * @property array storageSettings
+ * @property array storageParams
  * @property Datetime createdAt
  * @property Datetime completedAt
  * @property Datetime dateCreated
@@ -61,65 +62,8 @@ class JobRecord extends ActiveRecord
     // =========================================================================
 
     /**
-     * Setter method for transformerd `config` property
-     * 
-     * @param string|array|Config|null $config
-     */
-
-    public function setConfig( Config $config = null )
-    {
-        if (!$config) {
-            $this->_config = null;
-            $this->configParams = null;
-        }
-
-        else {
-            $this->_config = $config;
-            $this->configParams = JsonHelper::encode($config->toArray());
-        }
-    }
-
-    /**
-     * Getter method for transformed `config` property
-     * 
-     * @return Config|null
-     */
-
-    public function getConfig()
-    {
-        if (!isset($this->_config))
-        {
-            $config = $this->configParams;
-
-            if (is_string($config)) {
-                $config = JsonHelper::decode($config);
-            }
-
-            if (is_array($config))
-            {
-                if (!array_key_exists('class', $config)) {
-                    $config['class'] = Config::class;
-                }
-
-                $config = Craft::createObject($config);
-            }
-
-            if ($config && !$config instanceof Config)
-            {
-                $class = Config::class;
-                throw new InvalidConfigException(
-                    "Attribute `config` must be `null` or a $class representation (properties, JSON or instance)");
-            }
-
-            $this->_config = $config;
-        }
-
-        return $this->_config;
-    }
-
-    /**
      * Setter method for transformed `metadata` property
-     * 
+     *
      * @param string|array $metadata
      */
 
@@ -134,7 +78,7 @@ class JobRecord extends ActiveRecord
 
     /**
      * Getter method for transformed `metadata` property
-     * 
+     *
      * @return array
      */
 
@@ -150,29 +94,29 @@ class JobRecord extends ActiveRecord
     }
 
     /**
-     * Setter method for transformed `storageSettings` property
-     * 
+     * Setter method for transformed `storageParams` property
+     *
      * @param string|array
      */
 
-    public function setStorageSettings( $settings )
+    public function setStorageParams( $settings )
     {
         if (is_array($settings)) {
             $settings = JsonHelper::encode($settings);
         }
 
-        $this->storageSettings = $settings;
+        $this->storageParams = $settings;
     }
 
     /**
-     * Getter method for transformed `storageSettings` property
-     * 
+     * Getter method for transformed `storageParams` property
+     *
      * @return array
      */
 
-    public function getStorageSettings(): array
+    public function getStorageParams(): array
     {
-        $settings = $this->storageSettings ?? [];
+        $settings = $this->storageParams ?? [];
 
         if (is_string($settings)) {
             $settings = JsonHelper::decode($settings);

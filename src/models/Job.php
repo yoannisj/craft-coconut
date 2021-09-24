@@ -20,17 +20,20 @@ use Craft;
 use craft\base\VolumeInterface;
 use craft\base\Model;
 use craft\validators\HandleValidator;
+use craft\validators\DateTimeValidator;
 use craft\elements\Asset;
 use craft\helpers\UrlHelper;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
+use craft\helpers\DateTimeHelper;
 use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Notification;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\validators\AssociativeArrayValidator;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  *
@@ -41,9 +44,9 @@ class Job extends Model
     // =Static
     // =========================================================================
 
-    const JOB_STATUS_STARTING = 'job.starting';
-    const JOB_STATUS_COMPLETED = 'job.completed';
-    const JOB_STATUS_FAILED = 'job.failed';
+    const STATUS_STARTING = 'job.starting';
+    const STATUS_COMPLETED = 'job.completed';
+    const STATUS_FAILED = 'job.failed';
 
     // =Properties
     // =========================================================================
@@ -134,6 +137,18 @@ class Job extends Model
     protected $isFallbackStorage;
 
     /**
+     * @var Notification
+     */
+
+    private $_notification;
+
+    /**
+     * @var bool
+     */
+
+    protected $isNormalizedNotification;
+
+    /**
      * @var string|null Latest job status
      */
 
@@ -158,12 +173,6 @@ class Job extends Model
     public $message;
 
     /**
-     * @var Notification
-     */
-
-    private $_notification;
-
-    /**
      * @var array
      */
 
@@ -173,13 +182,13 @@ class Job extends Model
      * @var Datetime|null Date at which the job was created by Coconut service
      */
 
-    public $createdAt;
+    private $_createdAt;
 
     /**
      * @var Datetime|null Date at which the job was completed by Coconut service
      */
 
-    public $completedAt;
+    private $_completedAt;
 
     /**
      * @var Datetime|null Date at which the job was created in Craft's database
@@ -192,6 +201,12 @@ class Job extends Model
      */
 
     public $dateUpdated;
+
+    /**
+     * @var string
+     */
+
+    public $uid;
 
     // =Public Methods
     // =========================================================================
@@ -217,22 +232,6 @@ class Job extends Model
     //     return $props;
     // }
 
-     /**
-     * @inheritdoc
-     */
-
-    public function behaviors()
-    {
-        $behaviors = parent::behaviors();
-
-        $behaviors[] = [
-            'class' => PropertyAliasBehavior::class,
-            'camelCasePropertyAliases' => true,
-        ];
-
-        return $behaviors;
-    }
-
     // =Properties
     // -------------------------------------------------------------------------
 
@@ -249,6 +248,7 @@ class Job extends Model
     {
         $this->_input = $input;
 
+        // optimize for normal input values
         if ($input === null || $input instanceof Input) {
             $this->isNormalizedInput = true;
         } else {
@@ -272,27 +272,22 @@ class Job extends Model
     {
         if (!$this->isNormalizedInput)
         {
-            $input = null;
+            $input = $this->_input;
 
-            if ($this->_input instanceof Input) {
-                $input = $this->_input;
+            if (is_array($input)) {
+                $input = new Input($input);
             }
 
-            else if (is_array($this->_input)) {
-                $input = new Input($this->_input);
+            else if ($input instanceof Asset) {
+                $input = new Input([ 'asset' => $input ]);
             }
 
-            else if ($this->_input)
-            {
-                $input = new Input();
+            else if (is_numeric($input)) {
+                $input = new Input([ 'assetId' => (int)$input ]);
+            }
 
-                if ($this->_input instanceof Asset) {
-                    $input->asset = $this->_input;
-                } else if (is_numeric($this->_input)) {
-                    $input->assetId = (int)$this->_input;
-                } else if (is_string($this->_input)) {
-                    $input->url = $this->_input;
-                }
+            else if (is_string($input)) {
+                $input = new Input([ 'url' => $input ]);
             }
 
             $this->_input = $input;
@@ -311,28 +306,18 @@ class Job extends Model
     public function setOutputPathFormat( string $pathFormat = null )
     {
         $this->_outputPathFormat = $pathFormat;
-
-        // update normalized output models
-        foreach ($this->getOutputs() as $key => $output)
-        {
-            // only set path format on outputs that don't have an explicit path
-            $explicitPath = $output->getExplicitPath();
-            if (empty($explicitPath)) $output->setPath($pathFormat);
-
-            $this->_outputs[$key] = $output;
-        }
     }
 
     /**
-     * Getter method for defaulte `outputPathFormat` property
+     * Getter method for defaulted `outputPathFormat` property
      *
      * @return string
      */
 
     public function getOutputPathFormat(): string
     {
-        return ($this->_outputPathFormat ??
-            Coconut::$plugin->getSettings()->defaultPathFormat);
+        return ($this->_outputPathFormat ?:
+            Coconut::$plugin->getSettings()->defaultOutputPathFormat);
     }
 
     /**
@@ -341,8 +326,39 @@ class Job extends Model
 
     public function setOutputs( array $outputs )
     {
-        $this->_outputs = $outputs;
-        $this->isNormalizedOutputs = false;
+        if ($this->coconutId)
+        {
+            $currOutputs = $this->getOutputs();
+            $newOutputs = [];
+
+            foreach ($outputs as $output)
+            {
+                if (is_array($output)) {
+                    $output = new Output($output);
+                } else if (is_string($output)) {
+                    $output = new Output([ 'format' => $output ]);
+                } else if (!$output instanceof Output) {
+                    throw new InvalidConfigException('Could not resolve output');
+                }
+
+                $currOutput = $this->getOutputByKey($output->key);
+                if ($currOutput) {
+                    Craft::configure($currOutput, $output->getAttributes());
+                    $output = $currOutput;
+                }
+
+                $newOutputs[] = $output;
+            }
+
+            $this->_outputs = $newOutputs;
+            $this->isNormalizedOutputs = true;
+        }
+
+        else
+        {
+            $this->_outputs = $outputs;
+            $this->isNormalizedOutputs = false;
+        }
     }
 
     /**
@@ -351,40 +367,63 @@ class Job extends Model
 
      public function getOutputs()
     {
-        if (!$this->isNormalizedOutputs && isset($this->_outputs))
+        if (!$this->isNormalizedOutputs)
         {
             $outputs = [];
 
-            foreach ($this->_outputs as $formatKey => $params)
+            if (isset($this->_outputs))
             {
-                $output = null;
-
-                // support defining output as a format string (no extra params)
-                // or to define format fully in output's 'format' param (instead of in index)
-                if (is_numeric($formatKey))
+                // normalize set value for outputs property
+                foreach ($this->_outputs as $formatKey => $params)
                 {
-                    $output = $this->resolveOutputParams($params, null);
-                    $outputs[$output->key] = $output; // use output key as index
-                }
+                    $output = null;
 
-                // support multiple outputs for 1 same format
-                // @see https://docs.coconut.co/jobs/api#same-output-format-with-different-settings
-                else if (is_array($params) && !empty($params)
-                    && ArrayHelper::isIndexed($params)
-                ) {
-                    $formatIndex = 1;
-
-                    foreach ($params as $prm)
+                    // if job has an Id
+                    if ($this->id && $this->coconutId)
                     {
-                        $output = $this->resolveOutputParams($prm, $formatKey, $formatIndex++);
-                        $outputs[$formatKey][] = $output;
+                        if (!($params instanceof Output)
+                            && ArrayHelper::isAssociative($params)
+                        ) {
+                            throw new InvalidConfigException(
+                                'Existing job outputs must be an indexed list of output models or params');
+                        }
+
+                        $outputs[] = $this->resolveOutputParams($params, null);
+                    }
+
+                    // support defining output as a format string (no extra params)
+                    // or to define format fully in output's 'format' param (instead of in index)
+                    else if (is_numeric($formatKey))
+                    {
+                        $output = $this->resolveOutputParams($params, null);
+                        $outputs[$output->formatString] = $output; // use output key as index
+                    }
+
+                    // support multiple outputs for 1 same format
+                    // @see https://docs.coconut.co/jobs/api#same-output-format-with-different-settings
+                    else if (is_array($params) && !empty($params)
+                        && ArrayHelper::isIndexed($params)
+                    ) {
+                        $formatIndex = 1;
+
+                        foreach ($params as $prm)
+                        {
+                            $output = $this->resolveOutputParams($prm, $formatKey, $formatIndex++);
+                            $outputs[$formatKey][] = $output;
+                        }
+                    }
+
+                    else {
+                        $output = $this->resolveOutputParams($params, $formatKey);
+                        $outputs[$formatKey] = $output;
                     }
                 }
+            }
 
-                else {
-                    $output = $this->resolveOutputParams($params, $formatKey);
-                    $outputs[$formatKey] = $output;
-                }
+            else if (isset($this->id)) {
+                // get outputs from db records
+                $outputs = Coconut::$plugin->getOUtputs()
+                    ->getOutputsByJobId($this->id);
             }
 
             $this->_outputs = $outputs;
@@ -392,6 +431,131 @@ class Job extends Model
         }
 
         return $this->_outputs;
+    }
+
+    /**
+     * Setter method for reactive `storageHandle` property
+     *
+     * @param string|null $handle
+     */
+
+    public function setStorageHandle( string $handle = null )
+    {
+        if ($handle != $this->_storageHandle
+            && (!($volume = $this->getStorageVolume()) || $volume->handle != $handle)
+        ) {
+            $this->_storageHandle = $handle;
+            $this->_storageVolumeId = null;
+            $this->_storageVolume = null;
+            $this->_storage = null;
+
+            // force re-calculation next time storage is accessed
+            $this->isNormalizedStorage = false;
+        }
+    }
+
+    /**
+     * @return string|null
+     */
+
+    public function getStorageHandle()
+    {
+        return $this->_storageHandle;
+    }
+
+    /**
+     * Setter method for reactive 'storageVolumeId' property
+     *
+     * @param integer|null $volumeId
+     */
+
+    public function setStorageVolumeId( int $volumeId = null )
+    {
+        if (!$this->_storageVolumeId == $volumeId
+            && (!($volume = $this->getStorageVolume()) || $volume->id != $volumeId)
+        ) {
+            $this->_storageVolumeId = $volumeId;
+            $this->_storageVolume = null;
+            $this->_storageHandle = null;
+            $this->_storage = null;
+
+            // force re-calculation next time storage is accessed
+            $this->isNormalizedStorage = false;
+        }
+    }
+
+    /**
+     * Getter method for reactive `storageVolumeId` property
+     *
+     * @return integer|null
+     */
+
+    public function getStorageVolumeId()
+    {
+        if (!isset($this->_storageVolumeId)
+            && ($volume = $this->getStorageVolume())
+        ) {
+            $this->_storageVolumeId = $volume->id;
+        }
+
+        return $this->_storageVolumeId;
+    }
+
+    /**
+     * Setter method for reactive `storageVolume` property
+     *
+     * @param VolumeInterface|null $volume
+     */
+
+    public function setStorageVolume( VolumeInterface $volume = null )
+    {
+        if (!$volume || (!$currVolume = $this->getStorageVolume())
+            || $currVolume->id != $volume->id
+        ) {
+            $this->_storageVolume = $volume;
+            $this->_storageVolumeId = $volume ? $volume->id : null;
+            $this->_storageHandle = null;
+            $this->_storage = null;
+
+            // force re-calculation next time storage is accessed
+            $this->isNormalizedStorage = false;
+        }
+    }
+
+    /**
+     * Getter method for reactive `storageVolume` property
+     *
+     * @return VolumeInterface|null
+     */
+
+    public function getStorageVolume()
+    {
+        if (!$this->isNormalizedStorage
+            && !isset($this->_storageVolume))
+        {
+            $volume = null;
+
+            if ($this->_storageHandle)
+            {
+                $volume = Craft::$app->getVolumes()
+                    ->getVolumeByHandle($this->_storageHandle);
+            }
+
+            else if ($this->_storageVolumeId)
+            {
+                $volume = Craft::$app->getVolumes()
+                    ->getVolumeById($this->_storageVolumeId);
+            }
+
+            if ($volume)
+            {
+                $this->_storageVolume = $volume;
+                $this->_storageVolumeId = $volume->id;
+                $this->_storageHandle = $volume->handle;
+            }
+        }
+
+        return $this->_storageVolume;
     }
 
     /**
@@ -405,59 +569,32 @@ class Job extends Model
 
     public function setStorage( $storage )
     {
-        if (!$storage)
+        if (is_string($storage)) {
+            $storage = JsonHelper::decodeIfJson($storage);
+        }
+
+        if (is_numeric($storage)) {
+            $this->setStorageVolumeId((int)$storage);
+        }
+
+        else if (is_string($storage)) {
+            $this->setStorageHandle($storage);
+        }
+
+        else if ($storage instanceof VolumeInterface) {
+            $this->setStorageVolume($storage);
+        }
+
+        else
         {
-            $this->_storage = null;
+            $this->_storage = $storage ?: null;
             $this->_storageHandle = null;
             $this->_storageVolumeId = null;
             $this->_storageVolume = null;
-
-            $this->isNormalizedStorage = false;
         }
 
-        else if ($storage instanceof Storage)
-        {
-            $this->_storage = $storage;
-            $this->_storageHandle = null;
-            $this->_storageVolume = null;
-            $this->_storageVolumeId = null;
-
-            $this->isNormalizedStorage = true;
-        }
-
-        else if ($storage instanceof VolumeInterface)
-        {
-            // $this->_storage = null;
-            $this->_storageVolume = $storage;
-            $this->_storageHandle = $storage->handle;
-            $this->_storageVolumeId = $storage->id;
-            // $this->setStorageVolume($storage);
-
-            // force re-calculation next time storage is accessed
-            $this->isNormalizedStorage = false;
-        }
-
-        else if (is_string($storage) && $storage != $this->_storageHandle
-            && (!$this->_storageVolume || $storage != $this->_storageVolume->handle)
-        ) {
-            // $this->_storage = null;
-            $this->_storageHandle = $storage;
-            $this->_storageVolume = null;
-            $this->_storageVolumeId = null;
-
-            // force re-calculation next time storage is accessed
-            $this->isNormalizedStorage = false;
-        }
-
-        else {
-            $this->_storage = $storage;
-            $this->_storageHandle = null;
-            $this->_storageVolumeId = null;
-            $this->_storageVolume = null;
-
-            // force re-calculation next time storage is accessed
-            $this->isNormalizedStorage = false;
-        }
+        // force re-calculation next time storage is accessed
+        $this->isNormalizedStorage = false;
     }
 
     /**
@@ -518,60 +655,6 @@ class Job extends Model
         return $this->_storage;
     }
 
-        /**
-     * Getter method for reactive `storageVolumeId` property
-     *
-     * @return integer|null
-     */
-
-    public function getStorageVolumeId()
-    {
-        if (!isset($this->_storageVolumeId)
-            && ($volume = $this->getStorageVolume())
-        )
-        {
-            $this->_storageVolumeId = $volume->id;
-        }
-
-        return $this->_storageVolumeId;
-    }
-
-    /**
-     * Getter method for read-only `storageVolume` property
-     *
-     * @return VolumeInterface|null
-     */
-
-    public function getStorageVolume()
-    {
-        if (!$this->isNormalizedStorage
-            && !isset($this->_storageVolume))
-        {
-            $volume = null;
-
-            if ($this->_storageHandle)
-            {
-                $volume = Craft::$app->getVolumes()
-                    ->getVolumeByHandle($this->_storageHandle);
-            }
-
-            else if ($this->_storageVolumeId)
-            {
-                $volume = Craft::$app->getVolumes()
-                    ->getVolumeById($this->_storageVolumeId);
-            }
-
-            if ($volume)
-            {
-                $this->_storageVolume = $volume;
-                $this->_storageVolumeId = $volume->id;
-                $this->_storageHandle = $volume->handle;
-            }
-        }
-
-        return $this->_storageVolume;
-    }
-
     /**
      * Getter method for read-only `fallbackStorage` property
      *
@@ -609,57 +692,50 @@ class Job extends Model
     }
 
     /**
-     * Setter method for the normalized `nofitication` property
+     * Setter method for the normalized `notification` property
      *
-     * @param string|array|Notification|null $notification
+     * @param bool|string|array|Notification|null $notification
      */
 
     public function setNotification( $notification )
     {
-        if ($notification === null) {
-            $this->_notification = null;
-        }
-
-        else
-        {
-            $model = new Notification([
-                'metadata' => true,
-                'events' => true,
-            ]);
-
-            if (is_array($notification)) {
-                $model = Craft::configure($model, $notification);
-            }
-
-            else if (is_string($notification))
-            {
-                $model->type = 'http';
-                $model->url = $notification;
-            }
-
-            $this->_notification = $model;
-        }
+        $this->_notification = $notification;
+        $this->isNormalizedNotification = false;
     }
 
     /**
+     * Getter method for normalized `notification` property
+     *
      * @return Notification|null
      */
 
     public function getNotification()
     {
-        // support disabling notifications alltogether
-        if (!Coconut::$plugin->getSettings()->enableNotifications) {
-            return null;
-        }
-
-        if (!isset($this->_notification))
+        if (!$this->isNormalizedNotification)
         {
-            $this->_notification = new Notification([
-                'type' => 'http',
-                'url' => UrlHelper::actionUrl('coconut/jobs/notification'),
-                'metadata' => true,
-                'events' => true,
-            ]);
+            $settings = Coconut::$plugin->getSettings();
+            $notification = $this->_notification  ?? $settings->defaultJobNotification;
+
+            if (is_string($notification))
+            {
+                $notification = new Notification([
+                    'type' => 'http',
+                    'url' => $notification,
+                    'events' => true,
+                    'metadata' => true,
+                ]);
+            }
+
+            else if (is_array($notification))
+            {
+                $notification = new Notification(array_merge([
+                    'events' => true,
+                    'metadata' => true,
+                ], $notification));
+            }
+
+            $this->_notification = $notification;
+            $this->isNormalizedNotification = true;
         }
 
         return $this->_notification;
@@ -691,6 +767,58 @@ class Job extends Model
         return $this->_metadata;
     }
 
+    /**
+     * Setter method for normalized `createdAt` property
+     *
+     * @param string|integer|Datetime|null $createdAt
+     */
+
+    public function setCreatedAt( $createdAt )
+    {
+        if ($createdAt) {
+            $createdAt = DateTimeHelper::toDateTime($createdAt);
+        }
+
+        $this->_createdAt = $createdAt;
+    }
+
+    /**
+     * Getter method for normalized `createdAt` property
+     *
+     * @return DateTime|null
+     */
+
+    public function getCreatedAt()
+    {
+        return $this->_createdAt;
+    }
+
+    /**
+     * Setter method for normalized `completedAt` property
+     *
+     * @param string|integer|Datetime|null $completedAt
+     */
+
+    public function setCompletedAt( $completedAt )
+    {
+        if ($completedAt) {
+            $completedAt = DateTimeHelper::toDateTime($completedAt);
+        }
+
+        $this->_completedAt = $completedAt;
+    }
+
+    /**
+     * Getter method for normalized `completedAt` property
+     *
+     * @return DateTime|null
+     */
+
+    public function getCompletedAt()
+    {
+        return $this->_completedAt;
+    }
+
     // =Attributes
     // -------------------------------------------------------------------------
 
@@ -702,11 +830,27 @@ class Job extends Model
     {
         $attributes = parent::attributes();
 
-        $attributes[] = 'input';
-        $attributes[] = 'outputs';
-        $attributes[] = 'storage';
+        $attributes[] = 'storageHandle';
+        $attributes[] = 'storageVolumeId';
         $attributes[] = 'notification';
         $attributes[] = 'metadata';
+        $attributes[] = 'createdAt';
+        $attributes[] = 'completedAt';
+
+        return $attributes;
+    }
+
+    /**
+     * @inheritdoc
+     */
+
+    public function datetimeAttributes(): array
+    {
+        $attributes = parent::datetimeAttributes();
+
+        $attributes[] = 'outputPathFormat';
+        $attributes[] = 'createdAt';
+        $attributes[] = 'completedAt';
 
         return $attributes;
     }
@@ -723,9 +867,45 @@ class Job extends Model
         $rules = parent::rules();
 
         $rules['attrsRequired'] = [ ['input', 'storage', 'outputs'], 'required' ];
-        $rules['attrsString'] = [ ['outputPathFormat'], 'string' ];
+
+        $rules['attrsString'] = [ [
+            'outputPathFormat',
+            'progress',
+            'errorCode',
+            'message'
+        ], 'string' ];
+
+        $rules['attrAssociativeArray'] = [ ['metadata'], AssociativeArrayValidator::class ];
+
+        $rules['attrDateTime'] = [ [
+            'createdAt',
+            'completedAt',
+            'dateCreated',
+            'dateUpdated',
+        ], DateTimeValidator::class ];
+
+        $rules['statusInRange'] = [ 'status', 'in', 'range' => [
+            self::STATUS_STARTING,
+            self::STATUS_COMPLETED,
+            self::STATUS_FAILED,
+        ]];
+
+        $rules['errorCodeValid'] = [ 'errorCode', 'validateErrorCode'];
 
         return $rules;
+    }
+
+    /**
+     *
+     */
+
+    public function validateErrorCode( $attribute, $params, $validator )
+    {
+        if (!empty($this->$attribute))
+        {
+            $message = $model->message ?? Craft::t('coconut', 'Job API returned error');
+            $validator->addError($attribute, $message);
+        }
     }
 
     // =Fields
@@ -739,23 +919,8 @@ class Job extends Model
     {
         $fields = parent::fields();
 
-        // Some attributes are not fields if this job is yet to be ran
-        if (!($this->coconutId))
-        {
-            ArrayHelper::removeValue($fields, 'id');
-            ArrayHelper::removeValue($fields, 'coconutId');
-            ArrayHelper::removeValue($fields, 'status');
-            ArrayHelper::removeValue($fields, 'errorCode');
-            ArrayHelper::removeValue($fields, 'message');
-            ArrayHelper::removeValue($fields, 'metadata');
-            ArrayHelper::removeValue($fields, 'createdAt');
-            ArrayHelper::removeValue($fields, 'completedAt');
-        }
-
-        $fields[] = 'input';
-        $fields[] = 'storage';
-        $fields[] = 'outputs';
-        $fields[] = 'notification';
+        // some attributes should be 'extraFields'
+        ArrayHelper::removeValue($fields, 'storageParams');
 
         return $fields;
     }
@@ -768,26 +933,93 @@ class Job extends Model
     {
         $fields = parent::extraFields();
 
-        // Some attributes are not regular fields if this job is yet to be ran
-        if (!($this->coconutId))
-        {
-            $fields[] = 'id';
-            $fields[] = 'coconutId';
-            $fields[] = 'status';
-            $fields[] = 'errorCode';
-            $fields[] = 'message';
-            $fields[] = 'metadata';
-            $fields[] = 'createdAt';
-            $fields[] = 'completedAt';
-        }
-
-        $fields[] = 'outputPathFormat';
+        $fields[] = 'input';
+        $fields[] = 'outputs';
+        $fields[] = 'storage';
+        $fields[] = 'storageVolume';
 
         return $fields;
     }
 
     // =Operations
     // -------------------------------------------------------------------------
+
+    /**
+     * Returns coconut API parameters to create and start the job
+     *
+     * @return array
+     */
+
+    public function toParams(): array
+    {
+        if (!$this->input) {
+            return [];
+        }
+
+        $params = [
+            'input' => $this->input->toParams(),
+            'storage' => $this->storage->toParams(),
+            'notification' => $this->notification->toParams(),
+            'outputs' => [],
+        ];
+
+        foreach ($this->getOutputs() as $index => $output)
+        {
+            if (is_array($output))
+            {
+                foreach ($output as $formatIndex => $formatOutput) {
+                    $outputParams = $formatOutput->toParams();
+                    $params['outputs'][$index][$formatIndex] = $outputParams;
+                }
+            }
+
+            else {
+                $params['outputs'][$index] = $output->toParams();
+            }
+        }
+
+        return $params;
+    }
+
+    /**
+     * Returns output mode for given output key
+     *
+     * @param string $key
+     *
+     * @return Output|null
+     */
+
+    public function getOutputByKey( string $key )
+    {
+        $outputs = $this->getOutputs();
+
+        foreach ($outputs as $format => $output)
+        {
+            if (is_array($output))
+            {
+                foreach ($output as $index => $indexOutput)
+                {
+                    if ($indexOutput->key == $key) {
+                        return $indexOutput;
+                    }
+                }
+            }
+
+            else if ($output->key == $key) {
+                return $output;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     *
+     */
+
+    public function addOutput( Output $output )
+    {
+    }
 
     /**
      * Returns a new config model, which only includes given list of output
@@ -853,19 +1085,16 @@ class Job extends Model
             if (is_string($params))
             {
                 $params =[
-                    'format' => ConfigHelper::decodeFormat($params)
+                    'format' => JobHelper::decodeFormat($params)
                 ];
             }
         }
 
         $isArray = is_array($params);
-        $isModel = !$isArray && ($params instanceof Output);
+        $isModel = ($isArray == false && ($params instanceof Output));
 
         if (!$isArray && !$isModel)
         {
-            // var_dump($formatKey); var_dump($params);
-            // die();
-
             throw new InvalidConfigException(
                 "Each output must be a format string, an array of output params or an Output model");
         }
@@ -873,23 +1102,24 @@ class Job extends Model
         $output = null;
 
         // merge format specs from output index with output params
-        $keySpecs = $formatKey ? ConfigHelper::decodeFormat($formatKey) : [];
+        $keySpecs = $formatKey ? JobHelper::decodeFormat($formatKey) : [];
         $container = $keySpecs['container'] ?? null; // index should always define a container
         $paramSpecs = ArrayHelper::getValue($params, 'format');
 
         if (is_array($paramSpecs))
         {
             if ($container) $paramSpecs['container'] = $container;
-            $paramSpecs = ConfigHelper::parseFormat($paramSpecs);
+            $paramSpecs = JobHelper::parseFormat($paramSpecs);
         }
 
         else if (is_string($paramSpecs)) { // support defining 'format' param as a JSON or format string
-            $paramSpecs = ConfigHelper::decodeFormat($paramSpecs);
+            $paramSpecs = JobHelper::decodeFormat($paramSpecs);
             if ($container) $paramSpecs['container'] = $container;
         }
 
+
         // @todo: should index specs override param specs?
-        $formatSpecs = array_merge($keySpecs, $paramSpecs);
+        $formatSpecs = array_merge($keySpecs, $paramSpecs ?? []);
 
         if ($isArray)
         {

@@ -10,8 +10,8 @@ namespace yoannisj\coconuttests\fixtures;
 use Craft;
 use craft\records\VolumeFolder as VolumeFolderRecord;
 use craft\services\Volumes;
-use craft\test\ActiveFixture;
 use craft\helpers\FileHelper;
+use craft\test\ActiveFixture;
 
 /**
  * Class VolumeFolderFixture.

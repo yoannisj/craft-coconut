@@ -18,16 +18,23 @@ use yii\base\InvalidCallException;
 use Craft;
 use craft\base\VolumeInterface;
 use craft\helpers\StringHelper;
+use craft\helpers\UrlHelper;
+use craft\helpers\ArrayHelper;
+use craft\helpers\DateTimeHelper;
 use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\models\Input;
+use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Storage;
+use yoannisj\coconut\models\Job;
+use yoannisj\coconut\records\JobRecord;
 
 /**
  * Static helper class to work with coconut configs
  */
 
-class ConfigHelper
+class JobHelper
 {
     // =Constants
     // =========================================================================
@@ -636,7 +643,7 @@ class ConfigHelper
     /**
      * Returns the key for given format path
      *
-     * @param string $path The format path (as returned by `ConfigHelper::keyPath()`)
+     * @param string $path The format path (as returned by `JobHelper::keyPath()`)
      *
      * @return string The corresponding format key
      */
@@ -673,6 +680,268 @@ class ConfigHelper
     public static function sequencePath( string $path ): string
     {
 
+    }
+
+    /**
+     * Turns given URL public by replacing it's base wtih the
+     * 'publicBaseUrl' setting
+     *
+     * @param string $url
+     */
+
+    public static function publicUrl( string $url )
+    {
+        $publicBaseUrl = Coconut::$plugin->getSettings()->publicBaseUrl;
+
+        if (!empty($publicBaseUrl))
+        {
+            if (UrlHelper::isRootRelativeUrl($url)) {
+                return rtrim($publicBaseUrl, '/').'/'.$url;
+            }
+
+            $baseUrl = UrlHelper::baseUrl();
+            $protoRelativeBase = rtrim(preg_replace('/(http|https):\/\//', '://', $baseUrl), '/');
+
+            // is this a Craft URL ?
+            // (compare hosts to work around scheme inconsistencies)
+            if (strpos($url, $protoRelativeBase) !== false)
+            {
+                // replace base URL (with whatever scheme it uses) by public base URL
+                $baseUrlPattern = str_replace('/', '\/', preg_quote($protoRelativeBase));
+                $baseUrlPattern = '/(http|https)?'.$baseUrlPattern.'/';
+
+                // use public version of base URL
+                $url = preg_replace($baseUrlPattern, rtrim($publicBaseUrl, '/'), $url);
+            }
+        }
+
+        return $url;
+    }
+
+    /**
+     * Prepares and normalized structure of job data returned by the coconut API
+     * in order to populate the job, input and output models with it.
+     *
+     * @param array|object $data
+     *
+     * @return array
+     */
+
+    public static function prepareJobData( $data ): array
+    {
+        // move 'id' key to 'coconutId'
+        $data['coconutId'] = ArrayHelper::remove($data, 'id');
+
+        // rename date keys
+        $createdAt = ArrayHelper::remove($data, 'created_at');
+        if ($createdAt) $data['createdAt'] = $createdAt;
+
+        $completedAt = ArrayHelper::remove($data, 'completed_at');
+        if ($completedAt) $data['completedAt'] = $completedAt;
+
+        // remove 'null' input keys
+        $inputData = $data['input'] ?? null;
+        if ($inputData) $data['input'] = array_filter($data['input']);
+
+        // normalize structure of metadata
+        $metadata = ArrayHelper::remove($data, 'metadata');
+
+        if ($metadata && is_array($metadata))
+        {
+            $inputMetadata = $metadata['input'] ?? null;
+            $outputsMetadata = $metadata['outputs'] ?? null;
+
+            if ($inputMetadata)
+            {
+                $data['input'] = $data['input'] ?? [];
+                $data['input']['metadata'] = $inputMetadata;
+            }
+
+            if ($outputsMetadata)
+            {
+                $data['outputs'] = $data['outputs'] ?? [];
+
+                foreach ($outputsMetadata as $key => $outputMetadata)
+                {
+                    $foundOutputData = false;
+
+                    foreach ($data['outputs'] as $index => $outputData)
+                    {
+                        if ($outputData['key'] == $key)
+                        {
+                            $foundOutputData = true;
+                            $data['outputs'][$index]['metadata'] = $outputMetadata;
+                        }
+                    }
+
+                    if (!$foundOutputData)
+                    {
+                        // add output entry to data
+                        $data['outputs'][] = [
+                            'key' => $key,
+                            'metadata' => $metadata,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Poplates job model with given data (e.g. returned by API)
+     *
+     * @param Job $job
+     * @param array $data
+     *
+     * @return Job
+     */
+
+    public static function populateJobFromData( Job $job, array $data ): Job
+    {
+        $data = static::prepareJobData($data);
+
+        // $outputsData = ArrayHelper::remove($data, 'outputs');
+        // if ($outputsData)
+        // {
+        //     foreach ($outputsData as $outputData)
+        //     {
+        //         $outputKey = ArrayHelper::getValue($outputData, 'key');
+        //         $output = $job->getOutputByKey($outputKey);
+
+        //         if (!$output)
+        //         {
+        //             // add missing output, based on given data
+        //             $output = static::populateJobOutput(new Output([
+        //                 'job' => $job,
+        //                 'key' => $outputKey
+        //             ]), $outputData);
+
+        //             $job->addOutput($output);
+        //         }
+
+        //         else {
+        //             $output = static::populateJobOutput($output, $outputData);
+        //         }
+        //     }
+        // }
+
+        // update job with data received from Coconut
+        return static::populateObject($job, $data, true);
+    }
+
+    /**
+     *
+     */
+
+    public static function populateJobOutput( Output $output, array $data ): Output
+    {
+        return static::populateObject($output, $data);
+    }
+
+    /**
+     * Transfers data from given job record to job model
+     *
+     * @param Job $job
+     * @param JobRecord $record
+     *
+     * @return Job
+     */
+
+    public static function populateJobFromRecord( Job $job, JobRecord $record ): Job
+    {
+        $attrs = $record->getAttributes();
+
+        $job->setInput(new Input([
+            'assetId' => ArrayHelper::remove($attrs, 'inputAssetId'),
+            'url' => ArrayHelper::remove($attrs, 'inputUrl'),
+            // 'urlHash' => ArrayHelper::remove($attrs, 'inputUrlHash'),
+            'status' => ArrayHelper::remove($attrs, 'inputStatus'),
+            'metadata' => ArrayHelper::remove($attrs, 'inputMetadata'),
+            'expires' => ArrayHelper::remove($attrs, 'inputExpires'),
+        ]));
+
+        $job->setStorage(ArrayHelper::remove($attrs, 'storageHandle')
+            ?? ArrayHelper::remove($attrs,'storageVolumeId')
+            ?? ArrayHelper::remove($attrs,'storageParams'));
+
+        $job->setAttributes($attrs, false);
+
+        return $job;
+    }
+
+    /**
+     * Transfers data from given job model to job record
+     *
+     * @param JobRecord $record
+     * @param Job $job
+     *
+     * @return JobRecord
+     */
+
+    public static function populateRecordFromJob( JobRecord $record, Job $job): JobRecord
+    {
+        $attrs = $job->getAttributes();
+
+        $input = $job->getInput();
+        $record->inputAssetId = $input->assetId;
+        $record->inputUrl = $input->url;
+        // $record->inputUrlHash = $input->urlHash;
+        $record->inputStatus = $input->status;
+        $record->inputMetadata = $input->metadata;
+        $record->inputExpires = $input->expires;
+
+        // prioritize storage handle over storage volume id over plain storage params
+        $storageHandle = ArrayHelper::remove($attrs, 'storageHandle');
+        $storageVolumeId = ArrayHelper::remove($attrs, 'storageVolumeId');
+
+        if ($storageHandle) {
+            $record->storageHandle = $storageHandle;
+        } else if ($storageVolumeId) {
+            $record->storageVolumeId = $storageVolumeId;
+        } else if (($storage = $job->getStorage())) {
+            $record->storageParams = $storage->toParams();
+        }
+
+        $record->setAttributes($attrs, false);
+
+        return $record;
+    }
+
+    /**
+     * Populates object with given data
+     *
+     * @param object $object
+     * @param array|object $data Data to
+     * @param bool $recursive Whether values should be merged recursively
+     *
+     * @return object
+     */
+
+    public static function populateObject( object $object, $data, bool $recursive = true ): object
+    {
+        if (!is_object($data) && !is_array($data))
+        {
+            throw new InvalidArgumentException(
+                'Argument #2 `data` must be an array or object to traverse');
+        }
+
+        foreach ($data as $prop => $value)
+        {
+            if ((is_object($value) || ArrayHelper::isAssociative($value))
+                && ($currVal = $object->$prop)
+                && (is_object($currVal) || ArrayHelper::isAssociative($currVal))
+            ) {
+                $object->$prop = static::populateObject($currVal, $value, $recursive);
+            }
+
+            else {
+                $object->$prop = $value;
+            }
+        }
+
+        return $object;
     }
 
     // =Private Methods

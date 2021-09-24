@@ -23,11 +23,11 @@ use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 
 /**
  * Model representing and validating settings for Cococnut storage method
- * 
+ *
  * @property ServiceCredentials $credentials Credentials used for storage service
  * @property string $bucket_id Alias for 'bucket' property
  * @property string $container Alias for 'bucket' property
- * 
+ *
  */
 
 class ServiceCredentials extends Model
@@ -142,11 +142,36 @@ class ServiceCredentials extends Model
     // =Fields
     // -------------------------------------------------------------------------
 
+    // =Operations
+    // -------------------------------------------------------------------------
+
     /**
-     * @inheritdoc
+     * @return array
      */
 
-    public function fields()
+    public function toParams()
+    {
+        $params = [];
+
+        foreach ($this->paramFields() as $field)
+        {
+            $value = $this->$field;
+            $params[$field] = Craft::parseEnv($value);
+        }
+
+        return $params;
+    }
+
+    // =Protected Methods
+    // =========================================================================
+
+    /**
+     * Returns parameter field names supported by the Coconut API
+     *
+     * @return array
+     */
+
+    protected function paramFields(): array
     {
         $fields = [];
 
@@ -173,7 +198,4 @@ class ServiceCredentials extends Model
 
         return $fields;
     }
-
-    // =Protected Methods
-    // =========================================================================
 }

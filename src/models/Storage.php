@@ -271,10 +271,41 @@ class Storage extends Model
     // -------------------------------------------------------------------------
 
     /**
-     * @inheritdoc
+     * Returns Coconut API params for this job output
+     *
+     * @return array
      */
 
-    public function fields()
+    public function toParams(): array
+    {
+        $params = [];
+
+        foreach ($this->paramFields() as $field)
+        {
+            $value = $this->$field;
+
+            if ($field == 'credentials') {
+                $params['credentials'] = $value->toParams();
+            } else if (is_string($value)) {
+                $params[$field] = Craft::parseEnv($value);
+            } else {
+                $params[$field] = $value;
+            }
+        }
+
+        return $params;
+    }
+
+    // =Proteced Methods
+    // ========================================================================
+
+    /**
+     * Returns parameter field names supported by the Coconut API
+     *
+     * @return array
+     */
+
+    protected function paramFields(): array
     {
         // no service? use HTTP, (S)FTP protocol with `url` only
         if (empty($this->service)) {
@@ -283,10 +314,10 @@ class Storage extends Model
 
         // coconut test storage only supports the 'service' field
         else if ($this->service == 'coconut') {
-            return ['service'];
+            return [ 'service' ];
         }
 
-        // =common
+        // =common to all services
         $fields = [
             'service',
             'credentials',

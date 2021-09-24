@@ -20,7 +20,7 @@ use craft\records\Volume as VolumeRecord;
 use craft\errors\VolumeException;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\records\InputRecord;
+use yoannisj\coconut\records\JobRecord;
 
 /**
  * @property $id
@@ -56,51 +56,73 @@ class OutputRecord extends ActiveRecord
     // =Public Methods
     // =========================================================================
 
+    // =Attributes
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param string|array
+     */
+
+    public function setOffsets( $offsets )
+    {
+        if (is_array($offsets)) {
+            $offsets = implode(',', $offsets);
+        }
+
+        $this->offsets = $offsets;
+    }
+
+    /**
+     * @param string|array
+     */
+
+    public function setUrls( $urls )
+    {
+        if (is_array($urls)) {
+            $this->urls = JsonHelper::encode($urls);
+        }
+    }
+
+    /**
+     * @param string|array $metadata
+     */
+
+    public function setMetadata( $metadata )
+    {
+        if ($metadata && !is_string($metadata)) {
+            $metadata = JsonHelper::encode($metadata);
+        }
+
+        $this->metadata = $metadata;
+    }
+
+    /**
+     * @return array
+     */
+
+    public function getMetadata(): array
+    {
+        $metadata = $this->metadata ?? [];
+
+        if (is_string($metadata)) {
+            $metadata = JsonHelper::decode($metadata);
+        }
+
+        return $metadata;
+    }
+
     // =Relations
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the coconut input
+     * Returns the coconut job
      *
      * @return ActiveQueryInterface The relational query object
      */
 
-    public function getInput(): ActiveQueryInterface
+    public function getJob(): ActiveQueryInterface
     {
-        return $this->hasOne(InputRecord::class, ['id' => 'inputId']);
-    }
-
-    /**
-     * Setter method for memoized `volume` property
-     * 
-     * @param \craft\models\Volume|string|null $volume
-     */
-
-    public function setVolume( $volume )
-    {
-        if (is_string($volume)) {
-            $volume = Craft::$app->getVolumes()->getVolumeByHandle($volume);
-        }
-
-        if ($volume instanceof Volume) {
-            $this->_volume = $volume;
-            $this->volumeId = $volume->id;
-        }
-
-        else if (is_null($volume)) {
-            $this->_volume = null;
-        }
-    }
-
-    /**
-     * Returns the output volume (for storage)
-     *
-     * @return ActiveQueryInterface The relational query object
-     */
-
-    public function getVolume(): ActiveQueryInterface
-    {
-        return $this->hasOne(VolumeRecord::class, ['id' => 'volumeId']);
+        return $this->hasOne(JobRecord::class, ['id' => 'jobId']);
     }
 
     // =Events

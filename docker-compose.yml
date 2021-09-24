@@ -61,9 +61,10 @@ services:
       REDIS_VERSION: ${REDIS_VERSION:-5}
       CRAFT_VERSION: ${CRAFT_VERSION:-3.7}
       CRAFT_EDITION: ${CRAFT_EDITION:-solo}
-      WEB_URL: http://localhost:${WEB_PORT:-8080}
-      PRIMARY_SITE_URL: http://localhost:${WEB_PORT:-8080} # used by Craft >= 3.5
-      DEFAULT_SITE_URL: http://localhost:${WEB_PORT:-8080} # used by Craft < 3.5
+      WEB_URL: ${WEB_URL}
+      TUNNEL_URL: ${TUNNEL_URL:-''}
+      PRIMARY_SITE_URL: '@web' # used by Craft >= 3.5
+      DEFAULT_SITE_URL: '@web' # used by Craft < 3.5
       SECURITY_KEY: $SECURITY_KEY
       PACKAGE_NAME: $PACKAGE_NAME
     volumes: &craft-service-volumes
@@ -123,6 +124,26 @@ services:
     ports:
       - target: '${REDIS_PORT:-6379}'
         published: '${PUBLIC_PORT_PREFIX}${REDIS_PORT:-6379}'
+  ngrok:
+    image: wernight/ngrok
+    environment:
+      TUNNEL_TARGET_HOST: httpd
+      TUNNEL_TARGET_PORT: ${WEB_PORT:-8080}
+      NGROK_LOOK_DOMAIN: http://httpd
+      NGROK_PORT: ${WEB_PORT:-8080}
+      NGROK_PROTOCOL: ${TUNNEL_PROTOCOL:-HTTP}
+      NGROK_AUTH: ${NGROK_AUTH:-''}
+      NGROK_SUBDOMAIN: ${NGROK_SUBDOMAIN:-''}
+      NGROK_REGION: ${NGROK_REGION:-''}
+      NGROK_BINDTLS: ${TUNNEL_BINDTLS:-true}
+      NGROK_DEBUG: ${TUNNEL_DEBUG:-true}
+    init: true
+    networks:
+      - craftcms_tests_net
+    ports:
+      - ${PUBLIC_PORT_PREFIX}${TUNNEL_PORT:-4040}:${TUNNEL_PORT:-4040}
+    depends_on:
+      - httpd
 volumes: # docker internal networks
   cpresources:
     driver: local

@@ -32,8 +32,6 @@ use craft\helpers\ArrayHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\ElementHelper;
 
-use opencoconut\Coconut\Client as CoconutClient;
-
 use yoannisj\coconut\services\Storages;
 use yoannisj\coconut\services\Jobs;
 use yoannisj\coconut\services\Outputs;
@@ -62,16 +60,6 @@ class Coconut extends Plugin
 
     public static $plugin;
 
-
-    /**
-     *
-     */
-
-    public static function createClient()
-    {
-        $apiKey = $this->getSettings()->apiKey;
-        return new CoconutClient($apiKey);
-    }
 
     // =Tables (DB)
     // -------------------------------------------------------------------------
@@ -249,6 +237,18 @@ class Coconut extends Plugin
 
     // =Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Creates a new coconut client to connect to the coconut API
+     *
+     * @return \Coconut\Client
+     */
+
+    public function createClient()
+    {
+        $apiKey = $this->getSettings()->apiKey;
+        return new \Coconut\Client($apiKey);
+    }
 
     /**
      * @param string|Asset $source

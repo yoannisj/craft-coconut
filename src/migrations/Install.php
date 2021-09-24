@@ -31,6 +31,9 @@ class Install extends Migration
 
     public function safeUp()
     {
+
+    try {
+
         // check current tables
         $hasJobsTable = $this->db->tableExists(Coconut::TABLE_JOBS);
         $hasOutputsTable = $this->db->tableExists(Coconut::TABLE_OUTPUTS);
@@ -42,15 +45,16 @@ class Install extends Migration
                 'coconutId' => $this->string(32)->notNull(),
                 'status' => $this->string()->null(),
                 'progress' => $this->string()->null(),
-                'inputAssetId' => $this->integer()->notNull(),
+                'inputAssetId' => $this->integer()->null(),
                 'inputUrl' => $this->text()->null(),
                 'inputUrlHash' => $this->string(64)->null(),
                 'inputStatus' => $this->string()->null(),
                 'inputMetadata' => $this->longText()->null(),
                 'inputExpires' => $this->dateTime()->null(),
-                'storageHandle' => $this->string()->notNull(),
+                'outputPathFormat' => $this->string()->null(),
+                'storageHandle' => $this->string()->null(),
                 'storageVolumeId' => $this->integer()->null(),
-                'storageSettings' => $this->text()->null(),
+                'storageParams' => $this->text()->null(),
                 'createdAt' => $this->dateTime()->notNull(),
                 'completedAt' => $this->dateTime()->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
@@ -81,11 +85,30 @@ class Install extends Migration
                 'id' => $this->primaryKey(),
                 'jobId' => $this->integer()->null(),
                 'key' => $this->string()->notNull(),
-                'type' => $this->string()->notNull(),
                 'format' => $this->string(255)->notNull(),
-                'url' => $this->string()->notNull(),
-                'metadata' => $this->longText()->null(),
+                'path' => $this->string()->null(),
+                'if' => $this->string()->null(),
+                'deinterlace' => $this->boolean()->null(),
+                'square' => $this->boolean()->null(),
+                'blur' => $this->boolean()->null(),
+                'fit' => $this->string()->null(),
+                'transpose' => $this->string()->null(),
+                'hflip' => $this->boolean()->null(),
+                'vflip' => $this->boolean()->null(),
+                'offset' => $this->integer()->null(),
+                'duration' => $this->integer()->null(),
+                'number' => $this->integer()->null(),
+                'interval' => $this->integer()->null(),
+                'offsets' => $this->string()->null(),
+                'sprite' => $this->boolean()->null(),
+                'vtt' => $this->boolean()->null(),
+                'scene' => $this->text()->null(),
+                'watermark' => $this->text()->null(),
                 'status' => $this->string()->null(),
+                'url' => $this->string()->null(),
+                'urls' => $this->text()->null(),
+                'type' => $this->string()->notNull(),
+                'metadata' => $this->longText()->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
@@ -102,6 +125,12 @@ class Install extends Migration
         if (!$hasJobsTable || !$hasOutputsTable) {
             Craft::$app->db->schema->refresh();
         }
+
+    }
+
+    catch (\Throwable $e) {
+        var_dump($e->message); die();
+    }
 
         return true;
     }

@@ -19,6 +19,7 @@ use craft\helpers\ArrayHelper;
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 use yoannisj\coconut\models\Credentials;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Class representing notification params for the Coconut API
@@ -111,31 +112,36 @@ class Notification extends Model
     // =Fields
     // -------------------------------------------------------------------------
 
+    // =Operations
+    // -------------------------------------------------------------------------
+
     /**
-     * @inheritdoc
+     * Returns Coconut API params for this job output
+     *
+     * @return array
      */
 
-    public function fields()
+    public function toParams(): array
     {
-        $fields = [
-            'type',
-            'metadata',
-            'events',
+        $params = [
+            'type' => $this->type,
+            'events' => $this->events,
+            'metadata' => $this->metadata,
         ];
 
         switch ($this->type)
         {
             case 'http':
-                $fields[] = 'url';
+                $params['url'] = JobHelper::publicUrl($this->url);
                 break;
             case 'sns':
-                $fields[] = 'region';
-                $fields[] = 'credentials';
-                $fields[] = 'topic_arn';
+                $params['region'] = $this->region;
+                $params['credentials'] = $this->credentials;
+                $params['topic_arn'] = $this->topic_arn;
                 break;
         }
 
-        return $fields;
+        return $params;
     }
 
     // =Protected Methods

@@ -1,0 +1,10 @@
+handle: localUploads
+hasUrls: true
+name: 'Local Uploads'
+settings:
+  path: /app/web/uploads
+sortOrder: 1
+titleTranslationKeyFormat: null
+titleTranslationMethod: site
+type: craft\volumes\Local
+url: 'https://nanitweb.eu.ngrok.io/uploads'

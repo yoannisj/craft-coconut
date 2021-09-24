@@ -12,7 +12,7 @@ use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Storage;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Unit tests for Job model
@@ -89,7 +89,6 @@ class JobTest extends UnitTest
         $this->assertInstanceOf(Input::class, $job->input);
         $this->assertSame($asset->id, $job->input->assetId);
 
-
         // given
         $inputUrl = 'https://www.example.com/videos/video.mp4';
 
@@ -144,10 +143,10 @@ class JobTest extends UnitTest
      * =outputs
      *
      * @test
-     * @testdox Outputs property maps indexed list of outputs by their output key
+     * @testdox Outputs property maps indexed list of outputs by their output format string
      */
 
-    public function outputsPropertyMapsIndexedListOfOutputsByTheirOutputKey()
+    public function outputsPropertyMapsIndexedListOfOutputsByTheirOutputFormatString()
     {
         $job = new Job();
         $job->outputs = [
@@ -164,8 +163,8 @@ class JobTest extends UnitTest
             ])
         ];
 
-        foreach ($job->outputs as $key => $output) {
-            $this->assertSame($key, $output->key);
+        foreach ($job->outputs as $format => $output) {
+            $this->assertSame($format, $output->formatString);
         }
     }
 
@@ -215,10 +214,10 @@ class JobTest extends UnitTest
         $job = new Job();
         $job->outputs = $outputs;
 
-        foreach ($job->outputs as $key => $output)
+        foreach ($job->outputs as $format => $output)
         {
             $this->assertInstanceOf(Output::class, $output);
-            $this->assertSame($key, $output->key);
+            $this->assertSame($format, $output->formatString);
         }
     }
 
@@ -239,12 +238,12 @@ class JobTest extends UnitTest
         $job->outputs = $outputFormats;
 
         $index = 0;
-        foreach ($job->outputs as $key => $output)
+        foreach ($job->outputs as $format => $output)
         {
-            $parsedFormat = ConfigHelper::parseFormat($outputFormats[$index++]);
+            $parsedFormat = JobHelper::parseFormat($outputFormats[$index++]);
 
             $this->assertInstanceOf(Output::class, $output);
-            $this->assertSame($key, $output->key);
+            $this->assertSame($format, $output->formatString);
             $this->assertSame($parsedFormat, $output->format);
         }
     }

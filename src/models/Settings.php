@@ -21,6 +21,7 @@ use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\volumes\Local as LocalVolume;
 use craft\helpers\StringHelper;
+use craft\helpers\UrlHelper;
 use craft\helpers\App as AppHelper;
 use craft\helpers\Component as ComponentHelper;
 
@@ -54,6 +55,13 @@ class Settings extends Model
      */
 
     private $_apiKey = null;
+
+    /**
+     * @var string Public URL to use as *base* for all URLs sent to the Coconut API
+     * (i.e. local asset URLs and notification webhooks)
+     */
+
+    private $_publicBaseUrl;
 
     /**
      * @var boolean Whether transcoding videos should default to using the queue,
@@ -113,7 +121,7 @@ class Settings extends Model
     private $_storages = [];
 
     /**
-     * @var string|array|\yoannisj\coconut\models\StorageSettings
+     * @var string|array|\yoannisj\coconut\models\Storage
      *
      * The storage name or settings used to store Coconut output files when none
      * is given in transcoding job parameters.
@@ -172,7 +180,18 @@ class Settings extends Model
      * @default '_coconut/{path}/{key}.{ext}'
      */
 
-    public $defaultPathFormat = '_coconut/{path}/{key}.{ext}';
+    public $defaultOutputPathFormat = '_coconut/{path}/{key}.{ext}';
+
+    /**
+     * @var string|array|Notification|null Notification param to use if job
+     * notifications are enabled but job's own notification param is not set.
+     *
+     * @Note: it is recommended not to change this setting
+     *
+     * @default Notification for plugin's 'coconut/jobs/notify' controller action
+     */
+
+    private $_defaultJobNotification = null;
 
     /**
      * @var array Named coconut job settings.
@@ -189,7 +208,7 @@ class Settings extends Model
      *
      * The 'outputs' parameter can have indexed string items, in which case the string
      * will be used as `format` parameter, and the `path` parameter will be generated
-     * based on the `defaultPathFormat` setting.
+     * based on the `defaultOutputPathFormat` setting.
      *
      * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
      * their `path` parameter will be prefixed with an '_' (if it is not already).
@@ -203,7 +222,7 @@ class Settings extends Model
      *      'videoSources' => [
      *          'storage' => 'coconut', // assuming there is a volume with handle 'coconut'
      *          'outputs' => [
-     *              'webm', // will generate the output's `path` parameter based on `defaultPathFormat`
+     *              'webm', // will generate the output's `path` parameter based on `defaultOutputPathFormat`
      *              'mp4:360p',
      *              'mp4:720p',
      *              'mp4:1080p::quality=4' => [
@@ -286,6 +305,32 @@ class Settings extends Model
         }
 
         return $this->_apiKey;
+    }
+
+    /**
+     * Setter method for parsed `publicBaseUrl` property
+     *
+     * @param string|null $url
+     */
+
+    public function setPublicBaseUrl( string $url = null )
+    {
+        $this->_publicBaseUrl = $url;
+    }
+
+    /**
+     * Getter method for parsed `publicBaseUrl` property
+     *
+     * @return string|null
+     */
+
+    public function getPublicBaseUrl()
+    {
+        if ($this->_publicBaseUrl) {
+            return Craft::parseEnv($this->_publicBaseUrl);
+        }
+
+        return null;
     }
 
     /**
@@ -425,6 +470,34 @@ class Settings extends Model
     }
 
     /**
+     * Setter method for defaulted 'defaultJobNotification' property
+     *
+     * @param string|array|Notification|null $notification
+     */
+
+    public function setDefaultJobNotification( $notification )
+    {
+        $this->_defaultJobNotification = $notification;
+    }
+
+    /**
+     * Getter method for defaulted 'defaultJobNotification' property
+     *
+     * @return string|array|Notification
+     */
+
+    public function getDefaultJobNotification()
+    {
+        return $this->_defaultJobNotification ?? (new Notification([
+            'type' => 'http',
+            'url' => UrlHelper::actionUrl('coconut/jobs/notify'),
+            'params' => [],
+            'events'=> true,
+            'metadata'=> true,
+        ]));
+    }
+
+    /**
      * Setter method for normalized `jobs` setting
      *
      * @param array Map of named jobs where each key is a job name
@@ -548,9 +621,12 @@ class Settings extends Model
     {
         $attributes = parent::attributes();
 
+        $attributes[] = 'apiKey';
+        $attributes[] = 'publicBaseUrl';
         $attributes[] = 'storages';
         $attributes[] = 'defaultStorage';
         $attributes[] = 'defaultUploadVolume';
+        $attributes[] = 'defaultJobNotification';
         $attributes[] = 'jobs';
         $attributes[] = 'volumeJobs';
 
@@ -568,8 +644,8 @@ class Settings extends Model
     {
         $rules = parent::rules();
 
-        $rules['attrsRequired'] = [ ['apiKey', 'defaultUploadVolume', 'defaultPathFormat'], 'required' ];
-        $rules['attrsString'] = [ ['apiKey', 'defaultPathFormat'], 'string' ];
+        $rules['attrsRequired'] = [ ['apiKey', 'defaultUploadVolume', 'defaultOutputPathFormat'], 'required' ];
+        $rules['attrsString'] = [ ['apiKey', 'defaultOutputPathFormat'], 'string' ];
 
         // $rules['storagesStorageMap'] = [ ['storages'], 'validateStorageMap' ];
         // $rules['configsConfigMap'] = [ ['configs'], 'validateJobsMap' ];

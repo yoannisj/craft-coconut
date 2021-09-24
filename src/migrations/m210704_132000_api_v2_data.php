@@ -13,7 +13,7 @@ use craft\helpers\MigrationHelper;
 use craft\helpers\Assets as AssetsHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * m200914_132537_add_output_metadata_column migration.
@@ -161,7 +161,7 @@ class m210704_132000_api_v2_data extends Migration
             $url = $output['url'] ?? null;
 
             // populate new columns in outputs table
-            $key = ConfigHelper::formatString($format);
+            $key = JobHelper::formatString($format);
             $urlPath = $url ? parse_url($url, PHP_URL_PATH) : null;
             $type = $urlPath ? AssetsHelper::getFileKindByExtension($urlPath) : null;
             if ($urlPath && empty($type)) $type = 'httpstream'; // craft does not recognize 'httpstream' type

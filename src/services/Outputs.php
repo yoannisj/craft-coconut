@@ -24,6 +24,7 @@ use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\records\OutputRecord;
+use yoannisj\coconut\events\OutputEvent;
 
 /**
  * Singleton class to work with Coconut outputs
@@ -31,6 +32,12 @@ use yoannisj\coconut\records\OutputRecord;
 
 class Outputs extends Component
 {
+    // =Static
+    // =========================================================================
+
+    const EVENT_BEFORE_SAVE_OUTPUT = 'beforeSaveOutput';
+    const EVENT_AFTER_SAVE_OUTPUT = 'afterSaveOutput';
+
     // =Properties
     // =========================================================================
 
@@ -44,30 +51,94 @@ class Outputs extends Component
     // =========================================================================
 
     /**
+     * Updates a job output with given data
+     *
+     * @param Output $output Coconut job output to update
+     * @param array|object $data Output data to update output with
+     * @param bool $runValidation Whether to validate the updated output
+     *
+     * @return bool
+     */
+
+    public function updateOutput( Output $output, array $data, bool $runValidation = true )
+    {
+        if (!isset($output->id)) {
+            throw new InvalidArgumentException("Can not update new output");
+        }
+
+        $dataType = ArrayHelper::remove($data, 'type');
+        if (!$dataType != 'video' && $dataType != 'image' && $dataType != 'httpstream')
+        {
+            throw new InvalidArgumentException(
+                "Can not update job output with input or job data");
+        }
+
+        $key = ArrayHelper::getValue($data, 'key');
+        if ($key && $key != $output->key)
+        {
+            throw new InvalidArgumentException(
+                "Output key does not correspond with given data");
+        }
+
+        JobHelper::populateJobOutput($output, $data);
+
+        if (!$this->saveOutput($output, $runValidation)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * @param Output $output
      * @param bool $runValidation
      *
      * @return bool
      */
 
-    public function saveOutput( Output &$output, bool $runValidation = true ): bool
+    public function saveOutput( Output $output, bool $runValidation = true ): bool
     {
+        $isNewOutput = !isset($output->id);
+        $previousStatus = $output->status;
+
+        if ($this->hasEventHandlers(self::EVENT_BEFORE_SAVE_OUTPUT))
+        {
+            $this->trigger(self::EVENT_BEFORE_SAVE_OUTPUT, new OutputEvent([
+                'output' => $output,
+                'isNew' => $isNewOutput,
+                'previousStatus' => $previousStatus,
+            ]));
+        }
+
         if ($runValidation && !$output->validate()) {
             return false;
         }
 
-        $attrs = $output->getAttributes();
-        $isNew = !isset($output->id);
-        $record = $isNew ? new OutputRecord() : OutputRecord::findOne($output->id);
+        // get existing record for this output
+        $record = ($isNewOutput ? new OutputRecord() :
+            OutputRecord::findOne($output->id));
 
+        // update the record attributes and try saving
         $record->setAttributes($output->getAttributes(), false);
-        $success = $record->save();
+        // $record->type = $output->getType(); // read-only, but searchable attribute
+        if (!$record->save()) return false;
 
-        if ($success && $isNew) {
-            $output->id = $record->id;
+        // update output model's attributes based on what's now saved in the database
+        $output->id = $record->id;
+        $output->dateCreated = $record->dateCreated;
+        $output->dateUpdated = $record->dateUpdated;
+        $output->uid = $record->uid;
+
+        if ($this->hasEventHandlers(self::EVENT_AFTER_SAVE_OUTPUT))
+        {
+            $this->trigger(self::EVENT_AFTER_SAVE_OUTPUT, new OutputEvent([
+                'output' => $output,
+                'isNew' => $isNewOutput,
+                'previousStatus' => $previousStatus,
+            ]));
         }
 
-        return $success;
+        return true;
     }
 
     /**
@@ -154,6 +225,30 @@ class Outputs extends Component
         }
 
         return $newOutputs;
+    }
+
+    /**
+     * Returns all saved outputs for given job id
+     *
+     * @param int $jobId
+     *
+     * @return Output[]
+     */
+
+    public function getOutputsByJobId( int $jobId ): array
+    {
+        $records = OutputRecord::findAll([ 'jobId' => $jobId ]);
+        $outputs = [];
+
+        foreach ($records as $record)
+        {
+            $output = new Output();
+            $output->attributes = $record->attributes;
+
+            $outputs[] = $output;
+        }
+
+        return $outputs;
     }
 
     /**

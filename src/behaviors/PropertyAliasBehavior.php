@@ -94,13 +94,13 @@ class PropertyAliasBehavior extends Behavior
 
     public function canSetProperty( $name, $checkVars = true )
     {
-        $name = $this->camelCasePropertyAlias($name);
-
-        if (array_key_exists($name, $this->_propertyAliasesMap)) {
+        if (parent::canSetProperty($name, $checkVars)
+            || $this->getAliasedPropertyName($name)
+        ) {
             return true;
         }
 
-        return parent::canSetProperty($name, $checkVars);
+        return false;
     }
 
     /**
@@ -109,13 +109,13 @@ class PropertyAliasBehavior extends Behavior
 
     public function canGetProperty( $name, $checkVars = true )
     {
-        $name = $this->camelCasePropertyAlias($name);
-
-        if (array_key_exists($name, $this->_propertyAliasesMap)) {
+        if (parent::canGetProperty($name, $checkVars)
+            || $this->getAliasedPropertyName($name)
+        ) {
             return true;
         }
 
-        return parent::canGetProperty($name, $checkVars);
+        return false;
     }
 
     /**
@@ -124,13 +124,8 @@ class PropertyAliasBehavior extends Behavior
 
     public function __set( $name, $value )
     {
-        $name = $this->camelCasePropertyAlias($name);
-
-        if (array_key_exists($name, $this->_propertyAliasesMap)) {
-            $name = $this->_propertyAliasesMap[$name];
-        }
-
-        parent::__set($name, $value);
+        $name = $this->getAliasedPropertyName($name) ?? $name;
+        $this->owner->$name = $value;
     }
 
     /**
@@ -139,17 +134,46 @@ class PropertyAliasBehavior extends Behavior
 
     public function __get( $name )
     {
-        $name = $this->camelCasePropertyAlias($name);
-
-        if (array_key_exists($name, $this->_propertyAliasesMap)) {
-            $name = $this->_propertyAliasesMap[$name];
-        }
-
-        return parent::__get($name);
+        $name = $this->getAliasedPropertyName($name) ?? $name;
+        return $this->owner->$name;
     }
 
     // =Protected Methods
     // =========================================================================
+
+    /**
+     * Returns target property name for given property alias
+     *
+     * @param string $name
+     * @param bool $checkCamelCase
+     *
+     * @return string|null
+     */
+
+    protected function getAliasedPropertyName( string $name, bool $checkCamelCase = true )
+    {
+        foreach ($this->_propertyAliasesMap as $target => $aliases)
+        {
+            if (in_array($name, $aliases)) {
+                return $target;
+            }
+        }
+
+        if ($checkCamelCase && $this->camelCasePropertyAliases == true
+            && ($camelCased = $this->camelCasePropertyAlias($name)) != $name)
+        {
+            // if camel-cased property exists, than given property name aliases to it
+            if (property_exists($this->owner, $camelCased)) {
+                return $camelCased;
+            }
+
+            // maybe the camel-case version of this property name
+            // aliases to another property?
+            return $this->getAliasedPropertyName($camelCased, false);
+        }
+
+        return null;
+    }
 
     /**
      * Transforms given property name into camel case format if it should be

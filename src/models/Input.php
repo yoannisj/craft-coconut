@@ -25,9 +25,12 @@ use craft\helpers\FileHelper;
 use craft\helpers\Json as JsonHelper;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Model representing and validation Coconut inputs
+ *
+ * @todo: support service inputs (e.g. files directly uploaded from an S3 bucket, etc.)
  */
 
 class Input extends Model
@@ -259,7 +262,8 @@ class Input extends Model
     {
         $fields = parent::fields();
 
-        // this is an attribute, but should be an extraField
+        // this are attributes, but should be extraFields
+        $fields = ArrayHelper::withoutValue($fields, 'urlHash');
         $fields = ArrayHelper::withoutValue($fields, 'metadata');
 
         return $fields;
@@ -278,5 +282,18 @@ class Input extends Model
         $fields[] = 'metadata';
 
         return $fields;
+    }
+
+    /**
+     * Returns Coconut API params for this job output
+     *
+     * @return array
+     */
+
+    public function toParams(): array
+    {
+        return [
+            'url' => JobHelper::publicUrl($this->getUrl()),
+        ];
     }
 }

@@ -9,13 +9,13 @@ use UnitTester;
 use Craft;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  *
  */
 
-class ConfigHelperTest extends UnitTest
+class JobHelperTest extends UnitTest
 {
     use Specify;
 
@@ -63,14 +63,14 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Returns an empty array if given format string is empty",
             function()
         {
-            $decoded = ConfigHelper::decodeFormat('');
+            $decoded = JobHelper::decodeFormat('');
             $this->assertEquals( [], $decoded );
         });
 
         $this->specify("Recognizes base container in 1st segment of given format string",
             function( $container, $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertSame( $container, $decoded['container'] );
         }, [
             'examples' => [
@@ -96,7 +96,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Preserves alias container in 1st segment of given format string",
             function( $container, $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertSame( $container, $decoded['container'] );
         }, [
             'examples' => [
@@ -112,7 +112,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Preserves unknown container in 1st segment of given format string",
             function( $container, $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertSame( $container, $decoded['container'] );
         }, [
             'examples' => [
@@ -124,7 +124,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Includes implicit container specs in given format string",
             function( $container, $implicitSpecs )
         {
-            $decoded = ConfigHelper::decodeFormat($container);
+            $decoded = JobHelper::decodeFormat($container);
 
             foreach ($implicitSpecs as $spec => $value) {
                 $this->assertEquals( $decoded[$spec], $value );
@@ -136,7 +136,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `video_codec` in given format string",
             function( $format, $video_codec )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $video_codec, $decoded['video_codec'] );
         }, [
             'examples' => [
@@ -157,7 +157,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `resolution` definitions in given format string",
             function( $format, $implicitSpecs )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
 
             foreach ($implicitSpecs as $spec => $value)
             {
@@ -171,7 +171,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `resolution` definitions in given format string",
             function( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( '0x0', $decoded['resolution'] );
         }, [
             'examples' => [
@@ -185,7 +185,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `resolution` in given format string",
             function( $format, $resolution )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $resolution, $decoded['resolution'] );
         }, [
             'examples' => [
@@ -200,7 +200,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `video_bitrate` in given format string",
             function( $format, $video_bitrate )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $video_bitrate, $decoded['video_bitrate'] );
         }, [
             'examples' => [
@@ -214,7 +214,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `video_bitrate` in given format string",
             function( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( '1000k', $decoded['video_bitrate'] );
         }, [
             'examples' => [
@@ -226,7 +226,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes video `fps` in given format string",
             function( $format, $fps )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $fps, $decoded['fps'] );
         }, [
             'examples' => [
@@ -242,7 +242,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid video `fps` in given format string",
             function( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( '0fps', $decoded['fps'] );
         }, [
             'examples' => [
@@ -257,7 +257,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `audio_codec` in given format string",
             function( $format, $audio_codec )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $audio_codec, $decoded['audio_codec'] );
         }, [
             'examples' => [
@@ -278,7 +278,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `audio_bitrate` in given format string",
             function( $format, $audio_bitrate )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $audio_bitrate, $decoded['audio_bitrate'] );
         }, [
             'examples' => [
@@ -304,7 +304,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `audio_bitrate` in given format string",
             function( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( '128k', $decoded['audio_bitrate'] );
         }, [
             'examples' => [
@@ -319,7 +319,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `sample_rate` in given format string",
             function( $format, $sample_rate )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $sample_rate, $decoded['sample_rate'] );
         }, [
             'examples' => [
@@ -341,7 +341,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `sample_rate` in given format string",
             function( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( '44100hz', $decoded['sample_rate'] );
         }, [
             'examples' => [
@@ -356,7 +356,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `audio_channel` in given format string",
             function( $format, $audio_channel )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $audio_channel, $decoded['audio_channel'] );
         }, [
             'examples' => [
@@ -370,7 +370,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `pix_fmt` option in given format string",
             function( $format, $pix_fmt )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $pix_fmt, $decoded['pix_fmt'] );
         }, [
             'examples' => [
@@ -385,7 +385,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `pix_fmt` option in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'pix_fmt', $decoded );
         }, [
             'examples' => [
@@ -402,7 +402,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes boolean `2pass` option in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( true, $decoded['2pass'] );
         }, [
             'examples' => [
@@ -418,7 +418,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores boolean `2pass` option value in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( true, $decoded['2pass'] );
         }, [
             'examples' => [
@@ -432,7 +432,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `quality` option in given format string",
             function ( $format, $quality)
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $quality, $decoded['quality'] );
         }, [
             'examples' => [
@@ -447,7 +447,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `quality` option in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'quality', $decoded );
         }, [
             'examples' => [
@@ -461,7 +461,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores `quality` option if not supported by format codecs",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'quality', $decoded );
         }, [
             'examples' => [
@@ -476,7 +476,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Annuls `video_bitrate` when a valid `quality` option value is found in given format string",
             function ( $format, $quality )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( null, $decoded['video_bitrate'] );
         }, [
             'examples' => [
@@ -489,7 +489,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `maxrate` option in given format string",
             function ( $format, $maxrate )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $maxrate, $decoded['maxrate'] );
         }, [
             'examples' => [
@@ -503,7 +503,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `maxrate` option in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'maxrate', $decoded );
         }, [
             'examples' => [
@@ -516,7 +516,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores `maxrate` option if no valid `quality` option value is found in format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'maxrate', $decoded );
         }, [
             'examples' => [
@@ -531,7 +531,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `vprofile` option in given format string",
             function ( $format, $vprofile)
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $vprofile, $decoded['vprofile'] );
         }, [
             'examples' => [
@@ -549,7 +549,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `vprofile` option in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'vprofile', $decoded );
         }, [
             'examples' => [
@@ -566,7 +566,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores `vprofile` option if not supported by format codecs",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'vprofile', $decoded );
         }, [
             'examples' => [
@@ -580,7 +580,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes `level` format option in given format string",
             function ( $format, $level)
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $level, $decoded['level'] );
         }, [
             'examples' => [
@@ -605,7 +605,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores invalid `level` option in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'level', $decoded );
         }, [
             'examples' => [
@@ -621,7 +621,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores `level` option if not supported by format codecs",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'level', $decoded );
         }, [
             'examples' => [
@@ -635,7 +635,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Recognizes boolean `frag` option in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( true, $decoded['frag'] );
         }, [
             'examples' => [
@@ -647,7 +647,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Ignores boolean `frag` option value in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( true, $decoded['frag'] );
         }, [
             'examples' => [
@@ -659,7 +659,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Discards boolean `frag` option if not supported by format container",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertArrayNotHasKey( 'frag', $decoded );
         }, [
             'examples' => [
@@ -673,10 +673,10 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Discards all video specs if video segment is 'x' in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
 
             $this->assertSame( true, $decoded['video_disabled']);
-            foreach (ConfigHelper::VIDEO_SPECS as $spec) {
+            foreach (JobHelper::VIDEO_SPECS as $spec) {
                 $this->assertArrayNotHasKey( $spec, $decoded );
             }
         }, [
@@ -690,7 +690,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Discards video format options if video segment is 'x' in given format string",
             function( $format, $discarded_options )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             foreach ($discarded_options as $option) {
                 $this->assertArrayNotHasKey( $option, $decoded );
             }
@@ -705,10 +705,10 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Discards all audio specs if audio segment is 'x' in given format string",
             function ( $format )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
 
             $this->assertSame( true, $decoded['audio_disabled']);
-            foreach (ConfigHelper::AUDIO_SPECS as $spec) {
+            foreach (JobHelper::AUDIO_SPECS as $spec) {
                 $this->assertArrayNotHasKey( $spec, $decoded );
             }
         }, [
@@ -722,7 +722,7 @@ class ConfigHelperTest extends UnitTest
         $this->specify("Decodes all specs defined in given format strings",
             function( $format, $specs )
         {
-            $decoded = ConfigHelper::decodeFormat($format);
+            $decoded = JobHelper::decodeFormat($format);
             $this->assertEquals( $specs, $decoded );
         }, [
             'examples' => [
@@ -813,7 +813,7 @@ class ConfigHelperTest extends UnitTest
 
     public function encodeFormat()
     {
-        // @todo test behavior of `ConfigHelper::encodeFormat()` method
+        // @todo test behavior of `JobHelper::encodeFormat()` method
 
         $this->specify("Discards default spec values for container",
             function( $container, $defaults )
@@ -834,7 +834,7 @@ class ConfigHelperTest extends UnitTest
             function( $container, $defaults )
         {
             $format = array_merge([ 'container' => $container ], $defaults);
-            $parsed = ConfigHelper::parseFormat($format);
+            $parsed = JobHelper::parseFormat($format);
 
             $this->assertSame( [ 'container' => $container ], $parsed );
         }, [
@@ -847,7 +847,7 @@ class ConfigHelperTest extends UnitTest
             $container = 'mp4';
             $specs = array_merge([ 'container' => $container, ], $specs);
 
-            $parsed = ConfigHelper::parseFormat([
+            $parsed = JobHelper::parseFormat([
                 'container' => $container,
                 'resolution' => $definition,
             ]);
@@ -859,14 +859,14 @@ class ConfigHelperTest extends UnitTest
         // $this->specify('Accepts a format string by decoding it into an array of format specs',
         //     function( $format, $specs )
         // {
-        //     $parsed = ConfigHelper::parseFormat($format);
+        //     $parsed = JobHelper::parseFormat($format);
 
         //     $this->assertIsArray( $parsed );
         //     $this->assertSame( $parsed, $specs );
 
         // }, [ 'examples' => $this->provideValidFormatStringSpecs() ]);
 
-        // @todo test normalizatio behavior of `ConfigHelper::parseFormat()` method
+        // @todo test normalizatio behavior of `JobHelper::parseFormat()` method
     }
 
     // =Data
@@ -1574,14 +1574,14 @@ class ConfigHelperTest extends UnitTest
     {
         $data = [];
 
-        foreach (ConfigHelper::VIDEO_OUTPUT_CONTAINERS as $container)
+        foreach (JobHelper::VIDEO_OUTPUT_CONTAINERS as $container)
         {
-            $base = ConfigHelper::CONTAINER_ALIASES[$container] ?? $container;
+            $base = JobHelper::CONTAINER_ALIASES[$container] ?? $container;
             $specs = array_merge([],
-                ConfigHelper::DEFAULT_VIDEO_SPECS,
-                ConfigHelper::DEFAULT_AUDIO_SPECS,
-                (ConfigHelper::CONTAINER_VIDEO_SPECS[$base] ?? []),
-                (ConfigHelper::CONTAINER_AUDIO_SPECS[$base] ?? [])
+                JobHelper::DEFAULT_VIDEO_SPECS,
+                JobHelper::DEFAULT_AUDIO_SPECS,
+                (JobHelper::CONTAINER_VIDEO_SPECS[$base] ?? []),
+                (JobHelper::CONTAINER_AUDIO_SPECS[$base] ?? [])
             );
 
             $data[] = [
@@ -1605,12 +1605,12 @@ class ConfigHelperTest extends UnitTest
     {
         $data = [];
 
-        foreach (ConfigHelper::AUDIO_OUTPUT_CONTAINERS as $container)
+        foreach (JobHelper::AUDIO_OUTPUT_CONTAINERS as $container)
         {
-            $base = ConfigHelper::CONTAINER_ALIASES[$container] ?? $container;
+            $base = JobHelper::CONTAINER_ALIASES[$container] ?? $container;
             $specs = array_merge([],
-                ConfigHelper::DEFAULT_AUDIO_SPECS,
-                (ConfigHelper::DEFAULT_AUDIO_SPECS[$base] ?? [])
+                JobHelper::DEFAULT_AUDIO_SPECS,
+                (JobHelper::DEFAULT_AUDIO_SPECS[$base] ?? [])
             );
 
             $data[] = [
@@ -1634,12 +1634,12 @@ class ConfigHelperTest extends UnitTest
     {
         $data = [];
 
-        foreach (ConfigHelper::IMAGE_OUTPUT_CONTAINERS as $container)
+        foreach (JobHelper::IMAGE_OUTPUT_CONTAINERS as $container)
         {
-            $base = ConfigHelper::CONTAINER_ALIASES[$container] ?? $container;
+            $base = JobHelper::CONTAINER_ALIASES[$container] ?? $container;
             $specs = array_merge([],
-                ConfigHelper::DEFAULT_IMAGE_SPECS,
-                (ConfigHelper::CONTAINER_IMAGE_SPECS[$base] ?? [])
+                JobHelper::DEFAULT_IMAGE_SPECS,
+                (JobHelper::CONTAINER_IMAGE_SPECS[$base] ?? [])
             );
 
             $data[] = [

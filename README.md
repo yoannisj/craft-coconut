@@ -2,6 +2,13 @@
 
 Transcode your [Craft](https://www.craftcms.com) video assets with [Coconut.co](https://coconut.co/).
 
+## Manual Testing
+
+1. `docker-compose up -d`
+2. [http://localhost:8080](http://localhost:8080/admin)
+    - username: `craftcms`
+    - password: `craftcms2018!!`
+
 ## Todo
 
 - [ ] Better job error handling

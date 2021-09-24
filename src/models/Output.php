@@ -27,8 +27,10 @@ use craft\helpers\FileHelper;
 use craft\helpers\Assets as AssetsHelper;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 use yoannisj\coconut\models\Job;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\validators\AssociativeArrayValidator;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Model representing Coconut job outputs
@@ -45,8 +47,12 @@ class Output extends Model
     // =Static
     // =========================================================================
 
-    const SCENARIO_DEFAULT = 'default';
-    const SCENARIO_CONFIG = 'config';
+    const TYPE_VIDEO = 'video';
+    const TYPE_AUDIO = 'audio';
+    const TYPE_IMAGE = 'image';
+
+    const FIT_PAD = 'pad';
+    const FIT_CROP = 'crop';
 
     const STATUS_VIDEO_WAITING = 'video.waiting';
     const STATUS_VIDEO_QUEUED = 'video.queued';
@@ -140,12 +146,6 @@ class Output extends Model
     private $_pathFormat;
 
     /**
-     * @var array|null
-     */
-
-    private $_metadata;
-
-    /**
      * @var string Conditional expression to determine whether the
      *  output should be created or not
      *
@@ -158,7 +158,7 @@ class Output extends Model
      * @var boolean Whether to deinterlace the video output
      */
 
-    public $deinterlace;
+    public $deinterlace = false;
 
     /**
      * @var boolean Whether to crop the resulting output image to a squae
@@ -167,10 +167,17 @@ class Output extends Model
     public $square = false;
 
     /**
+     * @var integer Intensity of blur effect to apply to resulting image output.
+     *  Value must range from `1` to `5`.
+     */
+
+    public $blur;
+
+    /**
      * @var string Whether to 'crop' or 'pad' the resulting output
      */
 
-    public $fit = 'pad';
+    public $fit;
 
     /**
      * @var integer The rotation to apply to the output
@@ -197,11 +204,10 @@ class Output extends Model
     public $hflip = false;
 
     /**
-     * @var integer Intensity of blur effect to apply to resulting image output.
-     *  Value must range from `1` to `5`.
+     * @var integer The duration (in seconds) after which the resulting output should start
      */
 
-    public $blur;
+    public $offset;
 
     /**
      * @var integer The duration (in seconds) at which resulting output should be cut
@@ -210,28 +216,22 @@ class Output extends Model
     public $duration;
 
     /**
-     * @var integer The duration (in seconds) after which the resulting output should start
-     */
-
-    public $offset;
-
-    /**
      * @var integer Number of image outputs generated
      */
 
     public $number;
 
     /**
-     * @var float Interval (in seconds) between each image output to generate
+     * @var integer Interval (in seconds) between each image output to generate
      */
 
     public $interval;
 
     /**
-     * @var float[] Offsets (in seconds) at which to generate an image output
+     * @var integer[] Offsets (in seconds) at which to generate an image output
      */
 
-    public $offsets;
+    private $_offsets;
 
     /**
      * @var boolean Whether to combine resulting image outputs into a single
@@ -256,7 +256,7 @@ class Output extends Model
      * @see https://docs.coconut.co/jobs/outputs-images#gif-animation
      */
 
-    public $scene;
+    private $_scene;
 
     /**
      * @var array Url and position of watermark image to add to the resulting output.
@@ -267,7 +267,7 @@ class Output extends Model
      * @see https://docs.coconut.co/jobs/outputs-videos#watermark
      */
 
-    public $watermark;
+    private $_watermark;
 
     /**
      * @var string The URL to the generated output file (once stored)
@@ -279,7 +279,7 @@ class Output extends Model
      * @var string[] The list of URL's to the generated output files (once stored)
      */
 
-    public $urls;
+    private $_urls;
 
     /**
      * @var string Latest output status from Coconut job
@@ -287,6 +287,19 @@ class Output extends Model
      */
 
     public $status;
+
+    /**
+     * @var string Error message associated with this output
+     * @note This is only relevant if output has failed `status`
+     */
+
+    public $error;
+
+    /**
+     * @var array|null
+     */
+
+    private $_metadata;
 
     /**
      * @var \Datetime
@@ -300,8 +313,27 @@ class Output extends Model
 
     public $dateUpdated;
 
+    /**
+     * @var string
+     */
+
+    public $uid;
+
     // =Public Methods
     // =========================================================================
+
+    /**
+     * @inheritdoc
+     */
+
+    public function init()
+    {
+        parent::init();
+
+        if (!isset($this->fit)) {
+            $this->fit = self::FIT_PAD;
+        }
+    }
 
     // =Properties
     // -------------------------------------------------------------------------
@@ -350,7 +382,7 @@ class Output extends Model
 
         if (!empty($format)) {
             // Parse given format string or array of format specs
-            $format = ConfigHelper::parseFormat($format);
+            $format = JobHelper::parseFormat($format);
         }
 
         else if (!$isString && !is_array($format) && !is_null($format))
@@ -377,7 +409,7 @@ class Output extends Model
             if ($this->_key)
             {
                 try {
-                    $this->_format = ConfigHelper::parseFormat($this->_key);
+                    $this->_format = JobHelper::parseFormat($this->_key);
                 } catch (\Throwable $e) {
                     $this->_format = [];
                 }
@@ -432,7 +464,7 @@ class Output extends Model
         }
 
         // is this a template ?
-        else if (preg_match(ConfigHelper::PATH_EXPRESSION_PATTERN, $path))
+        else if (preg_match(JobHelper::PATH_EXPRESSION_PATTERN, $path))
         {
             $this->_explicitPath = null;
             $this->_pathFormat = $path;
@@ -460,20 +492,24 @@ class Output extends Model
             $path = $this->_explicitPath;
         }
 
-        // is current path a template?
-        else if ($this->_pathFormat)
+        // @todo: we need to define a default path here!
+
+        else
         {
+            // use output's path format, or fall back to defaultOutputPathFormat setting
+            $pathFormat = $this->getPathFormat();
+
             // @todo: support resolving Coconut input variables in paths
             // @see: https://docs.coconut.co/jobs/api#built-in-variables
 
             $vars = $this->pathVars();
 
             $path = preg_replace_callback(
-                ConfigHelper::PATH_EXPRESSION_PATTERN,
+                JobHelper::PATH_EXPRESSION_PATTERN,
                 function($matches) use ($vars) {
                     return $vars[ $matches[1] ] ?? '';
                 },
-                $this->_pathFormat
+                $pathFormat
             );
 
             // reduce conflicts if two outputs are resolved to the same path
@@ -497,7 +533,7 @@ class Output extends Model
         // make sure paths for image sequence outputs include a numbering placeholder
         if ($this->getType() == 'image'
             && ($this->number || $this->interval || !empty($this->offsets))
-            && !preg_match(ConfigHelper::SEQUENTIAL_PLACEHOLDER_PATTERN, $path)
+            && !preg_match(JobHelper::SEQUENTIAL_PLACEHOLDER_PATTERN, $path)
         ) {
             $path = (
                 pathinfo($path, PATHINFO_DIRNAME).'/'.
@@ -506,7 +542,85 @@ class Output extends Model
             );
         }
 
-        return ConfigHelper::privatisePath($path);
+        return JobHelper::privatisePath($path);
+    }
+
+    /**
+     * Setter method for normalized `offsets` property
+     *
+     * @param string|array|null $offsets
+     */
+
+    public function setOffsets( $offsets )
+    {
+        if (is_string($offsets)) {
+            $offsets = explode(',', $offsets);
+        }
+
+        $this->_offsets = $offsets;
+    }
+
+    /**
+     * Getter method for normalized `offsets` property
+     *
+     * @return array|null
+     */
+
+    public function getOffsets()
+    {
+        return $this->_offsets;
+    }
+
+    /**
+     * Setter method for normalized `scene` property
+     *
+     * @param string|array|null  $scene
+     */
+
+    public function setScene( $scene )
+    {
+        if (is_string($scene)) {
+            $scene = JsonHelper::decode($scene);
+        }
+
+        $this->_scene = $scene;
+    }
+
+    /**
+     * Getter method for normalized `scene` property
+     *
+     * @return array|null
+     */
+
+    public function getScene()
+    {
+        return $this->_scene;
+    }
+
+    /**
+     * Setter method for normalized `watermark` property
+     *
+     * @param string|array|null $watermark
+     */
+
+    public function setWatermark( $watermark )
+    {
+        if (is_string($watermark)) {
+            $watermark = JsonHelper::decode($watermark);
+        }
+
+        $this->_watermark = $watermark;
+    }
+
+    /**
+     * Getter method for normalized `watermark` property
+     *
+     * @return array|null
+     */
+
+    public function getWatermark()
+    {
+        return $this->_watermark;
     }
 
     /**
@@ -536,6 +650,32 @@ class Output extends Model
     }
 
     /**
+     * Setter method for normalized `urls` property
+     *
+     * @param string|array|null $urls
+     */
+
+    public function setUrls( $urls )
+    {
+        if (is_string($urls)) {
+            $urls = JsonHelper::decode($urls);
+        }
+
+        $this->_urls = $urls;
+    }
+
+    /**
+     * Getter method for normalized `urls` property
+     *
+     * @return array
+     */
+
+    public function getUrls()
+    {
+        return $this->_urls;
+    }
+
+    /**
      * Getter method for read-only `container` property
      *
      * @return string|null
@@ -560,7 +700,18 @@ class Output extends Model
     }
 
     /**
-     * Getter method for the read-only `type` property
+     * Setter method for defaulted `type` property
+     *
+     * @param string|null $type
+     */
+
+    public function setType( string $type = null )
+    {
+        $this->_type = $type;
+    }
+
+    /**
+     * Getter method for the defaulted `type` property
      *
      * @return string|null
      */
@@ -570,7 +721,7 @@ class Output extends Model
         if (!isset($this->_type)
             && !empty($container = $this->getContainer())
         ) {
-            $this->_type = ConfigHelper::containerType($container);
+            $this->_type = JobHelper::containerType($container);
         }
 
         return $this->_type;
@@ -587,7 +738,7 @@ class Output extends Model
         if (!isset($this->_formatString))
         {
             try {
-                $this->_formatString =  ConfigHelper::encodeFormat($this->getFormat());
+                $this->_formatString =  JobHelper::encodeFormat($this->getFormat());
             } catch (\Throwable $e) {
                 $this->_formatString = '';
             }
@@ -615,7 +766,26 @@ class Output extends Model
 
     public function getPathFormat()
     {
-        return $this->_pathFormat;
+        if ($this->_pathFormat) {
+            return $this->_pathFormat;
+        }
+
+        if (($job = $this->getJob())) {
+            return $job->getOutputPathFormat();
+        }
+
+        return Coconut::$plugin->getSettings()->defaultOutputPathFormat;
+    }
+
+    /**
+     * Returns whether this output uses the default path or not
+     *
+     * @return bool
+     */
+
+    public function isDefaultPath(): bool
+    {
+        return (!isset($this->_explicitPath) && !isset($this->_pathFormat));
     }
 
     // =Attributes
@@ -632,6 +802,12 @@ class Output extends Model
         $attributes[] = 'format';
         $attributes[] = 'key';
         $attributes[] = 'path';
+        $attributes[] = 'offsets';
+        $attributes[] = 'scene';
+        $attributes[] = 'watermark';
+        $attributes[] = 'urls';
+        $attributes[] = 'type';
+        $attributes[] = 'metadata';
 
         return $attributes;
     }
@@ -647,6 +823,59 @@ class Output extends Model
     {
         $rules = parent::rules();
 
+        $rules['attrRequired'] = [ [
+            'format',
+            'type',
+            'path'
+        ], 'required' ];
+
+        $rules['attrBoolean'] = [ [
+            'deinterlace',
+            'square',
+            'vflip',
+            'hflip',
+            'sprite',
+            'vtt',
+        ], 'boolean' ];
+
+        $rules['attrInteger'] = [ [
+            'id',
+            'jobId',
+            'formatIndex',
+            'blur',
+            'transpose',
+            'offset',
+            'duration',
+            'number',
+            'interval'
+        ], 'integer', 'min' => 0 ];
+
+        $rules['offsetsEachInteger'] = [ 'offsets', 'each', 'rule' => ['integer', 'min' => 0] ];
+
+        $rules['fitInRange'] = [ 'fit', 'in', 'range' => [
+            self::FIT_PAD,
+            self::FIT_CROP,
+        ] ];
+
+        $rules['sceneArrayKeys'] = [ 'scene', AssociativeArrayValidator::class,
+            'allowedKeys' => [ 'number', 'duration' ],
+            'requiredKeys' => [ 'number', 'duration' ],
+        ];
+
+        $rules['watermarkArrayKeys'] = [ 'watermark', AssociativeArrayValidator::class,
+            'allowedKeys' => [ 'url', 'position' ],
+            'requiredKeys' => [ 'url', 'position' ],
+        ];
+
+        $rules['typeInRange'] = [ 'type', 'in', 'range' => [
+            self::TYPE_VIDEO,
+            self::TYPE_AUDIO,
+            self::TYPE_IMAGE,
+        ] ];
+
+        $rules['urlUrl'] = [ 'url', 'url' ];
+        $rules['urlsEachUrl'] = [ 'urls', 'each', 'rule' => ['url'] ];
+
         return $rules;
     }
 
@@ -660,6 +889,8 @@ class Output extends Model
     public function fields()
     {
         $fields = parent::fields();
+
+        ArrayHelper::removeValue($fields, 'metadata');
 
         return $fields;
     }
@@ -676,10 +907,27 @@ class Output extends Model
         $fields[] = 'explicitPath';
         $fields[] = 'pathFormat';
         $fields[] = 'container';
-        $fields[] = 'type';
+
         $fields[] = 'metadata';
 
         return $fields;
+    }
+
+    /**
+     * Returns Coconut API params for this output
+     *
+     * @return array
+     */
+
+    public function toParams(): array
+    {
+        $paramFields = $this->paramFields();
+        $params = $this->toArray($paramFields);
+
+        // 'container' is not a format param supported by Coconut
+        ArrayHelper::remove($params['format'], 'container');
+
+        return $params;
     }
 
     // =Protected Methods
@@ -709,12 +957,59 @@ class Output extends Model
         }
 
         return [
-            'key' => ConfigHelper::keyAsPath($key),
-            'ext' => $format ? ConfigHelper::formatExtension($format) : null,
+            'key' => JobHelper::keyAsPath($key),
+            'ext' => $format ? JobHelper::formatExtension($format) : null,
             'path' => $inputPath,
             'filename' => ($inputPath ? pathinfo($inputPath, PATHINFO_FILENAME) : null),
             'hash' => $input ? $input->getUrlHash() : null,
         ];
     }
 
+    /**
+     * Returns parameter field names supported by the Coconut API
+     *
+     * @return array
+     */
+
+    protected function paramFields(): array
+    {
+        $fields = [
+            'key',
+            'path',
+            'if',
+            'format',
+        ];
+
+        switch ($this->type)
+        {
+            case 'video':
+            case 'image':
+                $fields[] = 'fit';
+                $fields[] = 'transpose';
+                $fields[] = 'vflip';
+                $fields[] = 'hflip';
+                $fields[] = 'watermark';
+            case 'video':
+            case 'audio':
+                $fields[] = 'offset';
+                $fields[] = 'duration';
+                break;
+            case 'image':
+                $fields[] = 'square';
+                $fields[] = 'blur';
+                if ($this->getContainer() == 'gif')
+                {
+                    $fields[] = 'scene';
+                } else {
+                    $fields[] = 'offsets';
+                    $fields[] = 'interval';
+                    $fields[] = 'number';
+                    $fields[] = 'sprite';
+                    $fields[] = 'vtt';
+                }
+                break;
+        }
+
+        return $fields;
+    }
 }
