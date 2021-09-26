@@ -869,6 +869,15 @@ class JobHelperTest extends UnitTest
         // @todo test normalizatio behavior of `JobHelper::parseFormat()` method
     }
 
+    /**
+     * @test
+     */
+
+    public function populateJobFromData()
+    {
+
+    }
+
     // =Data
     // ------------------------------------------------------------------------
 

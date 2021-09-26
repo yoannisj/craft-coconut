@@ -5,19 +5,81 @@ use craft\helpers\Db as DbHelper;
 
 use yoannisj\coconut\models\Job;
 
-$now = DbHelper::prepareDateForDb('now');
+$coconutSampleInput = 'https://s3.amazonaws.com/coconut.co/samples/1min.mp4';
+$coconutSampleInputHash = md5($coconutSampleInput);
+
+$now = new DateTime('now');
+$dbNow = DbHelper::prepareDateForDb($now);
+
+$yesterday = new DateTime('yesterday');
+$dbYesterday = DbHelper::prepareDateForDb($yesterday);
 
 return [
 
-    'externalInputJob' => [
+    'coconutSampleJobCompleted' => [
         'id' => 100,
-        'coconutId' => 'job-100------cid',
-        'inputUrl' => 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        'coconutId' => 'job-100----cid',
+        'status' => Job::STATUS_COMPLETED,
+        'progress' => '100%',
+        'inputAssetId' => null,
+        'inputUrl' => $coconutSampleInput,
+        'inputUrlHash' => $coconutSampleInputHash,
+        'inputStatus' => Input::STATUS_TRANSFERRED,
+        'inputMetadata' => null,
+        'inputExpires' => null,
+        'outputPathFormat' => null,
+        'storageHandle' => null,
+        'storageVolumeId' => null,
         'storageParams' => JsonHelper::encode([ 'service' => 'coconut' ]),
+        'createdAt' => $dbYesterday,
+        'completedAt' => unll,
+        'dateCreated' => $dbYesterday,
+        'dateUpdated' => $dbYesterday,
+        'uid' => 'job-100--------------------------uid',
+    ],
+
+    'coconutSampleJobFailed' => [
+        'id' => 101,
+        'coconutId' => 'job-101----cid',
+        'status' => Job::STATUS_FAILED,
+        'progress' => '33%',
+        'inputAssetId' => null,
+        'inputUrl' => $coconutSampleInput,
+        'inputUrlHash' => $coconutSampleInputHash,
+        'inputStatus' => Input::STATUS_TRANSFERRED,
+        'inputMetadata' => null,
+        'inputExpires' => null,
+        'outputPathFormat' => null,
+        'storageHandle' => null,
+        'storageVolumeId' => null,
+        'storageParams' => JsonHelper::encode([ 'service' => 'coconut' ]),
+        'createdAt' => $dbYesterday,
+        'completedAt' => unll,
+        'dateCreated' => $dbYesterday,
+        'dateUpdated' => $dbYesterday,
+        'uid' => 'job-101--------------------------uid',
+    ],
+
+    'coconutSampleJobStarting' => [
+        'id' => 102,
+        'coconutId' => 'job-102----cid',
         'status' => Job::STATUS_STARTING,
         'progress' => '0%',
-        'createdAt' => $now,
-        'uid' => 'job-100--------------------------uid',
+        'inputAssetId' => null,
+        'inputUrl' => $coconutSampleInput,
+        'inputUrlHash' => $coconutSampleInputHash,
+        'inputStatus' => Input::STATUS_STARTING,
+        'inputMetadata' => null,
+        'inputExpires' => null,
+        'outputPathFormat' => null,
+        'storageHandle' => null,
+        'storageVolumeId' => null,
+        'storageParams' => JsonHelper::encode([ 'service' => 'coconut' ]),
+        'createdAt' => $dbNow,
+        'completedAt' => unll,
+        'dateCreated' => $dbNow,
+        'dateUpdated' => $dbNow,
+        'uid' => 'job-102--------------------------uid',
     ],
 
 ];

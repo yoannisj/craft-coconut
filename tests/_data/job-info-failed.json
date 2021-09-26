@@ -1,0 +1,26 @@
+{
+  "id": "5yZlH12WX6jGGd",
+  "created_at": "2021-10-11 17:02:10 +0000",
+  "completed_at": "2021-10-11 17:02:24 +0000",
+  "status": "job.failed",
+  "progress": "100%",
+  "input": {
+    "status": "input.transferred"
+  },
+  "outputs": [
+    {
+      "key": "intro:webm:480p",
+      "type": "video",
+      "format": "webm:0x480",
+      "url": "https://s3.amazonaws.com/aws-us-east-1-media-test.coconut.co/11/17/3067613de3fa62b4be69d89407ddcf8c/_coconut//intro-webm-480p.webm",
+      "status": "video.encoded"
+    },
+    {
+      "key": "webm:480p",
+      "type": "video",
+      "format": "webm:0x480",
+      "error": "The media file couldn't be encoded because of a FFmpeg error.",
+      "status": "video.failed"
+    }
+  ]
+}
