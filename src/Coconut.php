@@ -40,7 +40,7 @@ use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\elements\actions\TranscodeVideo;
 use yoannisj\coconut\elements\actions\ClearVideoOutputs;
-use yoannisj\coconut\queue\jobs\transcodeSourceJob;
+use yoannisj\coconut\queue\jobs\RunJob;
 use yoannisj\coconut\variables\CoconutVariable;
 use yoannisj\coconut\events\VolumeStorageEvent;
 
