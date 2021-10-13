@@ -260,7 +260,7 @@ class Settings extends Model
      * @var array Container for normalized volume jobs
      */
 
-    private $_normalizedvolumeJobs = [];
+    private $_normalizedVolumeJobs = [];
 
     /**
      * @var array List of input volumes handles, for which the plugin should

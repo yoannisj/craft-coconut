@@ -17,6 +17,7 @@ use yii\base\InvalidCallException;
 
 use Craft;
 use craft\base\VolumeInterface;
+use craft\elements\Asset;
 use craft\helpers\StringHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\ArrayHelper;
@@ -351,6 +352,151 @@ class JobHelper
     // =========================================================================
 
     /**
+     * Resolved given value into an Input model
+     *
+     * @param mixed $input Input value to resolve
+     *
+     * @return Input|null
+     */
+
+    public static function resolveInput( $input )
+    {
+        if (empty($input)) {
+            return null;
+        }
+
+        if ($input instanceof Input) {
+            return $input;
+        }
+
+        if (is_array($input)) {
+            return new Input($input);
+        }
+
+        if ($input instanceof Asset) {
+            return new Input([ 'asset' => $input ]);
+        }
+
+        if (is_numeric($input)) {
+            return new Input([ 'assetId' => (int)$input ]);
+        }
+
+        if (is_string($input)) {
+            return new Input([ 'url' => $input ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return Output[]|null()
+     */
+
+    public function resolveOutputs( $outputs, Input $input = null )
+    {
+        if (empty($outputs)) return [];
+
+        $resolved = [];
+
+        // this job is still being configured
+        foreach ($outputs as $formatKey => $params)
+        {
+            $output = null;
+
+            // support defining output as a format string (no extra params)
+            // or to define format fully in output's 'format' param (instead of in index)
+            if (is_numeric($formatKey))
+            {
+                $output = static::resolveOutputParams($params, null);
+                $resolved[$output->formatString] = $output; // use output key as index
+            }
+
+            // support multiple outputs for 1 same format
+            // @see https://docs.coconut.co/jobs/api#same-output-format-with-different-settings
+            else if (is_array($params) && !empty($params)
+                && ArrayHelper::isIndexed($params)
+            ) {
+                $formatIndex = 1;
+
+                foreach ($params as $prm)
+                {
+                    $output = static::resolveOutputParams($prm, $formatKey, $formatIndex++);
+                    $resolved[$formatKey][] = $output;
+                }
+            }
+
+            else {
+                $output = static::resolveOutputParams($params, $formatKey);
+                $resolved[$formatKey] = $output;
+            }
+        }
+
+        return $resolved;
+
+    }
+
+    /**
+     *
+     */
+
+    public function resolveOutputParams( $params, string $formatKey = null, int $formatIndex = null )
+    {
+        if (!$formatKey)
+        {
+            if (is_string($params))
+            {
+                $params =[
+                    'format' => static::decodeFormat($params)
+                ];
+            }
+        }
+
+        $isArray = is_array($params);
+        $isModel = ($isArray == false && ($params instanceof Output));
+
+        if (!$isArray && !$isModel)
+        {
+            throw new InvalidArgumentException(
+                "Each output must be a format string, an array of output params or an Output model");
+        }
+
+        $output = null;
+
+        // merge format specs from output index with output params
+        $keySpecs = $formatKey ? static::decodeFormat($formatKey) : [];
+        $container = $keySpecs['container'] ?? null; // index should always define a container
+        $paramSpecs = ArrayHelper::getValue($params, 'format');
+
+        if (is_array($paramSpecs))
+        {
+            if ($container) $paramSpecs['container'] = $container;
+            $paramSpecs = static::parseFormat($paramSpecs);
+        }
+
+        else if (is_string($paramSpecs)) { // support defining 'format' param as a JSON or format string
+            $paramSpecs = static::decodeFormat($paramSpecs);
+            if ($container) $paramSpecs['container'] = $container;
+        }
+
+
+        // @todo: should index specs override param specs?
+        $formatSpecs = array_merge($keySpecs, $paramSpecs ?? []);
+
+        if ($isArray)
+        {
+            $params['format'] = $formatSpecs;
+            $output = new Output($params);
+        }
+
+        else {
+            $output = $params;
+            $output->format = $formatSpecs;
+        }
+
+        return $output;
+    }
+
+    /**
      * Parses given format string or array of format specs, by
      * analyzing and validating spec values against the format container,
      * and discarding invalid and irrelevant values.
@@ -521,7 +667,7 @@ class JobHelper
         }
 
         if ($type == 'video') {
-            return rtrim($container.':'.$audioSegment.':'.$optionsSegment, ':');
+            return rtrim($container.':'.$videoSegment.':'.$audioSegment.':'.$optionsSegment, ':');
         }
 
         if ($type == 'audio') {

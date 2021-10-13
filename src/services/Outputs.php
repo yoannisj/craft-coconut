@@ -21,10 +21,12 @@ use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\models\Job;
+use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Output;
+use yoannisj\coconut\models\Job;
 use yoannisj\coconut\records\OutputRecord;
 use yoannisj\coconut\events\OutputEvent;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Singleton class to work with Coconut outputs
@@ -41,14 +43,48 @@ class Outputs extends Component
     // =Properties
     // =========================================================================
 
-    /**
-     * @var array Resolved list of outputs per source url
-     */
-
-    protected $sourceOutputs = [];
-
     // =Public Methods
     // =========================================================================
+
+    /**
+     * Returns output for given input and format
+     *
+     * @param int|string|array|Asset|Input $input
+     * @param string|array $format
+     * @param bool $transcode Whether to transcode missing output with Coconut.co
+     *
+     * @return Output[]
+     */
+
+    public function getOutputs( $input, $outputs, bool $transcode = false ): array
+    {
+        $input = JobHelper::resolveInput($input);
+        $outputs = JobHelper::resolveOutputs($outputs);
+
+        $savedOutputs = $this->getOutputsForInput($input);
+    }
+
+    /**
+     *
+     */
+
+    public function getOutputsForInput( $input ): array
+    {
+        $input = JobHelper::resolveInput($input);
+        $jobs = Coconut::$plugin->getJobs()->getJobsForInput($input);
+
+        $outputs = [];
+
+        foreach ($jobs as $job)
+        {
+            // don't inlcude outputs Coconut does not know about ;)
+            if ($job->coconutId) {
+                $outputs += $job->getOutputs();
+            }
+        }
+
+        return $outputs;
+    }
 
     /**
      * Updates a job output with given data
@@ -289,12 +325,13 @@ class Outputs extends Component
     }
 
     /**
-     * Returns output model for given source video and output key
+     * Returns output model for given source video, and optionally for
+     * matching criteria.
      *
-     * @param \craft\elements\Asset | string $source
-     * @param array $criteria
+     * @param Asset | string $source Source for which to get outputs
+     * @param array $criteria Criteria against which returned outputs should match
      *
-     * @return yoannisj\coconut\models\Output | null
+     * @return Output | null
      */
 
     public function getSourceOutputs( $source, array $criteria = [] )

@@ -30,30 +30,14 @@ class CoconutVariable extends Component
     // =========================================================================
 
     /**
-     * @return array [ \yoannisj\coconut\models\Output ]
+     * @see yoannisj\coconut\services\Outputs::getOutputs()
+     *
+     * @return Output[]
      */
 
-    public function getOutputs( $source ): array
+    public function transcodeVideo( $video, $outputs = null ): array
     {
-        return Coconut::$plugin->getOutputs()->getOutputs($source);
-    }
-
-    /**
-     * @return \yoannisj\coconut\models\Output
-     */
-
-    public function getOutput( $source, string $key )
-    {
-        return Coconut::$plugin->getOutputs()->getOutput($source, $key);
-    }
-
-    /**
-     * @return string | null
-     */
-
-    public function getOutputUrl( $source, string $key )
-    {
-        return Coconut::$plugin->getOutputs()->getOutputUrl($source, $key);
+        return Coconut::$plugin->transcodeVideo($video, $outputs);
     }
 
     // =Protected Methods

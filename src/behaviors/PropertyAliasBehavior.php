@@ -15,6 +15,7 @@ namespace yoannisj\coconut\behaviors;
 use yii\base\InvalidConfigException;
 use yii\base\Behavior;
 
+use Craft;
 use craft\helpers\StringHelper;
 
 /**
@@ -35,7 +36,7 @@ class PropertyAliasBehavior extends Behavior
     public $camelCasePropertyAliases = false;
 
     /**
-     * @var arary Resolved list of camel case property aliases to check against
+     * @var array Resolved list of camel case property aliases to check against
      */
 
     private $_camelPropertyAliasesMap = [];
@@ -78,7 +79,7 @@ class PropertyAliasBehavior extends Behavior
                 if (!is_string($alias))
                 {
                     throw new InvalidConfigException(
-                        "Property alias must for `$target` must be a string");
+                        "Property alias for `$target` must be a string");
                 }
 
                 $this->_propertyAliasesMap[$alias] = $target;
@@ -152,12 +153,15 @@ class PropertyAliasBehavior extends Behavior
 
     protected function getAliasedPropertyName( string $name, bool $checkCamelCase = true )
     {
-        foreach ($this->_propertyAliasesMap as $target => $aliases)
-        {
-            if (in_array($name, $aliases)) {
-                return $target;
-            }
-        }
+        $target = $this->_propertyAliasesMap[$name] ?? null;
+        if ($target) return $target;
+
+        // foreach ($this->_propertyAliasesMap as $alias => $target)
+        // {
+        //     if (in_array($name, $aliases)) {
+        //         return $target;
+        //     }
+        // }
 
         if ($checkCamelCase && $this->camelCasePropertyAliases == true
             && ($camelCased = $this->camelCasePropertyAlias($name)) != $name)

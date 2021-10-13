@@ -68,7 +68,7 @@ class Jobs extends Component
      * @var Job[] List of memoized Coconut jobs indexed by their input asset ID
      */
 
-    private $_jobsPerInputAssetUrlHash = [];
+    private $_jobsPerInputUrlHash = [];
 
     /**
      * @var array[]
@@ -91,7 +91,7 @@ class Jobs extends Component
      * @param Job $job Th job model to run
      * @param boolean $runValidation Whether to validate given job before submitting it to Coconut
      *
-     * @return boolean
+     * @return boolean Whether job was successfully ran or not
      *
      * @throws \Coconut\Error if Coconut API could not be reached or returned an error
      */
@@ -101,26 +101,26 @@ class Jobs extends Component
         if (isset($job->coconutId))
         {
             throw new InvalidArgumentException(
-                'Can not re-run a job that has been ran before');
+                'Can not re-run a job that has been ran by Coconut.co before');
         }
 
-        if ($runValidation && !$job->validate()) {
-            return false;
+        if ($runValidation && !$job->validate())
+        {
+            Craft::info('Could not run Job due to validation error(s): '.
+                print_r($job->errors, true), __METHOD__);
+
+                return false;
         }
 
-        // use Coconut API to run the job (by creating a new one)
+        // use Coconut API to run the job
         // (throws an error if API is not reachable or returned an error code)
         $client = Coconut::$plugin->createClient();
-        $data = $client->job->create($job->toParams());
-        $data = ArrayHelper::toArray($data); // client return a StdObject instance
+        $data = $client->job->create($job->toParams()); // client will throw potential API errors
+        $data = ArrayHelper::toArray($data); // client returns a StdObject instance
 
         $job = JobHelper::populateJobFromData($job, $data);
 
-        if (!$this->saveJob($job)) {
-            return false;
-        }
-
-        return $job;
+        return true;
     }
 
     /**
@@ -156,23 +156,21 @@ class Jobs extends Component
 
         try
         {
-            // save job outputs
-            $coconutOutputs = Coconut::$plugin->getOutputs();
-            foreach ($job->getOutputs() as $output)
-            {
-                if (!$coconutOutputs->saveOutput($output, $runValidation))
-                {
-                    $transaction->rollBack();
-                    return false;
-                }
-            }
+            // save job record
+            $record = $isNewJob ? new JobRecord() : JobRecord::findOne($job->id);
+            $record = JobHelper::populateRecordFromJob($record, $job);
 
-            $record = JobHelper::populateRecordFromJob(new JobRecord(), $job);
+            $success = true;
 
             if (isset($record->id)) {
-                $record->update();
+                $success = $record->update();
             } else {
-                $record->insert();
+                $success = $record->insert();
+            }
+
+            if (!$success) {
+                $transaction->rollBack();
+                return false;
             }
 
             // update job model's attributes based on what's now saved in the database
@@ -180,6 +178,18 @@ class Jobs extends Component
             $job->dateCreated = $record->dateCreated;
             $job->dateUpdated = $record->dateUpdated;
             $job->uid = $record->uid;
+
+            // save job outputs
+            $coconutOutputs = Coconut::$plugin->getOutputs();
+            foreach ($job->getOutputs() as $output)
+            {
+                $output->jobId = $job->id;
+
+                if (!$coconutOutputs->saveOutput($output, $runValidation)) {
+                    $transaction->rollBack();
+                    return false;
+                }
+            }
 
             $transaction->commit();
         }
@@ -208,10 +218,10 @@ class Jobs extends Component
      *
      * @param Job $job
      *
-     * @return Job
+     * @return bool Whether job info could be retrieved
      */
 
-    public function pullJobInfo( Job $job )
+    public function pullJobInfo( Job $job ): bool
     {
         if (!isset($job->coconutId))
         {
@@ -229,7 +239,7 @@ class Jobs extends Component
             $job = JobHelper::populateJobFromData($job, $data);
         }
 
-        return $job;
+        return true;
     }
 
     /**
@@ -237,10 +247,10 @@ class Jobs extends Component
      *
      * @param Job $job
      *
-     * @return Job
+     * @return bool Whether metadata could be retrieved
      */
 
-    public function pullJobMetadata( Job $job )
+    public function pullJobMetadata( Job $job ): bool
     {
         if (!isset($job->coconutId))
         {
@@ -258,7 +268,7 @@ class Jobs extends Component
             $job = JobHelper::populateJobFromData($job, $data);
         }
 
-        return $job;
+        return true;
     }
 
     /**
@@ -412,7 +422,7 @@ class Jobs extends Component
      * @return Job[]
      */
 
-    public function getJobsForInputAsset( Asset $asset )
+    public function getJobsForInputAsset( Asset $asset ): array
     {
         return $this->getJobsForInputAssetId($asset->id);
     }
@@ -427,14 +437,17 @@ class Jobs extends Component
 
     public function getJobsForInputAssetId( int $assetId ): array
     {
-        if (!array_key_exists($this->assetId, $this->_jobsPerInputAssetId))
+        if (!array_key_exists($assetId, $this->_jobsPerInputAssetId))
         {
-            $records = JobRecord::findAll([
-                'inputAssetId' => $assetId,
-            ]);
+            $records = JobRecord::findAll([ 'inputAssetId' => $assetId ]);
 
-            foreach ($records as $record) {
-                $this->memoizeJobRecord($record);
+            if (!empty($records))
+            {
+                foreach ($records as $record) {
+                    $this->memoizeJobRecord($record);
+                }
+            } else {
+                $this->_jobsPerInputAssetId[$assetId] = [];
             }
         }
 
@@ -449,23 +462,48 @@ class Jobs extends Component
      * @return Job[]
      */
 
-    public function getJobsForInputUrl( string $url )
+    public function getJobsForInputUrl( string $url ): array
     {
         $urlHash = md5($url);
 
         if (!array_key_exists($urlHash, $this->_jobsPerInputUrlHash))
         {
-            $record = JobRecord::findByCondition([
-                'urlHash' => $urlHash,
-            ])->limit(1)->one();
+            $records = JobRecord::findAll([
+                'inputUrlHash' => $urlHash
+            ]);
 
-            if ($record) {
-                $this->memoizeJobRecord($record);
+            if (!empty($records))
+            {
+                foreach ($records as $record) {
+                    $this->memoizeJobRecord($record);
+                }
+            } else {
+                $this->_jobsPerInputUrlHash[$urlHash] = [];
             }
         }
 
         return $this->_jobsPerInputUrlHash[$urlHash];
     }
+
+    /**
+     *
+     */
+
+    public function getJobsForInput( $input ): array
+    {
+        $input = JobHelper::resolveInput($input);
+
+        if ($input->assetId) {
+            return $this->getJobsForInputAssetId($input->assetId);
+        }
+
+        else if ($input->url) {
+            return $this->getJobsForInputUrl($input->url);
+        }
+
+        return [];
+    }
+
 
 
 
@@ -615,18 +653,42 @@ class Jobs extends Component
     protected function memoizeJobRecord( JobRecord $record = null )
     {
         $job = JobHelper::populateJobFromRecord(new Job(), $record);
+        $input = $job->getInput();
 
-        $this->_jobsPerId[$record->id] = $job;
-        $this->_jobsPerCoconutId[$record->coconutId] = $job;
+        $this->_jobsPerId[$job->id] = $job;
 
-        if (!empty($record->inputAssetId)) {
-            $this->_jobsPerInputAssetId[$record->inputAssetId] = $job;
+        if (!empty($job->coconutId)) {
+            $this->_jobsPerCoconutId[$job->coconutId] = $job;
         }
 
-        if (!empty($record->inputAssetUrlHash)) {
-            $this->_jobsPerInputAssetUrlHash[$record->inputAssetUrlHash] = $job;
+        if (($assetId = $input->assetId))
+        {
+            if (!isset($this->_jobsPerInputAssetId[$assetId])) {
+                $this->_jobsPerInputAssetId[$assetId] = [];
+            }
+
+            $this->_jobsPerInputAssetId[$input->assetId][] = $job;
+        }
+
+        if (($urlHash = $input->urlHash))
+        {
+            if (!isset($this->_jobsPerInputUrlHash[$urlHash])) {
+                $this->_jobsPerInputUrlHash[$urlHash] = [];
+            }
+
+            $this->_jobsPerInputUrlHash[$input->urlHash][] = $job;
         }
     }
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Handles errors for given Coconut job.

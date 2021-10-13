@@ -284,7 +284,9 @@ class Storage extends Model
         {
             $value = $this->$field;
 
-            if ($field == 'credentials') {
+            if ($field == 'url') {
+                $params['url'] = JobHelper::publicUrl($value);
+            } else if ($field == 'credentials') {
                 $params['credentials'] = $value->toParams();
             } else if (is_string($value)) {
                 $params[$field] = Craft::parseEnv($value);

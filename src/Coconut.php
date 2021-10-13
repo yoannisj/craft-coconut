@@ -13,8 +13,9 @@
 namespace yoannisj\coconut;
 
 use yii\base\Event;
+use yii\base\Exception;
 use yii\base\InvalidArgumentException;
-use yii\base\InvalidValueException;
+use yii\base\InvalidConfigException;
 
 use Craft;
 use craft\base\VolumeInterface;
@@ -43,6 +44,7 @@ use yoannisj\coconut\elements\actions\ClearVideoOutputs;
 use yoannisj\coconut\queue\jobs\RunJob;
 use yoannisj\coconut\variables\CoconutVariable;
 use yoannisj\coconut\events\VolumeStorageEvent;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Coconut plugin class for Craft
@@ -165,8 +167,8 @@ class Coconut extends Plugin
             Asset::class,
             Element::EVENT_REGISTER_ACTIONS,
             function( RegisterElementActionsEvent $e ) {
-                $e->actions[] = TranscodeVideo::class;
-                $e->actions[] = ClearVideoOutputs::class;
+                // $e->actions[] = TranscodeVideo::class;
+                // $e->actions[] = ClearVideoOutputs::class;
             }
         );
 
@@ -237,6 +239,157 @@ class Coconut extends Plugin
 
     // =Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Returns Coconut outputs for given video, or transcodes them if they
+     * have not been transcoded before
+     *
+     * The first `$input` argument would typically be a video Asset or an
+     * external video URL.
+     *
+     * The second `$outputs` argument can be a list of output formats, output
+     * models (or arrays configuring output models)
+     *
+     * Alternatively the `$input` argument can be a Job model (or an array
+     * configuring one) with an input. In that case the `$outputs` argument
+     * should be omitted, or it can be a list of outputs to add to the job.
+     *
+     * @param mixed $input Video to transcode
+     * @param mixed $outputs Outputs to transcode video into
+     *
+     * @return Output[]
+     *
+     * @throws InvalidArgumentException If no input could be resolved from given arguments
+     */
+
+    public function transcodeVideo( $input, $outputs = null ): array
+    {
+        $job = null;
+        $storage = null;
+
+        // check if any of given arguments is a job
+        if ($input instanceof Job) {
+            $job = $input;
+            if ($outputs) $job->addOutputs($outputs); // add given outputs
+        } else if (is_array($input) && array_key_exists('input', $input)) {
+            $job = new Job($input);
+            if ($outputs) $job->addOutputs($outputs); // add given outputs
+        }
+
+        else if ($outputs instanceof Job) {
+            $job = $outputs;
+            $outputs = null;
+        } else if (is_array($outputs) && array_key_exists('outputs', $outputs)) {
+            $job = new Job($outputs);
+            $outputs = null;
+        } else if (is_string($outputs)) { // could be a named job...
+            $job = $this->getSettings()->getNamedJob($outputs);
+            $outputs = null;
+        }
+
+        // or resolve arguments as input + outputs
+        if (!$job)
+        {
+            $input = JobHelper::resolveInput($input);
+            if ($outputs) $outputs = JobHelper::resolveOutputs($outputs);
+        }
+
+        // We need at least an input video to transcode
+        if (!$input)
+        {
+            throw new InvalidArgumentException(
+                "Could not resolve `\$input` video argument to transcode");
+        }
+
+        if ($job)
+        {
+            $input = $job->getInput();
+            $outputs = $job->getOutputs();
+            $storage = $job->getStorage();
+        }
+
+        // re-use outputs saved for input, and identify missing outputs
+        $savedOutputs = $this->getOutputs()->getOutputsForInput($input);
+        $missingOutputs = [];
+        $transcodedOutputs = [];
+
+        foreach ($outputs as $key => $output)
+        {
+            // @todo: check output key vs. output params?
+            // -> checking key might result in multiple identical outputs (from ≠ jobs)
+            // @todo: do we care about storage here? we might return outputs
+            //  from a different storage since storage is not part of the output params..
+            // $savedOutput = ArrayHelper::firstWhere($savedOutputs,
+            //     $output->toParams());
+            $savedOutput = ArrayHelper::firstWhere($savedOutputs,
+                'key', $output->key);
+
+            if ($savedOutput) {
+                $transcodedOutputs[$key] = $savedOutput;
+            } else {
+                $missingOutputs[$key] = $output;
+            }
+        }
+
+        if (!empty($missingOutputs))
+        {
+            // Create new job to run and transcode missing outputs
+            // Note: if no outputs/storage were given in arguments and input
+            //  is an asset, then the job will resolve internally to use the
+            //  default outputs/storage configured for the input asset's volume
+            $job = new Job([
+                'input' => $input,
+                'outputs' => $missingOutputs,
+                'storage' => $storage,
+            ]);
+
+            $coconutJobs = $this->getJobs();
+
+            // Run job via Coconut.co API (updates the job properties)
+            // @todo: implement UI for job's feedback progress (based on notifications)
+            if (!$coconutJobs->runJob($job))
+            {
+                if ($job->hasErrors())
+                {
+                    throw new InvalidConfigException(
+                        "Could not run job due to validation error(s)");
+                }
+
+                throw new Exception('Could not run job');
+            }
+
+            // save new job and its configured outputs to the database
+            if (!$coconutJobs->saveJob($job))
+            {
+                if ($job->hasErrors())
+                {
+                    $errorsText = implode("\n- ", $job->getErrorSummary(true));
+
+                    if ($job->hasErrors('outputs'))
+                    {
+                        $errorsText .= "\n\tOutput errors:\n";
+
+                        foreach ($job->getOutputs() as $output)
+                        {
+                            $glue = "\n\t- [".$output->key.'] ';
+                            $errorsText .= implode($glue, $output->getErrorSummary(true));
+                        }
+                    }
+
+                    throw new InvalidConfigException(
+                        "Could not save job due to validation error(s)"
+                        ."\n - ". $errorsText);
+                }
+
+                throw new Exception('Could not save job');
+            }
+
+            // return newly saved outputs as well
+            $transcodedOutputs += $job->getOutputs();
+        }
+
+        return $transcodedOutputs;
+    }
 
     /**
      * Creates a new coconut client to connect to the coconut API

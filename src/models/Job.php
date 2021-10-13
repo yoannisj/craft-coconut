@@ -70,12 +70,6 @@ class Job extends Model
     private $_input;
 
     /**
-     * @var boolean Whether the input property value has been normalized
-     */
-
-    protected $isNormalizedInput;
-
-    /**
      * @var string The format used to generate missing output paths.
      *  Defaults to the plugin's `defaultOutputPath` setting.
      */
@@ -89,10 +83,16 @@ class Job extends Model
     private $_outputs;
 
     /**
-     * @var boolean Whether the outputs property has been normalized
+     * @var array List of output models saved for this job in the database
      */
 
-    protected $isNormalizedOutputs = false;
+    private $_savedOutputs;
+
+    /**
+     * @var array IDs for saved outputs that are not relevant anymore
+     */
+
+    private $_legacyOutputIds;
 
     /**
      * @var string
@@ -241,19 +241,12 @@ class Job extends Model
      * Given `$input` parameter can be an Input model, an array of input properties,
      * an Asset element, an Asset element ID or a URL to an external input file
      *
-     * @param string|array|Input|Asset|null $input
+     * @param mixed $input
      */
 
     public function setInput( $input )
     {
-        $this->_input = $input;
-
-        // optimize for normal input values
-        if ($input === null || $input instanceof Input) {
-            $this->isNormalizedInput = true;
-        } else {
-            $this->isNormalizedInput = false;
-        }
+        $this->_input = JobHelper::resolveInput($input);
 
         // fallback storage depends on input
         $this->_fallbackStorage = null;
@@ -270,30 +263,6 @@ class Job extends Model
 
     public function getInput()
     {
-        if (!$this->isNormalizedInput)
-        {
-            $input = $this->_input;
-
-            if (is_array($input)) {
-                $input = new Input($input);
-            }
-
-            else if ($input instanceof Asset) {
-                $input = new Input([ 'asset' => $input ]);
-            }
-
-            else if (is_numeric($input)) {
-                $input = new Input([ 'assetId' => (int)$input ]);
-            }
-
-            else if (is_string($input)) {
-                $input = new Input([ 'url' => $input ]);
-            }
-
-            $this->_input = $input;
-            $this->isNormalizedInput = true;
-        }
-
         return $this->_input;
     }
 
@@ -326,111 +295,123 @@ class Job extends Model
 
     public function setOutputs( array $outputs )
     {
+        $resolvedOutputs = [];
+
         if ($this->coconutId)
         {
-            $currOutputs = $this->getOutputs();
-            $newOutputs = [];
+            // if this is an existing coconut job
+            $savedOutputs = $this->getSavedOutputs();
+            $savedOutputsByKey = [];
 
-            foreach ($outputs as $output)
-            {
-                if (is_array($output)) {
-                    $output = new Output($output);
-                } else if (is_string($output)) {
-                    $output = new Output([ 'format' => $output ]);
-                } else if (!$output instanceof Output) {
-                    throw new InvalidConfigException('Could not resolve output');
-                }
-
-                $currOutput = $this->getOutputByKey($output->key);
-                if ($currOutput) {
-                    Craft::configure($currOutput, $output->getAttributes());
-                    $output = $currOutput;
-                }
-
-                $newOutputs[] = $output;
+            foreach ($savedOutputs as $index => $savedOutput) {
+                $savedOutputsByKey[$savedOutput->key] = $savedOutput;
             }
 
-            $this->_outputs = $newOutputs;
-            $this->isNormalizedOutputs = true;
+            $savedOutputs = $savedOutputsByKey;
+
+            foreach ($outputs as $index => $output)
+            {
+                if (!is_numeric($index)
+                    || (!$output instanceof Output && !ArrayHelper::isAssociative($output))
+                ) {
+                    throw new InvalidConfigException(
+                        'Existing job outputs must be an indexed list of output models or parameters');
+                }
+
+                $outputKey = ArrayHelper::getValue($output, 'key');
+
+                if (is_array($output)) {
+                    $output = new Output($output);
+                }
+
+                // if output with same key was saved before
+                $savedOutput = $savedOutputs[$outputKey] ?? null;
+                if ($savedOutput)
+                {
+                    // replace old output by new one
+                    $output->id = $savedOutput->id;
+                    $output->dateCreated = $savedOutput->dateCreated;
+                    $output->uid = $savedOutput->uid;
+
+                    unset($savedOutputs[$outputKey]);
+                }
+
+                $resolvedOutputs[] = $output;
+            }
+
+            // saved outputs that were not replaced are now legacy
+            $this->_legacyOutputIds = ArrayHelper::getColumn($savedOutputs, 'id');
         }
 
-        else
-        {
-            $this->_outputs = $outputs;
-            $this->isNormalizedOutputs = false;
+        else {
+            $resolvedOutputs = JobHelper::resolveOutputs($outputs);
         }
+
+        foreach ($resolvedOutputs as $output) {
+            $output->setJob($this);
+        }
+
+        $this->_outputs = $resolvedOutputs;
     }
 
     /**
+     * Getter method for normalized `outputs` property
+     *
      * @return Output[]
      */
 
-     public function getOutputs()
+     public function getOutputs(): array
     {
-        if (!$this->isNormalizedOutputs)
-        {
-            $outputs = [];
-
-            if (isset($this->_outputs))
-            {
-                // normalize set value for outputs property
-                foreach ($this->_outputs as $formatKey => $params)
-                {
-                    $output = null;
-
-                    // if job has an Id
-                    if ($this->id && $this->coconutId)
-                    {
-                        if (!($params instanceof Output)
-                            && ArrayHelper::isAssociative($params)
-                        ) {
-                            throw new InvalidConfigException(
-                                'Existing job outputs must be an indexed list of output models or params');
-                        }
-
-                        $outputs[] = $this->resolveOutputParams($params, null);
-                    }
-
-                    // support defining output as a format string (no extra params)
-                    // or to define format fully in output's 'format' param (instead of in index)
-                    else if (is_numeric($formatKey))
-                    {
-                        $output = $this->resolveOutputParams($params, null);
-                        $outputs[$output->formatString] = $output; // use output key as index
-                    }
-
-                    // support multiple outputs for 1 same format
-                    // @see https://docs.coconut.co/jobs/api#same-output-format-with-different-settings
-                    else if (is_array($params) && !empty($params)
-                        && ArrayHelper::isIndexed($params)
-                    ) {
-                        $formatIndex = 1;
-
-                        foreach ($params as $prm)
-                        {
-                            $output = $this->resolveOutputParams($prm, $formatKey, $formatIndex++);
-                            $outputs[$formatKey][] = $output;
-                        }
-                    }
-
-                    else {
-                        $output = $this->resolveOutputParams($params, $formatKey);
-                        $outputs[$formatKey] = $output;
-                    }
-                }
-            }
-
-            else if (isset($this->id)) {
-                // get outputs from db records
-                $outputs = Coconut::$plugin->getOUtputs()
-                    ->getOutputsByJobId($this->id);
-            }
-
-            $this->_outputs = $outputs;
-            $this->isNormalizedOutputs = true;
+        // default to saved outputs
+        if (!isset($this->_outputs)) {
+            return $this->getSavedOutputs();
         }
 
-        return $this->_outputs;
+        return $this->_outputs ?? [];
+    }
+
+    /**
+     * Getter method for read-only `savedOutputs` property
+     *
+     * @return Output[] List of Output models saved in the database for this job
+     *
+     * @todo Memoize queried outputs in the Outputs service
+     */
+
+    public function getSavedOutputs(): array
+    {
+        if (!isset($this->_savedOutputs) && $this->id)
+        {
+            $this->_savedOutputs = Coconut::$plugin->getOutputs()
+                ->getOutputsByJobId($this->id);
+        }
+
+        return $this->_savedOutputs ?? [];
+    }
+
+    /**
+     * Getter method for computd `legacyOutputs` property
+     *
+     * @return Output[]
+     */
+
+    public function getLegacyOutputs()
+    {
+        if (empty($this->_legacyOutputIds)) {
+            return [];
+        }
+
+        $savedOutputs = $this->getSavedOutputs();
+        $legacyOutputs = [];
+
+        foreach ($savedOutputs as $output)
+        {
+            if (in_array($output->id, $this->_legacyOutputIds)) {
+                $legacyOutputs[] = $output;
+            }
+        }
+
+        return $legacyOutputs;
     }
 
     /**
@@ -982,7 +963,7 @@ class Job extends Model
     }
 
     /**
-     * Returns output mode for given output key
+     * Returns output model for given output key
      *
      * @param string $key
      *
@@ -993,14 +974,15 @@ class Job extends Model
     {
         $outputs = $this->getOutputs();
 
-        foreach ($outputs as $format => $output)
+        foreach ($outputs as $output)
         {
+            // when configuring the job, multiple outputs per format are supported
             if (is_array($output))
             {
-                foreach ($output as $index => $indexOutput)
+                foreach ($output as $index => $nthOutput)
                 {
-                    if ($indexOutput->key == $key) {
-                        return $indexOutput;
+                    if ($nthOutput->key == $key) {
+                        return $nthOutput;
                     }
                 }
             }
@@ -1014,11 +996,79 @@ class Job extends Model
     }
 
     /**
+     * Adds given list of output models to the job
      *
+     * The `$outputs` argument can be anything supported by the
+     *  `JobHelper::resolveOutputs()` function.
+     *  or
+     *
+     * @param array $outputs List of outputs to add
+     *
+     * @throws InvalidArgumentException If job has already been ran by Coconut.co
+     */
+
+    public function addOutputs( array $outputs )
+    {
+        $outputs = JobHelper::resolveOutputs($outputs);
+
+        foreach ($outputs as $output) {
+            $this->addOutput($output);
+        }
+    }
+
+    /**
+     * Adds given output model to the job
+     *
+     * @param Output $output Output model (or config array) to add
+     *
+     * @throws InvalidArgumentException If job has already been ran by Coconut.co
      */
 
     public function addOutput( Output $output )
     {
+        if ($this->coconutId)
+        {
+            throw new InvalidArgumentException(
+                'Can not add output to a Job that has already been ran.');
+        }
+
+        $outputKey = $output->key;
+
+        if ($this->id && $output->jobId && $this->id !== $output->jobId) {
+            throw new InvalidArgumentException('Output already belongs to a different job');
+        }
+
+        if ($outputKey && $this->getOutputByKey($outputKey)) {
+            throw new InvalidArgumentException("Job already has an output with key '$outputKey'");
+        }
+
+        if ($this->coconutId) {
+            $this->_outputs[] = $output;
+        }
+
+        else
+        {
+            $outputs = $this->getOutputs();
+
+            // when configuring a job, multiple outputs can be defined for one format
+            $formatString = $output->getFormatString();
+            $formatOutputs = $outputs[$formatString] ?? null;
+
+            if ($formatOutputs)
+            {
+                if (!is_array($formatOutputs)) {
+                    $formatOutputs = [ $formatOutputs ];
+                }
+
+                $formatOutputs[] = $output;
+
+                $this->_outputs[$formatString] = $formatOutputs;
+            }
+
+            else {
+                $this->_outputs[$formatString] = $output;
+            }
+        }
     }
 
     /**
@@ -1078,7 +1128,7 @@ class Job extends Model
      * @return Output|null
      */
 
-    protected function resolveOutputParams( $params, $formatKey, int $formatIndex = null )
+    protected function resolveOutputParams( $params, string $formatKey = null, int $formatIndex = null )
     {
         if (!$formatKey)
         {

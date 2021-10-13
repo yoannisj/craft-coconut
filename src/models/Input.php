@@ -105,6 +105,22 @@ class Input extends Model
     // -------------------------------------------------------------------------
 
     /**
+     * Getter method for readonly `name` property
+     */
+
+    public function getName(): string
+    {
+        if (($asset = $this->getAsset())) {
+            return $asset->title;
+        } else if (($url = $this->getUrl())) {
+            return basename($url);
+        }
+
+        return 'Undefined';
+    }
+
+
+    /**
      * Setter method for the resolved `asset` property
      *
      * @param Asset|null $asset
@@ -124,7 +140,7 @@ class Input extends Model
 
     public function getAsset()
     {
-        if (isset($this->assetId) && !isset($this->_asset))
+        if ($this->assetId && !$this->_asset)
         {
             $asset = Craft::$app->getAssets()->getAssetById($this->assetId);
             $this->_asset = $asset;
@@ -133,7 +149,7 @@ class Input extends Model
         if ($this->_asset && $this->_asset->kind != 'video')
         {
             throw new InvalidConfigException(
-                "Property `asset` must be of kind 'video'.");
+                "Property `asset` must be of kind 'video'");
         }
 
         return $this->_asset;
@@ -262,7 +278,9 @@ class Input extends Model
     {
         $fields = parent::fields();
 
-        // this are attributes, but should be extraFields
+        $fields[] = 'name';
+
+        // these are attributes, but should be extraFields
         $fields = ArrayHelper::withoutValue($fields, 'urlHash');
         $fields = ArrayHelper::withoutValue($fields, 'metadata');
 
