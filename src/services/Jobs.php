@@ -13,6 +13,7 @@
 namespace yoannisj\coconut\services;
 
 use Coconut\Client as CoconutClient;
+use Coconut\Error as CoconutError;
 
 use yii\base\Exception;
 use yii\base\InvalidArgumentException;
@@ -24,6 +25,7 @@ use craft\helpers\Json as JsonHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Input;
+use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\records\JobRecord;
 use yoannisj\coconut\exceptions\CoconutApiExeption;
@@ -223,21 +225,30 @@ class Jobs extends Component
 
     public function pullJobInfo( Job $job ): bool
     {
-        if (!isset($job->coconutId))
-        {
-            throw new InvalidArgumentExceptino(
-                'Can not pull info for new job');
+        if (!isset($job->coconutId)) {
+            throw new InvalidArgumentException("Can not pull info for new job");
         }
 
-        if (!array_key_exists($job->coconutId, $this->_jobInfoByCoconutId))
+        $data = $this->_jobInfoByCoconutId[$job->coconutId] ?? null;
+
+        if (!$data)
         {
             $client = Coconut::$plugin->createClient();
-            $data = $client->job->retrieve($job->coconutId);
-            $data = ArrayHelper::toArray($data); // client return a StdObject instance
 
-            $this->_jobInfoByCoconutId[$job->coconutId] = $data;
-            $job = JobHelper::populateJobFromData($job, $data);
+            try {
+                $data = $client->job->retrieve($job->coconutId);
+                $data = ArrayHelper::toArray($data); // client returns a StdObject instance
+                $this->_jobInfoByCoconutId[$job->coconutId] = $data;
+            }
+
+            // catch and log Coconut API errors
+            catch (CoconutError $e) {
+                Craft::error($e->getMessage(), 'coconut');
+                return false;
+            }
         }
+
+        $job = JobHelper::populateJobFromData($job, $data);
 
         return true;
     }
@@ -252,21 +263,31 @@ class Jobs extends Component
 
     public function pullJobMetadata( Job $job ): bool
     {
-        if (!isset($job->coconutId))
-        {
-            throw new InvalidArgumentExceptino(
-                'Can not pull metadata for new job');
+        if (!isset($job->coconutId)) {
+            throw new InvalidArgumentException('Can not pull metadata for new job');
         }
 
-        if (!array_key_exists($job->coconutId, $this->_jobMetadataByCoconutId))
+        $data = $this->_jobMetadataByCoconutId[$job->coconutId] ?? null;
+
+        if (!$data)
         {
             $client = Coconut::$plugin->createClient();
-            $data = $client->metadata->retrieve($job->coconutId);
-            $data = ArrayHelper::toArray($data); // client return a StdObject instance
 
-            $this->_jobMetadataByCoconutId[$job->coconutId] = $data;
-            $job = JobHelper::populateJobFromData($job, $data);
+            try {
+                $data = $client->metadata->retrieve($job->coconutId);
+                $data = ArrayHelper::toArray($data); // client returns a StdObject instance
+                $this->_jobMetadataByCoconutId[$job->coconutId] = $data;
+            }
+
+            // catch and log Coconut API errors
+            catch (CoconutError $e)
+            {
+                Craft::error($e->getMessage(), 'coconut');
+                return false;
+            }
         }
+
+        $job = JobHelper::populateJobFromData($job, $data);
 
         return true;
     }
@@ -287,27 +308,7 @@ class Jobs extends Component
             throw new InvalidArgumentException('Can not update a new job');
         }
 
-        if (ArrayHelper::remove($data, 'type') != 'job')
-        {
-            throw new InvalidArgumentException(
-                'Can not update job directly with input or output data');
-        }
-
-        // normalize data so it can be used to populate the job and output models
-        $data = JobHelper::prepareJobData($data);
-        $outputsData = ArrayHelper::remove($data, 'outputs');
-
-        if ($outputsData)
-        {
-            foreach ($outputsData as $outputData)
-            {
-                if (!$this->updateJobOutput($job, $outputData, $runValidation)) {
-                    return false;
-                }
-            }
-        }
-
-        // populate job with given data
+        // populate job (and its outputs) with given data
         $job = JobHelper::populateJobFromData($job, $data);
 
         // save updated job in database
@@ -317,51 +318,64 @@ class Jobs extends Component
     /**
      * Updates job input metadata based on given data
      *
-     * @param Jon $job Coconut job the input belongs to
+     * @param Job $job Coconut job the input belongs to
      * @param array $inputData Data to update the job input with
-     * @param bool $runValidation Whether to validate the updated job
+     * @param bool $runValidation Whether to validate the updated job when saving
      *
-     * @return bool
+     * @return bool Whether the job was succesfully updated and saved
      */
 
     public function updateJobInput( Job $job, array $inputData, bool $runValidation = true )
     {
-        $job = JobHelper::populateJobFromData($job, [
-            'input' => $inputData,
-        ]);
+        if (!$job->id) {
+            throw new InvalidArgumentException("Can not update new Job model");
+        }
+
+        // we are updating the input on the job
+        $data = [ 'input' => $inputData, ];
+
+        $job = JobHelper::populateJobFromData($job, $data);
 
         return $this->saveJob($job, $runValidation);
     }
 
     /**
+     * Updates job output based on given data
      *
+     * @param Job $job Coconut job the output belongs to
+     * @param array $outputData Output data to update the job with
+     * @param bool $runValidation Whether to validate the updated job when saving
+     *
+     * @return bool Whether the job output was succesfully updated and saved
      */
 
-    public function updateJobOutput( $job, $outputData, bool $runValidation = true )
+    public function updateJobOutput( Job $job, array $outputData, bool $runValidation = true )
     {
-        $outputKey = ArrayHelper::getValue($outputData, 'key');
-        if (!$outputKey) {
-            throw new InvalidArgmentExceptino('Output data is missing an output key');
+        if (!$job->id) {
+            throw new InvalidArgumentException("Can not update new Job model");
         }
 
-        $coconutOutputs = Coconut::$plugin->getOutputs();
-        $output = $job->getOutputByKey($outputKey);
+        // translate into job data so we can populate relevant job attributes
+        $jobData = [];
 
-        if (!$output)
+        // 'progress' refers to the job's progress (not the output's progress)
+        $jobProgress = ArrayHelper::remove($outputData, 'progress');
+        if ($jobProgress) $jobData['progress'] = $jobProgress;
+
+        // set output progress based on it's status
+        if (($outputStatus = $outputData['status'] ?? null)
+            && in_array($outputStatus, Output::FINAL_STATUSES))
         {
-            $output = JobHelper::populateJobOutput(new Output([
-                'job' => $job,
-                'key' => $outputKey
-            ]), $outputData);
-
-            if (!$coconutOutputs->saveOutput($output, $runValidation)) {
-                return false;
-            }
-
-            $job->addOutput($output);
+            $outputData['progress'] = '100%'; // we're done working with this output
         }
 
-        else if (!$coconutOutputs->updateOutput($output, $runValidation)) {
+        // include output data into job data and populate job with the result
+        $jobData['outputs'] = [ $outputData ];
+        $job = JobHelper::populateJobFromData($job, $jobData);
+
+        // we need to save the whole job because of 'progress'
+        // will also save the updated output
+        if (!Coconut::$plugin->getJobs()->saveJob($job, $runValidation)) {
             return false;
         }
 
@@ -400,9 +414,9 @@ class Jobs extends Component
     {
         if (!array_key_exists($coconutId, $this->_jobsPerCoconutId))
         {
-            $record = JobRecord::find([
+            $record = JobRecord::findOne([
                 'coconutId' => $coconutId,
-            ])->limit(1)->one();
+            ]);
 
             if ($record) {
                 $this->memoizeJobRecord($record);

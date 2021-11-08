@@ -10,7 +10,7 @@ namespace yoannisj\coconut\validators;
 use yii\validators\Validator;
 
 use Craft;
-use craft\helpers\AssociativeArray;
+use craft\helpers\ArrayHelper;
 
 /**
  * Class ArrayValidator.
@@ -139,7 +139,7 @@ class AssociativeArrayValidator extends Validator
             }
         }
 
-        if (!empy($this->forbiddenKeys))
+        if (!empty($this->forbiddenKeys))
         {
             $forbiddenKeys = [];
 

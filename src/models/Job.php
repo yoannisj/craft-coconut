@@ -12,6 +12,7 @@
 
 namespace yoannisj\coconut\models;
 
+use yii\base\Exception;
 use yii\base\InvalidConfigException;
 use yii\base\InvalidArgumentException;
 use yii\validators\InlineValidator;
@@ -47,6 +48,10 @@ class Job extends Model
     const STATUS_STARTING = 'job.starting';
     const STATUS_COMPLETED = 'job.completed';
     const STATUS_FAILED = 'job.failed';
+
+    const FINAL_STATUSES = [
+        'job.completed', 'job.failed',
+    ];
 
     // =Properties
     // =========================================================================
@@ -158,13 +163,7 @@ class Job extends Model
      * @var string|null Current progress of job's transcoding (in percentage)
      */
 
-    public $progress;
-
-    /**
-     * @var string
-     */
-
-    public $errorCode;
+    private $_progress = '0%';
 
     /**
      * @var string
@@ -697,6 +696,11 @@ class Job extends Model
             $settings = Coconut::$plugin->getSettings();
             $notification = $this->_notification  ?? $settings->defaultJobNotification;
 
+            if (is_string($notification)) {
+                $notification = JsonHelper::decodeIfJson($notification);
+            }
+
+            // still as string? than it must be a URL
             if (is_string($notification))
             {
                 $notification = new Notification([
@@ -725,13 +729,47 @@ class Job extends Model
     /**
      * Setter method for normalized metadata property
      *
-     * @param string|array $metadata
+     * @param string|array|null $metadata
      */
 
     public function setMetadata( $metadata )
     {
         if (is_string($metadata)) {
             $metadata = JsonHelper::decode($metadata);
+        }
+
+        if ($metadata !== null && !ArrayHelper::isAssociative($metadata))
+        {
+            throw new InvalidConfigException(
+                "Property `metadata` must be a JSON string, an associative array or null");
+        }
+
+        if ($metadata)
+        {
+            // transfer input metadata to the input model
+            $inputMetadata = ArrayHelper::remove($metadata, 'input');
+            if ($inputMetadata)
+            {
+                $input = $this->getInput();
+                if ($input) $input->setMetadata($inputMetadata);
+            }
+
+            // transfer outputs metadata to the output models
+            $outputsMetadata = ArrayHelper::remove($metadata, 'outputs');
+            if ($outputsMetadata)
+            {
+                foreach ($metadata['outputs'] as $key => $outputMetadata)
+                {
+                    $output = $this->getOutputByKey($key);
+
+                    if (!$output) {
+                        $output = new Output([ 'key' => $key ]);
+                        $this->addOutput($output);
+                    }
+
+                    $output->setMetadata($outputMetadata);
+                }
+            }
         }
 
         $this->_metadata = $metadata;
@@ -745,7 +783,54 @@ class Job extends Model
 
     public function getMetadata()
     {
-        return $this->_metadata;
+        // job metadata comes from Coconut, so it needs to exist there
+        if (!$this->coconutId) {
+            return null;
+        }
+
+        $metadata = $this->_metadata ?? [];
+
+        // collect metadata from input and output models
+        $input = $this->getInput();
+        $outputs = $this->getOutputs();
+
+        $metadata['input'] = $input ? $input->getMetadata() : null;
+        $metadata['outputs'] = [];
+
+        foreach ($outputs as $output) {
+            $metadata['outputs'][] = $output->getMetadata();
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * Setter method for defaulted `progress` property
+     *
+     * @param string|null $progress
+     */
+
+    public function setProgress( string $progress = null )
+    {
+        $this->_progress = $progress;
+    }
+
+    /**
+     * Getter method for defaulted `progress` property
+     *
+     * @return string
+     */
+
+    public function getProgress()
+    {
+        if (!isset($this->_progress))
+        {
+            if ($this->getIsFinished()) {
+                $this->_progress = '100%';
+            }
+        }
+
+        return $this->_progress;
     }
 
     /**
@@ -800,6 +885,17 @@ class Job extends Model
         return $this->_completedAt;
     }
 
+    /**
+     * Getter method for computed 'isFinished' property
+     *
+     * @return bool
+     */
+
+    public function getIsFinished(): bool
+    {
+        return in_array($this->status, static::FINAL_STATUSES);
+    }
+
     // =Attributes
     // -------------------------------------------------------------------------
 
@@ -811,10 +907,11 @@ class Job extends Model
     {
         $attributes = parent::attributes();
 
+        $attributes[] = 'outputPathFormat';
         $attributes[] = 'storageHandle';
         $attributes[] = 'storageVolumeId';
         $attributes[] = 'notification';
-        $attributes[] = 'metadata';
+        $attributes[] = 'progress';
         $attributes[] = 'createdAt';
         $attributes[] = 'completedAt';
 
@@ -829,7 +926,6 @@ class Job extends Model
     {
         $attributes = parent::datetimeAttributes();
 
-        $attributes[] = 'outputPathFormat';
         $attributes[] = 'createdAt';
         $attributes[] = 'completedAt';
 
@@ -847,13 +943,25 @@ class Job extends Model
     {
         $rules = parent::rules();
 
-        $rules['attrsRequired'] = [ ['input', 'storage', 'outputs'], 'required' ];
+        $rules['attrRequired'] = [ [
+            'input',
+            'outputs',
+            'storage',
+        ], 'required' ];
 
-        $rules['attrsString'] = [ [
-            'outputPathFormat',
+        $rules['attrInteger']  = [ [
+            'id',
+            'storageVolumeId',
+        ], 'integer' ];
+
+        $rules['attrString'] = [ [
+            'coconutId',
+            'status',
             'progress',
-            'errorCode',
-            'message'
+            'outputPathFormat',
+            'storageHandle',
+            'message',
+            'uid',
         ], 'string' ];
 
         $rules['attrAssociativeArray'] = [ ['metadata'], AssociativeArrayValidator::class ];
@@ -871,21 +979,28 @@ class Job extends Model
             self::STATUS_FAILED,
         ]];
 
-        $rules['errorCodeValid'] = [ 'errorCode', 'validateErrorCode'];
+        $rules['outputsValid'] = [ 'outputs', 'validateModels' ];
 
         return $rules;
     }
+
 
     /**
      *
      */
 
-    public function validateErrorCode( $attribute, $params, $validator )
+    public function validateModels( string $attribute, array $params = null, InlineValidator $validator )
     {
-        if (!empty($this->$attribute))
+        $models = $this->$attribute;
+
+        foreach ($models as $model)
         {
-            $message = $model->message ?? Craft::t('coconut', 'Job API returned error');
-            $validator->addError($attribute, $message);
+            if (!$model->validate())
+            {
+                $validator->addError($this, $attribute,
+                    'All `{attribute}` models must be valid');
+                break; // no need to validate other models
+            }
         }
     }
 

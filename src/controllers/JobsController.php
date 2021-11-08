@@ -12,16 +12,23 @@
 
 namespace yoannisj\coconut\controllers;
 
+use yii\base\ErrorException;
 use yii\web\NotFoundHttpException;
 use yii\web\BadRequestHttpException;
+use yii\web\ServerErrorHttpException;
 
 use Craft;
-use craft\base\Controller;
+use craft\web\Controller;
 use craft\elements\Asset;
 use craft\web\Request;
+use craft\web\UploadedFile;
+use craft\errors\UploadFailedException;
+use craft\helpers\ArrayHelper;
+use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\queue\jobs\TranscodeJob;
+use yoannisj\coconut\models\Job;
+use yoannisj\coconut\models\Notification;
 
 /**
  *
@@ -32,20 +39,20 @@ class JobsController extends Controller
     // =Static
     // =========================================================================
 
-    const NOTIFICATION_EVENT_JOB_COMPLETED = 'job.completed';
-    const NOTIFICATION_EVENT_JOB_FAILED = 'job.failed';
-    const NOTIFICATION_EVENT_INPUT_TRANSFERED = 'input.transferred';
-    const NOTIFICATION_EVENT_OUTPUT_COMPLETED = 'output.completed';
-    const NOTIFICATION_EVENT_OUTPUT_FAILED = 'output.failed';
-
     // =Properties
     // =========================================================================
 
     /**
-     * @inheritdocs
+     * @inheritdoc
      */
 
     public $allowAnonymous = true;
+
+    /**
+     * @inheritdoc
+     */
+
+    public $enableCsrfValidation = false;
 
     // =Public Methods
     // =========================================================================
@@ -60,25 +67,27 @@ class JobsController extends Controller
         $this->requirePostRequest();
 
         $params = $this->request->getBodyParams();
+
         $jobId = $params['job_id'] ?? null;
         $event = $params['event'] ?? null;
-        $isMetadata = $params['metadata'] ?? false;
+        $hasMetadata = $params['metadata'] ?? false;
         $data = $params['data'] ?? [];
-        $dataType = ArrayHelper::remove($data, 'type');
 
-        Craft::error('NOTIFICATION ('.$event.')', __METHOD__);
-        Craft::error($data, __METHOD__);
+        Craft::error("NOTIFY [#$jobId] $event");
 
         $coconutJobs = Coconut::$plugin->getJobs();
         $job = $coconutJobs->getJobByCoconutId($jobId);
+        $success = false;
 
         // received notification from unknown job?
         if (!$job) {
-            throw new NotFoundHttpException("Could not find job with given coconut ID");
+            throw new NotFoundHttpException("Could not find job with ID '$jobId'");
         }
 
-        // safely ignore any events coming in after job has been completed
-        else if ($job->status == Job::STATUS_COMPLETED) {
+        // safely ignore any events coming in after job has been completed or failed
+        else if ($job->status == Job::STATUS_COMPLETED
+            || $job->status == Job::STATUS_FAILED
+        ) {
             $success= true;
         }
 
@@ -86,23 +95,37 @@ class JobsController extends Controller
         {
             switch ($event)
             {
-                case self::NOTIFICATION_EVENT_JOB_COMPLETED:
-                case self::NOTIFICATION_EVENT_JOB_FAILED:
-                    $success = $coconutJobs->updateJob($job, $data);
-                    break;
-                case self::NOTIFICATION_EVENT_INPUT_TRANSFERED:
+                case Notification::EVENT_INPUT_TRANSFERRED:
                     $success = $coconutJobs->updateJobInput($job, $data);
                     break;
-                case self::NOTIFICATION_OUTPUT_COMPLETED:
-                case self::NOTIFICATION_OUTPUT_FAILED:
+                case Notification::EVENT_OUTPUT_COMPLETED:
+                case Notification::EVENT_OUTPUT_FAILED:
                     $success = $coconutJobs->updateJobOutput($job, $data);
+                    break;
+                case Notification::EVENT_JOB_COMPLETED:
+                case Notification::EVENT_JOB_FAILED:
+                    $success = $coconutJobs->updateJob($job, $data);
                     break;
             }
         }
 
-        if (!$success) {
-            throw new BadRequestHttpException("Could not handle job notification");
+        if (!$success)
+        {
+            Craft::error('JOB ERRORS');
+            Craft::error($job->getErrorSummary(true));
+
+            Craft::error('OUTPUT ERRORS');
+            foreach ($job->getOutputs() as $output)
+            {
+                Craft::error('--> '.$output->key);
+                Craft::error($output->getErrorSummary(true));
+            }
+
+            throw new ServerErrorHttpException("Could not handle job notification");
         }
+
+        $this->response->setStatusCode(200);
+        return $this->response;
     }
 
     /**

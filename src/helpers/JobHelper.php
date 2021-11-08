@@ -13,7 +13,6 @@
 namespace yoannisj\coconut\helpers;
 
 use yii\base\InvalidArgumentException;
-use yii\base\InvalidCallException;
 
 use Craft;
 use craft\base\VolumeInterface;
@@ -28,6 +27,7 @@ use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Storage;
+use yoannisj\coconut\models\Notification;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\records\JobRecord;
 
@@ -586,7 +586,7 @@ class JobHelper
         }
 
         if (empty($container)) {
-            throw new InvalidCallException("Could not resolve container from given arguments");
+            throw new InvalidArgumentException("Could not resolve container from given arguments");
         }
 
         // get output type based on container
@@ -865,77 +865,6 @@ class JobHelper
     }
 
     /**
-     * Prepares and normalized structure of job data returned by the coconut API
-     * in order to populate the job, input and output models with it.
-     *
-     * @param array|object $data
-     *
-     * @return array
-     */
-
-    public static function prepareJobData( $data ): array
-    {
-        // move 'id' key to 'coconutId'
-        $data['coconutId'] = ArrayHelper::remove($data, 'id');
-
-        // rename date keys
-        $createdAt = ArrayHelper::remove($data, 'created_at');
-        if ($createdAt) $data['createdAt'] = $createdAt;
-
-        $completedAt = ArrayHelper::remove($data, 'completed_at');
-        if ($completedAt) $data['completedAt'] = $completedAt;
-
-        // remove 'null' input keys
-        $inputData = $data['input'] ?? null;
-        if ($inputData) $data['input'] = array_filter($data['input']);
-
-        // normalize structure of metadata
-        $metadata = ArrayHelper::remove($data, 'metadata');
-
-        if ($metadata && is_array($metadata))
-        {
-            $inputMetadata = $metadata['input'] ?? null;
-            $outputsMetadata = $metadata['outputs'] ?? null;
-
-            if ($inputMetadata)
-            {
-                $data['input'] = $data['input'] ?? [];
-                $data['input']['metadata'] = $inputMetadata;
-            }
-
-            if ($outputsMetadata)
-            {
-                $data['outputs'] = $data['outputs'] ?? [];
-
-                foreach ($outputsMetadata as $key => $outputMetadata)
-                {
-                    $foundOutputData = false;
-
-                    foreach ($data['outputs'] as $index => $outputData)
-                    {
-                        if ($outputData['key'] == $key)
-                        {
-                            $foundOutputData = true;
-                            $data['outputs'][$index]['metadata'] = $outputMetadata;
-                        }
-                    }
-
-                    if (!$foundOutputData)
-                    {
-                        // add output entry to data
-                        $data['outputs'][] = [
-                            'key' => $key,
-                            'metadata' => $metadata,
-                        ];
-                    }
-                }
-            }
-        }
-
-        return $data;
-    }
-
-    /**
      * Poplates job model with given data (e.g. returned by API)
      *
      * @param Job $job
@@ -946,35 +875,75 @@ class JobHelper
 
     public static function populateJobFromData( Job $job, array $data ): Job
     {
-        $data = static::prepareJobData($data);
+        $dataType = ArrayHelper::remove($data, 'type');
 
-        // $outputsData = ArrayHelper::remove($data, 'outputs');
-        // if ($outputsData)
-        // {
-        //     foreach ($outputsData as $outputData)
-        //     {
-        //         $outputKey = ArrayHelper::getValue($outputData, 'key');
-        //         $output = $job->getOutputByKey($outputKey);
+        if ($dataType && $dataType != 'job')
+        {
+            throw new InvalidArgumentException(
+                "Can not update job with data of type '$dataType'");
+        }
 
-        //         if (!$output)
-        //         {
-        //             // add missing output, based on given data
-        //             $output = static::populateJobOutput(new Output([
-        //                 'job' => $job,
-        //                 'key' => $outputKey
-        //             ]), $outputData);
+        // move 'id' key to 'coconutId'
+        $id = ArrayHelper::remove($data, 'id');
+        $job_id = ArrayHelper::remove($data, 'job_id');
+        $coconutId = $job_id ?: $id;
+        if ($coconutId) $data['coconutId'] = $coconutId;
 
-        //             $job->addOutput($output);
-        //         }
+        // rename date keys
+        $createdAt = ArrayHelper::remove($data, 'created_at');
+        if ($createdAt) $data['createdAt'] = $createdAt;
 
-        //         else {
-        //             $output = static::populateJobOutput($output, $outputData);
-        //         }
-        //     }
-        // }
+        $completedAt = ArrayHelper::remove($data, 'completed_at');
+        if ($completedAt) $data['completedAt'] = $completedAt;
 
-        // update job with data received from Coconut
-        return static::populateObject($job, $data, true);
+        // get job progress to fill-in missing output progress
+        // (some output notifications arrive after the job completion
+        //  notification and will be ignored..)
+        $progress = $data['progress'] ?? null;
+
+        // remove 'null' input keys
+        // (those would otherwise override valid input on job model)
+        $inputData = ArrayHelper::remove($data, 'input');
+        if ($inputData) $data['input'] = array_filter($inputData);
+
+        // update job outputs with data received from Coconut
+        $outputsData = ArrayHelper::remove($data, 'outputs');
+        if ($outputsData)
+        {
+            foreach ($outputsData as $outputData)
+            {
+                $outputKey = ArrayHelper::getValue($outputData, 'key');
+
+                if (!$outputKey) {
+                    throw new InvalidArgmentException('Given data is missing the output key');
+                }
+
+                $output = $job->getOutputByKey($outputKey);
+
+                if (!$output)
+                {
+                    // @todo throw error for invalid key?
+                    // add new output to job based on given data
+                    // @todo get output format from job params and key?
+                    $output = new Output([
+                        'job' => $job,
+                        'key' => $outputKey,
+                    ]);
+
+                    $job->addOutput($output);
+                }
+
+                // if job has completed it means all outputs have completed too
+                if ($progress == '100%') $outputData['progress'] = '100%';
+
+                static::populateJobOutput($output, $outputData);
+            }
+        }
+
+        // update job with rest of the data received from Coconut
+        $job = static::populateObject($job, $data, true);
+
+        return $job;
     }
 
     /**
@@ -983,6 +952,16 @@ class JobHelper
 
     public static function populateJobOutput( Output $output, array $data ): Output
     {
+        $dataType = ArrayHelper::getValue($output, 'type');
+
+        if ($dataType && $dataType != Output::TYPE_VIDEO
+            && $dataType != Output::TYPE_IMAGE
+            && $dataType != Output::TYPE_HTTPSTREAM)
+        {
+            throw new InvalidArgumentException(
+                "Can not populate job with data of type '$dataType'");
+        }
+
         return static::populateObject($output, $data);
     }
 
@@ -1005,12 +984,18 @@ class JobHelper
             // 'urlHash' => ArrayHelper::remove($attrs, 'inputUrlHash'),
             'status' => ArrayHelper::remove($attrs, 'inputStatus'),
             'metadata' => ArrayHelper::remove($attrs, 'inputMetadata'),
+            'error' => ArrayHelper::remove($attrs, 'inputError'),
             'expires' => ArrayHelper::remove($attrs, 'inputExpires'),
         ]));
 
-        $job->setStorage(ArrayHelper::remove($attrs, 'storageHandle')
-            ?? ArrayHelper::remove($attrs,'storageVolumeId')
-            ?? ArrayHelper::remove($attrs,'storageParams'));
+        $storageHandle = ArrayHelper::remove($attrs, 'storageHandle');
+        $storageVolumeId = ArrayHelper::remove($attrs,'storageVolumeId');
+        $storageParams = ArrayHelper::remove($attrs,'storageParams');
+        $storage = ($storageHandle ?? $storageVolumeId ?? $storageParams);
+        if ($storage) $job->setStorage($storage);
+
+        // $notification = ArrayHelper::remove($attrs, 'notification');
+        // if ($notification) $job->setNotification($notification);
 
         $job->setAttributes($attrs, false);
 
@@ -1029,14 +1014,18 @@ class JobHelper
     public static function populateRecordFromJob( JobRecord $record, Job $job): JobRecord
     {
         $attrs = $job->getAttributes();
-
         $input = $job->getInput();
-        $record->inputAssetId = $input->assetId;
-        $record->inputUrl = $input->url;
-        // $record->inputUrlHash = $input->urlHash;
-        $record->inputStatus = $input->status;
-        $record->inputMetadata = $input->metadata;
-        $record->inputExpires = $input->expires;
+
+        if ($input)
+        {
+            $record->inputAssetId = $input->assetId;
+            $record->inputUrl = $input->url;
+            $record->inputUrlHash = $input->urlHash;
+            $record->inputStatus = $input->status;
+            $record->inputMetadata = $input->metadata;
+            $record->inputExpires = $input->expires;
+            $record->inputError = $input->error;
+        }
 
         // prioritize storage handle over storage volume id over plain storage params
         $storageHandle = ArrayHelper::remove($attrs, 'storageHandle');
@@ -1058,15 +1047,20 @@ class JobHelper
     /**
      * Populates object with given data
      *
-     * @param object $object
+     * @param array|object $object
      * @param array|object $data Data to
      * @param bool $recursive Whether values should be merged recursively
      *
-     * @return object
+     * @return array|object
      */
 
-    public static function populateObject( object $object, $data, bool $recursive = true ): object
+    public static function populateObject( $object, $data, bool $recursive = true )
     {
+        if (!is_object($object) && !is_array($object)) {
+            throw new InvalidArgumentException(
+                "Argument #2 `object` must be an object or array to populate");
+        }
+
         if (!is_object($data) && !is_array($data))
         {
             throw new InvalidArgumentException(
@@ -1075,15 +1069,16 @@ class JobHelper
 
         foreach ($data as $prop => $value)
         {
-            if ((is_object($value) || ArrayHelper::isAssociative($value))
-                && ($currVal = $object->$prop)
-                && (is_object($currVal) || ArrayHelper::isAssociative($currVal))
+            if ($recursive
+                && (is_object($value) || ArrayHelper::isAssociative($value))
+                && ($currValue = ArrayHelper::getValue($object, $prop))
+                && (is_object($currValue) || ArrayHelper::isAssociative($currValue))
             ) {
-                $object->$prop = static::populateObject($currVal, $value, $recursive);
+                ArrayHelper::setValue($object, $prop, static::populateObject($currValue, $value, $recursive));
             }
 
             else {
-                $object->$prop = $value;
+                ArrayHelper::setValue($object, $prop, $value);
             }
         }
 
@@ -1399,7 +1394,7 @@ class JobHelper
 
         if (empty($container))
         {
-            throw new InvalidCallException(
+            throw new InvalidArgumentException(
                 "Could not determine the container from given arguments");
         }
 

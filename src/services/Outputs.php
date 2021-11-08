@@ -90,7 +90,7 @@ class Outputs extends Component
      * Updates a job output with given data
      *
      * @param Output $output Coconut job output to update
-     * @param array|object $data Output data to update output with
+     * @param array $data Output data to update output with
      * @param bool $runValidation Whether to validate the updated output
      *
      * @return bool
@@ -102,7 +102,7 @@ class Outputs extends Component
             throw new InvalidArgumentException("Can not update new output");
         }
 
-        $dataType = ArrayHelper::remove($data, 'type');
+        $dataType = ArrayHelper::get($data, 'type');
         if (!$dataType != 'video' && $dataType != 'image' && $dataType != 'httpstream')
         {
             throw new InvalidArgumentException(
@@ -156,6 +156,7 @@ class Outputs extends Component
 
         // update the record attributes and try saving
         $record->setAttributes($output->getAttributes(), false);
+
         // $record->type = $output->getType(); // read-only, but searchable attribute
         if (!$record->save()) return false;
 
@@ -279,7 +280,7 @@ class Outputs extends Component
         foreach ($records as $record)
         {
             $output = new Output();
-            $output->attributes = $record->attributes;
+            $output->setAttributes($record->getAttributes(), false);
 
             $outputs[] = $output;
         }

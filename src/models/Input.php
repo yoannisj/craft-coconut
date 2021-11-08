@@ -20,6 +20,7 @@ use Craft;
 use craft\base\Model;
 use craft\db\Query;
 use craft\elements\Asset;
+use craft\validators\DateTimeValidator;
 use craft\helpers\ArrayHelper;
 use craft\helpers\FileHelper;
 use craft\helpers\Json as JsonHelper;
@@ -80,12 +81,6 @@ class Input extends Model
     private $_urlHash;
 
     /**
-     * @var array Metadata retrieved from Coconut API
-     */
-
-    private $_metadata;
-
-    /**
      * @var string Latest input status from Coconut job
      * @see https://docs.coconut.co/jobs/api#job-status
      */
@@ -93,10 +88,29 @@ class Input extends Model
     public $status;
 
     /**
+     * @var string Progress (in percentage) of the input handling by Coconut
+     */
+
+    public $progress = '0%';
+
+    /**
+     * @var array Metadata retrieved from Coconut API
+     */
+
+    private $_metadata;
+
+    /**
      * @var Datetime|null
      */
 
     public $expires;
+
+    /**
+     * @var string Error message associated with this input
+     * @note This is only relevant if input has failed `status`
+     */
+
+    public $error;
 
     // =Public Methods
     // =========================================================================
@@ -263,6 +277,10 @@ class Input extends Model
     public function rules()
     {
         $rules = parent::rules();
+
+        $rules['attrDateTime'] = [ [
+            'expires',
+        ], DateTimeValidator::class ];
 
         return $rules;
     }

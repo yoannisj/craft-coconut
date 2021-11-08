@@ -64,20 +64,6 @@ class Settings extends Model
     private $_publicBaseUrl;
 
     /**
-     * @var boolean Whether transcoding videos should default to using the queue,
-     * or run synchonously. It is highly recommended to use the queue whenever
-     * possible, but if your craft environment is not running queued jobs in the
-     * background, you may want to default to running jobs synchronously.
-     *
-     * More info on how to run queued jobs in the background:
-     *  https://nystudio107.com/blog/robust-queue-job-handling-in-craft-cms
-     *
-     * @default true
-     */
-
-    public $preferQueue = true;
-
-    /**
      * @var integer
      *
      * Depending on your Coconut plan and the parameters you are using to transcode
@@ -171,7 +157,7 @@ class Settings extends Model
      * - '{filename}' the input filename (without extension)
      * - '{hash}' a unique md5 hash based on the input URL
      * - '{shortHash}' a shortened version of the unique md5 hash
-     * - '{key}' the outputs `key` parameter (a path-friendly version of it)
+     * - '{key}' the outputs `key` parameter (a path-friendly version of it)
      * - '{ext}' the output file extension
      *
      * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
@@ -180,7 +166,7 @@ class Settings extends Model
      * @default '_coconut/{path}/{key}.{ext}'
      */
 
-    public $defaultOutputPathFormat = '_coconut/{path}/{key}.{ext}';
+    public $defaultOutputPathFormat = '_coconut/{path}--{key}.{ext}';
 
     /**
      * @var string|array|Notification|null Notification param to use if job

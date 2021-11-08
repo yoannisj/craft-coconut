@@ -21,6 +21,7 @@ use craft\base\Model;
 use craft\base\VolumeInterface;
 use craft\db\Query;
 use craft\elements\Asset;
+use craft\validators\DateTimeValidator;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
 use craft\helpers\FileHelper;
@@ -36,10 +37,15 @@ use yoannisj\coconut\helpers\JobHelper;
  * Model representing Coconut job outputs
  *
  * @property Job $job
+ * @property string|null $progress Progress of the output transcoding (in percentage)
  * @property array $format
  * @property string $formatString
  * @property string $explicitPath
  * @property string $type
+ * @property bool $isDefaultPath Whether this output uses the default path or note
+ * @property bool $isFinished Wether transcoding the output has come to an end
+ * @property bool $isFruitfull Wether transcoding resulted in an output file
+ * @property bool $isFruitless Wether transcoding failed to result in an output file
  */
 
 class Output extends Model
@@ -60,6 +66,7 @@ class Output extends Model
     const STATUS_VIDEO_ENCODED = 'video.encoded';
     const STATUS_VIDEO_FAILED = 'video.failed';
     const STATUS_VIDEO_SKIPPED = 'video.skipped';
+    const STATUS_VIDEO_ABORTED = 'video.aborted';
 
     const STATUS_IMAGE_WAITING = 'image.waiting';
     const STATUS_IMAGE_QUEUED = 'image.queued';
@@ -67,14 +74,34 @@ class Output extends Model
     const STATUS_IMAGE_CREATED = 'image.created';
     const STATUS_IMAGE_FAILED = 'image.failed';
     const STATUS_IMAGE_SKIPPED = 'image.skipped';
+    const STATUS_IMAGE_ABORTED = 'image.aborted';
 
-    const STATUS_HTTPSTREAM_WAITING = 'httpstream.variants.waiting';
-    const STATUS_HTTPSTREAM_QUEUED = 'httpstream.variants.queued';
+    const STATUS_HTTPSTREAM_WAITING = 'httpstream.waiting';
+    const STATUS_HTTPSTREAM_QUEUED = 'httpstream.queued';
+    const STATUS_HTTPSTREAM_VARIANTS_WAITING = 'httpstream.variants.waiting';
+    const STATUS_HTTPSTREAM_VARIANTS_QUEUED = 'httpstream.variants.queued';
     const STATUS_HTTPSTREAM_VARIANTS_ENCODING = 'httpstream.variants.encoding';
     const STATUS_HTTPSTREAM_PACKAGING = 'httpstream.packaging';
     const STATUS_HTTPSTREAM_PACKAGED = 'httpstream.packaged';
     const STATUS_HTTPSTREAM_FAILED = 'httpstream.failed';
     const STATUS_HTTPSTREAM_SKIPPED = 'httpstream.skipped';
+    const STATUS_HTTPSTREAM_ABORTED = 'httpstream.aborted';
+
+    const FINAL_STATUSES = [
+        'video.encoded', 'video.failed', 'video.skipped', 'video.aborted',
+        'image.created', 'image.failed', 'image.skipped', 'image.aborted',
+        'httpstream.packaged', 'httpstream.failed', 'httpstream.skipped', 'httpstream.aborted',
+    ];
+
+    const FRUITFULL_STATUSES = [
+        'video.encoded', 'image.created', 'httpstream.packaged',
+    ];
+
+    const FRUITLESS_STATUSES = [
+        'video.failed', 'video.skipped', 'video.aborted',
+        'image.failed', 'image.skipped', 'image.aborted',
+        'httpstream.failed', 'httpstream.skipped', 'httpstream.aborted',
+    ];
 
     // =Properties
     // =========================================================================
@@ -270,6 +297,26 @@ class Output extends Model
     private $_watermark;
 
     /**
+     * @var string Latest output status from Coconut job
+     * @see https://docs.coconut.co/jobs/api#job-status
+     */
+
+    public $status;
+
+    /**
+     * @var string|null Progress (in percentage) for creation of this output
+     */
+
+    private $_progress = '0%';
+
+    /**
+     * @var string Error message associated with this output
+     * @note This is only relevant if output has failed `status`
+     */
+
+    public $error;
+
+    /**
      * @var string The URL to the generated output file (once stored)
      */
 
@@ -280,20 +327,6 @@ class Output extends Model
      */
 
     private $_urls;
-
-    /**
-     * @var string Latest output status from Coconut job
-     * @see https://docs.coconut.co/jobs/api#job-status
-     */
-
-    public $status;
-
-    /**
-     * @var string Error message associated with this output
-     * @note This is only relevant if output has failed `status`
-     */
-
-    public $error;
 
     /**
      * @var array|null
@@ -363,6 +396,35 @@ class Output extends Model
         }
 
         return $this->_job;
+    }
+
+    /**
+     * Setter method for defaulted `progress` property
+     *
+     * @param string|null $progress
+     */
+
+    public function setProgress( string $progress = null )
+    {
+        $this->_progress = $progress;
+    }
+
+    /**
+     * Getter method for defaulted `progress` property
+     *
+     * @return string
+     */
+
+    public function getProgress()
+    {
+        if (!isset($this->_progress))
+        {
+            if ($this->getIsFinished()) {
+                $this->_progress = '100%';
+            }
+        }
+
+        return $this->_progress;
     }
 
     /**
@@ -739,7 +801,7 @@ class Output extends Model
         {
             try {
                 $this->_formatString =  JobHelper::encodeFormat($this->getFormat());
-            } catch (\Throwable $e) {
+            } catch (InvalidArgumentException $e) {
                 $this->_formatString = '';
             }
         }
@@ -778,14 +840,54 @@ class Output extends Model
     }
 
     /**
-     * Returns whether this output uses the default path or not
+     * Getter method for computed `isDefaultPath` property
      *
      * @return bool
      */
 
-    public function isDefaultPath(): bool
+    public function getIsDefaultPath(): bool
     {
         return (!isset($this->_explicitPath) && !isset($this->_pathFormat));
+    }
+
+    /**
+     * Getter method for computed `isFinished` property
+     *
+     * @return bool
+     */
+
+    public function getIsFinished(): bool
+    {
+        return in_array($this->status, static::FINAL_STATUSES);
+    }
+
+
+    /**
+     * Getter method for computed `isFruitfull` property
+     *
+     * Note: will return `false` if output transcoding is still in progress,
+     *  but the output could later end up being fruitfull.
+     *
+     * @return bool
+     */
+
+    public function getIsFruitfull(): bool
+    {
+        return in_array($this->status, static::FRUITFULL_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isFruitless` property
+     *
+     * Note: will return false if output transcoding is still in progress,
+     *  but the output could later end up being fruitless.
+     *
+     * @return bool
+     */
+
+    public function getIsFruitless(): bool
+    {
+        return in_array($this->status, static::FRUITLESS_STATUSES);
     }
 
     // =Attributes
@@ -799,6 +901,7 @@ class Output extends Model
     {
         $attributes = parent::attributes();
 
+        $attributes[] = 'progress';
         $attributes[] = 'format';
         $attributes[] = 'key';
         $attributes[] = 'path';
@@ -824,9 +927,10 @@ class Output extends Model
         $rules = parent::rules();
 
         $rules['attrRequired'] = [ [
+            'key',
             'format',
+            'path',
             'type',
-            'path'
         ], 'required' ];
 
         $rules['attrBoolean'] = [ [
@@ -847,10 +951,30 @@ class Output extends Model
             'offset',
             'duration',
             'number',
-            'interval'
+            'interval',
         ], 'integer', 'min' => 0 ];
 
-        $rules['offsetsEachInteger'] = [ 'offsets', 'each', 'rule' => ['integer', 'min' => 0] ];
+        $rules['attrString'] = [ [
+            'key',
+            'status',
+            'progress',
+            'path',
+            'if',
+            'fit',
+            'url',
+            'urls',
+            'type',
+            'error',
+            'uid',
+        ], 'string' ];
+
+        $rules['attrDateTime'] = [ [
+            'dateCreated',
+            'dateUpdated'
+        ], DateTimeValidator::class ];
+
+        $rules['offsetsEachInteger'] = [ 'offsets', 'each',
+            'rule' => ['integer', 'min' => 0] ];
 
         $rules['fitInRange'] = [ 'fit', 'in', 'range' => [
             self::FIT_PAD,

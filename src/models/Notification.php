@@ -27,6 +27,15 @@ use yoannisj\coconut\helpers\JobHelper;
 
 class Notification extends Model
 {
+    // =Static
+    // =========================================================================
+
+    const EVENT_INPUT_TRANSFERRED = 'input.transferred';
+    const EVENT_OUTPUT_COMPLETED = 'output.completed';
+    const EVENT_OUTPUT_FAILED = 'output.failed';
+    const EVENT_JOB_COMPLETED = 'job.completed';
+    const EVENT_JOB_FAILED = 'job.failed';
+
     // =Properties
     // =========================================================================
 
