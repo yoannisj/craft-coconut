@@ -150,7 +150,7 @@ class Notification extends Model
                 break;
         }
 
-        return $params;
+        return JobHelper::cleanParams($params);
     }
 
     // =Protected Methods

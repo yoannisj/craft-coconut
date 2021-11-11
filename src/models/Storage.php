@@ -21,6 +21,7 @@ use craft\helpers\StringHelper;
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 use yoannisj\coconut\models\ServiceCredentials;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Model representing and validating settings for Cococnut storage method
@@ -242,6 +243,7 @@ class Storage extends Model
             'expires',
             'cacheControl',
         ], 'string' ];
+
         $rules['attrBool'] = [ ['secure'], 'boolean' ];
         $rules['credentialsValid'] = [ ['credentials'], 'validateCredentials' ];
 
@@ -295,7 +297,7 @@ class Storage extends Model
             }
         }
 
-        return $params;
+        return JobHelper::cleanParams($params);
     }
 
     // =Proteced Methods

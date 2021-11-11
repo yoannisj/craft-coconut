@@ -1085,6 +1085,31 @@ class JobHelper
         return $object;
     }
 
+    /**
+     * Removes empty values from given params. Similar to php's `array_filter`
+     *  but recursive.
+     *
+     * @param array $params
+     *
+     * @return array
+     */
+
+    public static function cleanParams( array $params )
+    {
+        $res = [];
+
+        foreach ($params as $key => $value)
+        {
+            if (ArrayHelper::isAssociative($value)) {
+                $value = static::cleanParams($value);
+            }
+
+            if (!empty($value)) $res[$key] = $value;
+        }
+
+        return $res;
+    }
+
     // =Private Methods
     // =========================================================================
 

@@ -1051,7 +1051,7 @@ class Output extends Model
         // 'container' is not a format param supported by Coconut
         ArrayHelper::remove($params['format'], 'container');
 
-        return $params;
+        return JobHelper::cleanParams($params);
     }
 
     // =Protected Methods

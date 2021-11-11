@@ -321,7 +321,7 @@ class Input extends Model
     }
 
     /**
-     * Returns Coconut API params for this job output
+     * Returns Coconut API params for this job input
      *
      * @return array
      */
