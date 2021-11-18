@@ -135,31 +135,126 @@ class JobsController extends Controller
 
     public function actionUpload()
     {
+        Craft::error('UPLOAD!');
+
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
 
-        $volumeId = $request->getRequiredParam('volumeId');
-        $volume = Craft::$app->getVolumes()->getVolumeById($volumeId);
+        Craft::error('-> UPLOAD QUERY PARAMS');
+        Craft::error($request->getQueryParams());
+        Craft::error('-> UPLOAD BODY PARAMS');
+        Craft::error($request->getBodyParams());
+        Craft::error('-----');
+        Craft::error('VOLUME:: '.$request->getParam('volume'));
+        Craft::error('VOLUME ID:: '.$request->getParam('volumeId'));
+        Craft::error('=====');
 
-        if (!$volume) {
-            throw new BadRequestHttpException('Could not find upload volume.');
-        }
+        $volumeHandle = $request->getParam('volume');
+        $volumeId = $request->getParam('volumeId');
 
-        $outputPath = $request->getRequiredParam('outputPath');
-        $outputFile = $request->getRequiredParam('encoded_video');
-
-        Craft::error('OUTPUT IS RESOURCE:: ' . is_resource($outputFile) ? 'YES' : 'NO');
-
-        // replace / create file on volume
-        if ($volume->fileExists($outputPath)) {
-            $volume->updateFileByStream($outputPath, $outputFile);
+        if ($volumeHandle) {
+            $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
+        } else if ($volumeId) {
+            $volume = Craft::$app->getVolumes()->getVolumeById($volumeId);
         } else {
-            $volume->createFileByStream($outputPath, $outputFile);
+            throw new BadRequestHttpException(
+                "Missing one of required parameters `volume` or `volumeId`.");
         }
+
+        if (!$volume)
+        {
+            throw new NotFoundHttpException(
+                "Could not determine upload storage volume.");
+        }
+
+        $uploadedFile = UploadedFile::getInstanceByName('encoded_video');
+        // $outputPath = $request->getRequiredParam('outputPath');
+
+        if (!$uploadedFile) {
+            throw new BadRequestHttpException('No file was uplaoded');
+        }
+
+        // Get path to temporarily saved file
+        $tempPath = $this->getUploadedFileTempPath($uploadedFile);
+
+        Craft::error('UPLOAD TEMP PATH:: '.$tempPath);
+
+        // try to open a file stream
+        if (($stream = fopen($tempPath, 'rb')) === false)
+        {
+            FileHelper::unlink($tempPath); // delete temporarily saved file
+
+            throw new FileException(Craft::t('app',
+                'Could not open file for streaming at {path}', [
+                    'path' => $tempPath
+                ])
+            );
+        }
+
+        // // upload file to the volume
+        // if ($volume->fileExists($outputPath)) {
+        //     // replace output file
+        //     $volume->updateFileByStream($outputPath, $stream, [
+        //         'mimetype' => FileHelper::getMimeType($tempPath),
+        //     ]);
+        // } else {
+        //     // create output file
+        //     $volume->createFileByStream($outputPath, $stream, [
+        //         'mimetype' => FileHelper::getMimeType($tempPath),
+        //     ]);
+        // }
+
+        // // Rackspace will disconnect the stream automatically
+        // if (is_resource($stream)) {
+        //     fclose($stream);
+        // }
+
+        // Tell coconut we could upload the file successfully
+        $this->response->setStatusCode(200);
+        return $this->response;
     }
 
     // =Protected Methods
     // =========================================================================
+
+    /**
+     * Saves given uploaded file temporarily on the file-system, and returns
+     * the file's temporary path.
+     *
+     * @param UploadedFile $uploadedFile
+     *
+     * @return string Path to temporarily saved uploaded file
+     *
+     * @throws UploadFailedException if $uploadedFile could not be saved
+     */
+
+    protected function getUploadedFileTempPath( UploadedFile $uploadedFile )
+    {
+        if ($uploadedFile->getHasError()) {
+            throw new UploadFailedException($uploadedFile->error);
+        }
+
+        try {
+            $tempPath = $uploadedFile->saveAsTempFile();
+        } catch (ErrorException $e) {
+            throw new UploadFailedException(0, null, $e);
+        }
+
+        if ($tempPath === false) {
+            throw new UploadFailedException(UPLOAD_ERR_CANT_WRITE);
+        }
+
+        return $tempPath;
+    }
+
+
+
+
+
+
+
+
+
 
     /**
      *
