@@ -348,6 +348,12 @@ class JobHelper
 
     const PATH_PRIVATISATION_PATTERN = '/^(\.{0,2}\/)?([^_])/';
 
+    /**
+     * Pattern used to find extra separators in a path
+     */
+
+    const PATH_EXTRA_SEPARATORS_PATTERN = '/\/+/';
+
     // =Public Methods
     // =========================================================================
 
@@ -816,6 +822,19 @@ class JobHelper
     }
 
     /**
+     * Normalizes given file path
+     *
+     * @param string $path
+     *
+     * @return string
+     */
+
+    public function normalizePath( string $path ): string
+    {
+        return trim(preg_replace(static::PATH_EXTRA_SEPARATORS_PATTERN, '/', $path), '/');
+    }
+
+    /**
      * Adds a sequential placeholder to given path
      *
      * @param string $path
@@ -825,7 +844,16 @@ class JobHelper
 
     public static function sequencePath( string $path ): string
     {
+        if (!preg_match(static::SEQUENTIAL_PLACEHOLDER_PATTERN, $path))
+        {
+            $path = (
+                pathinfo($path, PATHINFO_DIRNAME).'/'.
+                pathinfo($path, PATHINFO_FILENAME).
+                '-%.2d.'.pathinfo($path, PATHINFO_EXTENSION)
+            );
+        }
 
+        return $path;
     }
 
     /**

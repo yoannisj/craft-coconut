@@ -595,16 +595,11 @@ class Output extends Model
         // make sure paths for image sequence outputs include a numbering placeholder
         if ($this->getType() == 'image'
             && ($this->number || $this->interval || !empty($this->offsets))
-            && !preg_match(JobHelper::SEQUENTIAL_PLACEHOLDER_PATTERN, $path)
         ) {
-            $path = (
-                pathinfo($path, PATHINFO_DIRNAME).'/'.
-                pathinfo($path, PATHINFO_FILENAME).
-                '-%.2d.'.pathinfo($path, PATHINFO_EXTENSION)
-            );
+            $path = Jobhelper::sequencePath($path);
         }
 
-        return JobHelper::privatisePath($path);
+        return JobHelper::privatisePath(JobHelper::normalizePath($path));
     }
 
     /**
@@ -1068,25 +1063,50 @@ class Output extends Model
         $job = $this->getJob();
 
         $input = $job ? $job->getInput() : null;
+        $inputAsset = $input ? $input->getAsset() : null;
         $inputUrl = $input ? $input->getUrl() : null;
-        $inputPath = null;
 
-        if ($inputUrl)
+        $path = null;
+        $filename = null;
+
+        if ($inputAsset)
         {
-            $inputPath = parse_url($inputUrl, PHP_URL_PATH);
-            $inputPath = trim((
-                pathinfo($inputPath, PATHINFO_DIRNAME).'/'.
-                pathinfo($inputPath, PATHINFO_FILENAME)
-            ), '/');
+            // prepend with volume handle if the output will not be
+            // stored in same volume
+            if (!$job->storageVolumeId
+                || $job->storageVolumeId != $inputAsset->volumeId)
+            {
+                $path = ($inputAsset->volume->handle
+                    .'/'.$inputAsset->folderPath);
+            } else {
+                $path = $inputAsset->folderPath;
+            }
+
+            $filename = pathinfo($inputAsset->filename, PATHINFO_FILENAME);
         }
 
-        return [
+        else if ($inputUrl)
+        {
+            $path = parse_url($inputUrl, PHP_URL_PATH);
+            $path = (pathinfo($path, PATHINFO_DIRNAME).'/'.
+                pathinfo($path, PATHINFO_FILENAME));
+
+            $filename = pathinfo($path, PATHINFO_FILENAME);
+        }
+
+        if ($path) { // normalize separators in path
+            $path = JobHelper::normalizePath($path);
+        }
+
+        $vars = [
             'key' => JobHelper::keyAsPath($key),
-            'ext' => $format ? JobHelper::formatExtension($format) : null,
-            'path' => $inputPath,
-            'filename' => ($inputPath ? pathinfo($inputPath, PATHINFO_FILENAME) : null),
             'hash' => $input ? $input->getUrlHash() : null,
+            'path' => $path,
+            'filename' => $filename,
+            'ext' => $format ? JobHelper::formatExtension($format) : null,
         ];
+
+        return $vars;
     }
 
     /**

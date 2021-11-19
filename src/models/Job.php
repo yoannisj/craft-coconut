@@ -613,10 +613,13 @@ class Job extends Model
                 $storage = Craft::createObject($storage);
             }
 
-            if (!$storage) {
+            if (!$storage)
+            {
                 $storage = $this->getFallbackStorage();
                 $this->isFallbackStorage = true;
-            } else {
+            }
+
+            else {
                 $this->isFallbackStorage = false;
             }
 
@@ -662,6 +665,11 @@ class Job extends Model
                 {
                     $storage = Coconut::$plugin->getStorages()
                         ->getVolumeStorage($uploadVolume);
+
+                    // @todo: store volume / handle information on storage model
+                    // instead of on job, to more easily and efficiantly recognize
+                    // and compare volume storage
+                    $this->_storageVolumeId = $uploadVolume->id;
                 }
             }
 

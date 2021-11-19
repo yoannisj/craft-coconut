@@ -166,7 +166,7 @@ class Settings extends Model
      * @default '_coconut/{path}/{key}.{ext}'
      */
 
-    public $defaultOutputPathFormat = '_coconut/{path}--{key}.{ext}';
+    public $defaultOutputPathFormat = '_coconut/{path}/{filename}--{key}.{ext}';
 
     /**
      * @var string|array|Notification|null Notification param to use if job
