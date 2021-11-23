@@ -140,15 +140,6 @@ class JobsController extends Controller
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
 
-        Craft::error('-> UPLOAD QUERY PARAMS');
-        Craft::error($request->getQueryParams());
-        Craft::error('-> UPLOAD BODY PARAMS');
-        Craft::error($request->getBodyParams());
-        Craft::error('-----');
-        Craft::error('VOLUME:: '.$request->getParam('volume'));
-        Craft::error('VOLUME ID:: '.$request->getParam('volumeId'));
-        Craft::error('=====');
-
         $volumeHandle = $request->getParam('volume');
         $volumeId = $request->getParam('volumeId');
 
@@ -167,17 +158,20 @@ class JobsController extends Controller
                 "Could not determine upload storage volume.");
         }
 
-        $uploadedFile = UploadedFile::getInstanceByName('encoded_video');
-        // $outputPath = $request->getRequiredParam('outputPath');
+        $outputPath = $request->getRequiredParam('outputPath');
+        $uploadedFile = (UploadedFile::getInstanceByName('encoded_video') ?:
+            UploadedFile::getInstanceByName('thumbnail'));
 
         if (!$uploadedFile) {
-            throw new BadRequestHttpException('No file was uplaoded');
+            throw new BadRequestHttpException('No file was uploaded');
         }
 
         // Get path to temporarily saved file
         $tempPath = $this->getUploadedFileTempPath($uploadedFile);
 
         Craft::error('UPLOAD TEMP PATH:: '.$tempPath);
+        Craft::error('UPLOAD VOLUME:: '.$volume->handle);
+        Craft::error('UPLOAD OUTPUT PATH:: '.$outputPath);
 
         // try to open a file stream
         if (($stream = fopen($tempPath, 'rb')) === false)
@@ -192,22 +186,22 @@ class JobsController extends Controller
         }
 
         // // upload file to the volume
-        // if ($volume->fileExists($outputPath)) {
-        //     // replace output file
-        //     $volume->updateFileByStream($outputPath, $stream, [
-        //         'mimetype' => FileHelper::getMimeType($tempPath),
-        //     ]);
-        // } else {
-        //     // create output file
-        //     $volume->createFileByStream($outputPath, $stream, [
-        //         'mimetype' => FileHelper::getMimeType($tempPath),
-        //     ]);
-        // }
+        if ($volume->fileExists($outputPath)) {
+            // replace output file
+            $volume->updateFileByStream($outputPath, $stream, [
+                'mimetype' => FileHelper::getMimeType($tempPath),
+            ]);
+        } else {
+            // create output file
+            $volume->createFileByStream($outputPath, $stream, [
+                'mimetype' => FileHelper::getMimeType($tempPath),
+            ]);
+        }
 
         // // Rackspace will disconnect the stream automatically
-        // if (is_resource($stream)) {
-        //     fclose($stream);
-        // }
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
 
         // Tell coconut we could upload the file successfully
         $this->response->setStatusCode(200);

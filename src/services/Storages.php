@@ -97,12 +97,12 @@ class Storages extends Component
             // no need to resolve volume storage if module/plugin already did
             if (!$storage)
             {
-                // @todo: resolve storage settings for services supported by Coconut
-                $storage = new Storage([
-                    'url' => UrlHelper::actionUrl('coconut/jobs/upload', [
-                        'volume' => $volume->handle,
-                    ]),
+                $url = UrlHelper::actionUrl('coconut/jobs/upload', [
+                    'volume' => $volume->handle,
                 ]);
+
+                // @todo: resolve storage settings for services supported by Coconut
+                $storage = new Storage([ 'url' => $url.'&outputPath=' ]);
             }
 
             // allow modules/plugins to further customise storage settings
