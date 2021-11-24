@@ -22,7 +22,7 @@ use craft\helpers\Json as JsonHelper;
 use yoannisj\coconut\Coconut;
 
 /**
- * 
+ *
  */
 
 class ClearVideoOutputs extends ElementAction
@@ -80,11 +80,14 @@ EOD;
             ->kind('video')
             ->all();
 
+        if (empty($videos)) return true;
+
+        $coconutOutputs = Coconut::$plugin->getOutputs();
         $anySuccess = false;
 
         foreach ($videos as $video)
         {
-            if (Coconut::$plugin->getOutputs()->clearSourceOutputs($video) !== false) {
+            if ($coconutOutputs->clearOutputsForInput($video)) {
                 $anySuccess = true;
             }
         }
@@ -93,18 +96,18 @@ EOD;
     }
 
     /**
-     * 
+     *
      */
 
     protected function getOutputAssetIds()
     {
         $results = (new Query())
-            ->select('sourceAssetId')
-            ->from(Coconut::TABLE_OUTPUTS)
+            ->select('inputAssetId')
+            ->from(Coconut::TABLE_JOBS)
             ->distinct()
             ->all();
 
-        $assetIds = ArrayHelper::getColumn($results, 'sourceAssetId');
+        $assetIds = ArrayHelper::getColumn($results, 'inputAssetId');
 
         return array_filter($assetIds);
     }

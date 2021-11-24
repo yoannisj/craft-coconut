@@ -88,6 +88,45 @@ class Jobs extends Component
     // =========================================================================
 
     /**
+     * @param string $handle
+     *
+     * @return Job|null
+     */
+
+    public function getNamedJobs( string $handle )
+    {
+        $namedJobs = Coconut::$plugin->getSettings()->getNamedJobs();
+        return $namedJobs[$handle] ?? null;
+    }
+
+    /**
+     * @param string|VolumeInterface $volume
+     *
+     * @return Job|null
+     *
+     * @throws InvalidArgumentException If given $volume argument is not a volume instance of handle
+     */
+
+    public function getVolumeJob( $volume )
+    {
+        $handle = null;
+
+        if ($volume instanceof VolumeInterface) {
+            $handle = $volume->handle;
+        } else if (is_string($volume)) {
+            $handle = $volume;
+        }
+
+        else {
+            throw new InvalidArgumentException(
+                "Argument 'volume' must be a Volume instance or a volume handle");
+        }
+
+        $volumeJobs = Coconut::$plugin->getSettings()->getvolumeJobs();
+        return $volumeJobs[$handle] ?? null;
+    }
+
+    /**
      * Runs given job via Coconut's API
      *
      * @param Job $job Th job model to run
@@ -137,16 +176,12 @@ class Jobs extends Component
     public function saveJob( Job $job, bool $runValidation = true ): bool
     {
         $isNewJob = !isset($job->id);
-        $previousStatus = $job->status;
-        $previousInputStatus = $job->getInput()->status;
 
         if ($this->hasEventHandlers(self::EVENT_BEFORE_SAVE_JOB))
         {
             $this->trigger(self::EVENT_BEFORE_SAVE_JOB, new JobEvent([
                 'job' => $job,
                 'isNew' => $isNewJob,
-                'previousStatus' => $previousStatus,
-                'previousInputStatus' => $previousInputStatus,
             ]));
         }
 
@@ -185,9 +220,19 @@ class Jobs extends Component
             $coconutOutputs = Coconut::$plugin->getOutputs();
             foreach ($job->getOutputs() as $output)
             {
+                // make sure output records are linked to the job record
                 $output->jobId = $job->id;
 
                 if (!$coconutOutputs->saveOutput($output, $runValidation)) {
+                    $transaction->rollBack();
+                    return false;
+                }
+            }
+
+            // delete legacy outputs
+            foreach ($job->getLegacyOutputs() as $output)
+            {
+                if (!$coconutOutputs->deleteOutput($output)) {
                     $transaction->rollBack();
                     return false;
                 }
@@ -207,8 +252,6 @@ class Jobs extends Component
             $this->trigger(self::EVENT_AFTER_SAVE_JOB, new JobEvent([
                 'job' => $job,
                 'isNew' => $isNewJob,
-                'previousStatus' => $previousStatus,
-                'previousInputStatus' => $previousInputStatus,
             ]));
         }
 

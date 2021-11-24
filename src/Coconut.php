@@ -167,8 +167,8 @@ class Coconut extends Plugin
             Asset::class,
             Element::EVENT_REGISTER_ACTIONS,
             function( RegisterElementActionsEvent $e ) {
-                // $e->actions[] = TranscodeVideo::class;
-                // $e->actions[] = ClearVideoOutputs::class;
+                $e->actions[] = TranscodeVideo::class;
+                $e->actions[] = ClearVideoOutputs::class;
             }
         );
 
@@ -283,7 +283,7 @@ class Coconut extends Plugin
             $job = new Job($outputs);
             $outputs = null;
         } else if (is_string($outputs)) { // could be a named job...
-            $job = $this->getSettings()->getNamedJob($outputs);
+            $job = $this->getJobs()->getNamedJob($outputs);
             $outputs = null;
         }
 
@@ -324,7 +324,7 @@ class Coconut extends Plugin
             $savedOutput = ArrayHelper::firstWhere($savedOutputs,
                 'key', $output->key);
 
-            if ($savedOutput) {
+            if ($savedOutput && !$savedOutput->getIsFruitless()) {
                 $transcodedOutputs[$key] = $savedOutput;
             } else {
                 $missingOutputs[$key] = $output;
@@ -453,13 +453,13 @@ class Coconut extends Plugin
         }
 
         else if (is_string($job)) {
-            $job = $this->getSettings()->getNamedJob($job);
+            $job = $this->getJobs()->getNamedJob($job);
         }
 
         else if (!$job && $source instanceof Asset)
         {
             $volume = $source->getVolume();
-            $job = $this->getSettings()->getVolumeJob($volume->handle);
+            $job = $this->getJobs()->getVolumeJob($volume->handle);
         }
 
         if ($strict && !($job instanceof Job))

@@ -42,7 +42,7 @@ class TranscodeVideo extends ElementAction
     public function getTriggerHtml()
     {
         $type = Json::encode(static::class);
-        $fileExtensions = implode('|', JobHelper::SOURCE_FILE_EXTENSIONS);
+        $fileExtensions = implode('|', JobHelper::INPUT_CONTAINERS);
 
         $js = <<<EOD
 (function()
@@ -52,7 +52,7 @@ class TranscodeVideo extends ElementAction
         batch: true,
         validateSelection: function(\$selectedItems)
         {
-            var videoRe = /\.({$fileExtensions})$/;
+            var videoRe = /\.({$fileExtensions})$/i;
             for (var i = 0; i < \$selectedItems.length; i++)
             {
                 var url = \$selectedItems.eq(i).find('.element').data('url');
@@ -80,15 +80,14 @@ EOD;
             ->kind('video')
             ->all();
 
+        if (empty($videos)) return true;
+
         $anySuccess = false;
 
         foreach ($videos as $video)
         {
-            try {
-                Coconut::$plugin->transcodeSource($video, null, true);
+            if (Coconut::$plugin->transcodeVideo($video, null)) {
                 $anySuccess = true;
-            } catch (\Throwable $e) {
-                $anySuccess = false;
             }
         }
 

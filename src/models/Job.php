@@ -394,7 +394,7 @@ class Job extends Model
      * @return Output[]
      */
 
-    public function getLegacyOutputs()
+    public function getLegacyOutputs(): array
     {
         if (empty($this->_legacyOutputIds)) {
             return [];

@@ -31,10 +31,4 @@ class OutputEvent extends Event
      */
 
     public $isNew;
-
-    /**
-     * @var string|null
-     */
-
-    public $previousStatus;
 }

@@ -873,11 +873,11 @@ class JobHelper
                 return rtrim($publicBaseUrl, '/').'/'.$url;
             }
 
+            // is this a Craft URL ?
+            // (compare hosts to work around scheme inconsistencies)
             $baseUrl = UrlHelper::baseUrl();
             $protoRelativeBase = rtrim(preg_replace('/(http|https):\/\//', '://', $baseUrl), '/');
 
-            // is this a Craft URL ?
-            // (compare hosts to work around scheme inconsistencies)
             if (strpos($url, $protoRelativeBase) !== false)
             {
                 // replace base URL (with whatever scheme it uses) by public base URL

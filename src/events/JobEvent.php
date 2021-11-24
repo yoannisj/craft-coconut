@@ -31,16 +31,4 @@ class JobEvent extends Event
      */
 
     public $isNew;
-
-    /**
-     * @var string|null
-     */
-
-    public $previousStatus;
-
-    /**
-     * @var string|null
-     */
-
-    public $previousInputStatus;
 }

@@ -225,10 +225,10 @@ class Settings extends Model
     private $_jobs = [];
 
     /**
-     * @var array Container for normalized jobs
+     * @var bool Whether `jobs` property was normalized or not (internal flag)
      */
 
-    private $_normalizedJobs = [];
+    protected $isNormalizedJobs;
 
     /**
      * @var array Sets default job parameters for craft assets in given volumes.
@@ -243,10 +243,10 @@ class Settings extends Model
     private $_volumeJobs = [];
 
     /**
-     * @var array Container for normalized volume jobs
+     * @var bool Whether volumeJobs property was normalized or not (internal flag)
      */
 
-    private $_normalizedVolumeJobs = [];
+    protected $isNormalizedVolumeJobs;
 
     /**
      * @var array List of input volumes handles, for which the plugin should
@@ -587,7 +587,7 @@ class Settings extends Model
                         'Setting `volumeJobs` must resolve to a list of `'.Job::class.'` models');
                 }
 
-                $this->_volumeJobs[$name] = $job;
+                $this->_volumeJobs[$handle] = $job;
             }
 
             $this->isNormalizedJobs = true;
@@ -751,48 +751,6 @@ class Settings extends Model
 
     // =Operations
     // -------------------------------------------------------------------------
-
-    /**
-     * Returns Coconut storage model with given name
-     *
-     * @return Storage|null
-     */
-
-    public function getNamedStorage( string $name )
-    {
-        $storages = $this->getStorages();
-        return $storages[$name] ?? null;
-    }
-
-    /**
-     * Returns Coconut job model with given name
-     *
-     * @return Job|null
-     */
-
-    public function getNamedJob( string $name )
-    {
-        $jobs = $this->getJobs();
-        return $jobs[$name] ?? null;
-    }
-
-    /**
-     * Returns Coconut job model for given assets volume
-     *
-     * @param VolumeInterface|string $volume
-     *
-     * @return Job|null
-     */
-
-    public function getVolumeJob( $volume )
-    {
-        if ($volume instanceof VolumeInterface) {
-            $volume = $volume->handle;
-        }
-
-        $volumeJobs = $this->getvolumeJobs();
-        return $volumeJobs[$volume] ?? null;
-    }
 
     // =Protected Methods
     // =========================================================================

@@ -39,6 +39,9 @@ class Outputs extends Component
 
     const EVENT_BEFORE_SAVE_OUTPUT = 'beforeSaveOutput';
     const EVENT_AFTER_SAVE_OUTPUT = 'afterSaveOutput';
+    const EVENT_COMPLETE_OUTPUT = 'completeOutput';
+    const EVENT_BEFORE_DELETE_OUTPUT = 'deleteOutput';
+    const EVENT_AFTER_DELETE_OUTPUT = 'deleteOutput';
 
     // =Properties
     // =========================================================================
@@ -135,14 +138,12 @@ class Outputs extends Component
     public function saveOutput( Output $output, bool $runValidation = true ): bool
     {
         $isNewOutput = !isset($output->id);
-        $previousStatus = $output->status;
 
         if ($this->hasEventHandlers(self::EVENT_BEFORE_SAVE_OUTPUT))
         {
             $this->trigger(self::EVENT_BEFORE_SAVE_OUTPUT, new OutputEvent([
                 'output' => $output,
                 'isNew' => $isNewOutput,
-                'previousStatus' => $previousStatus,
             ]));
         }
 
@@ -171,7 +172,16 @@ class Outputs extends Component
             $this->trigger(self::EVENT_AFTER_SAVE_OUTPUT, new OutputEvent([
                 'output' => $output,
                 'isNew' => $isNewOutput,
-                'previousStatus' => $previousStatus,
+            ]));
+        }
+
+        // trigger output completion event for convenience
+        if ($output->getIsFinished()
+            && $this->hasEventHandlers(self::EVENT_COMPLETE_OUTPUT))
+        {
+            $this->trigger(self::EVENT_COMPLETE_OUTPUT, new OutputEvent([
+                'output' => $output,
+                'isNew' => $isNewOutput,
             ]));
         }
 
@@ -186,10 +196,46 @@ class Outputs extends Component
 
     public function deleteOutput( Output $output ): bool
     {
+        // we can not delete an output which has not been saved yet
         if (!$output->id) return false;
 
         $record = OutputRecord::findOne($output->id);
-        if ($record) return $record->delete();
+        if (!$record) return false;
+
+        if ($this->hasEventHandlers(self::EVENT_BEFORE_DELETE_OUTPUT))
+        {
+            if (!$output) $output = new Output($record->getAttributes());
+
+            $this->trigger(self::EVENT_BEFORE_DELETE_OUTPUT, new OutputEvent([
+                'output' => $output,
+                'isNew' => false,
+            ]));
+        }
+
+        // delete output files from volume storages
+        $job = $output->getJob();
+        $storageVolume = $job->getStorageVolume();
+
+        if ($storageVolume) {
+            $storageVolume->deleteFile($output->path);
+        }
+
+        if ($record->delete())
+        {
+            // @todo: delete job if it was left without any outputs?
+
+            if ($this->hasEventHandlers(self::EVENT_AFTER_DELETE_OUTPUT))
+            {
+                if (!$output) $output = new Output($record->getAttributes());
+
+                $this->trigger(self::EVENT_AFTER_DELETE_OUTPUT, new OutputEvent([
+                    'output' => $output,
+                    'isNew' => false,
+                ]));
+            }
+
+            return true;
+        }
 
         return false;
     }
@@ -211,6 +257,34 @@ class Outputs extends Component
         foreach ($records as $record)
         {
             if ($record->delete() === false) {
+                $success = false;
+            }
+        }
+
+        return $success;
+    }
+
+    /**
+     * Clears all outputs for given input
+     *
+     * @param mixed $input
+     *
+     * @return bool
+     */
+
+    public function clearOutputsForInput( $input )
+    {
+        $outputs = $this->getOutputsForInput($input);
+        $success = true;
+
+        foreach ($outputs as $output)
+        {
+            // only delete finished outputs
+            if (!$output->getIsFinished()) continue;
+
+            // @todo: check if job output has id before deleting it?
+            // -> might change whether this is considered successfull or not
+            if (!$this->deleteOutput($output))  {
                 $success = false;
             }
         }
@@ -450,6 +524,9 @@ class Outputs extends Component
     }
 
     // =Protected Methods
+    // =========================================================================
+
+    // =Private Methods
     // =========================================================================
 
     /**

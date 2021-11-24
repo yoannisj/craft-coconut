@@ -58,12 +58,15 @@ class JobsController extends Controller
     // =========================================================================
 
     /**
-     * Pushes a new coconut job to the queue
+     * Webhook to update coconut job information in local DB
      */
 
     public function actionNotify()
     {
-        // $this->requireToken(); // @todo: inject valid token in notification URL
+        // @todo: inject valid token in notification URL
+        // @todo: secure notification webhook:
+
+        // $this->requireToken();
         $this->requirePostRequest();
 
         $params = $this->request->getBodyParams();
