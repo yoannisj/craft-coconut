@@ -122,7 +122,7 @@ class JobsController extends Controller
             Craft::error('OUTPUT ERRORS');
             foreach ($job->getOutputs() as $output)
             {
-                Craft::error('--> '.$output->key);
+                Craft::error('> '.$output->key);
                 Craft::error($output->getErrorSummary(true));
             }
 
@@ -140,7 +140,7 @@ class JobsController extends Controller
 
     public function actionUpload( string $volumeHandle, string $outputPath )
     {
-        Craft::error('UPLOAD!');
+        Craft::error('UPLOAD:: '. $volumeHandle . ' > '.$outputPath);
         $this->requirePostRequest();
 
         // get volume model based on given handle
@@ -161,10 +161,6 @@ class JobsController extends Controller
 
         // Get path to temporarily saved file
         $tempPath = $this->getUploadedFileTempPath($uploadedFile);
-
-        Craft::error('UPLOAD TEMP PATH:: '.$tempPath);
-        Craft::error('UPLOAD VOLUME:: '.$volume->handle);
-        Craft::error('UPLOAD OUTPUT PATH:: '.$outputPath);
 
         // try to open a file stream
         if (($stream = fopen($tempPath, 'rb')) === false)

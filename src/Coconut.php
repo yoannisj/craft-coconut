@@ -193,9 +193,9 @@ class Coconut extends Plugin
         Event::on(
             Asset::class,
             Element::EVENT_REGISTER_ACTIONS,
-            function( RegisterElementActionsEvent $e ) {
-                $e->actions[] = TranscodeVideo::class;
-                $e->actions[] = ClearVideoOutputs::class;
+            function( RegisterElementActionsEvent $event ) {
+                $event->actions[] = TranscodeVideo::class;
+                $event->actions[] = ClearVideoOutputs::class;
             }
         );
 
@@ -203,24 +203,24 @@ class Coconut extends Plugin
         Event::on(
             Elements::class,
             Elements::EVENT_AFTER_SAVE_ELEMENT,
-            function( ElementEvent $e ) {
-                $this->onAfterSaveElement($e);
+            function( ElementEvent $event ) {
+                $this->onAfterSaveElement($event);
             }
         );
 
         Event::on(
             Elements::class,
             Elements::EVENT_AFTER_RESTORE_ELEMENT,
-            function ( ElementEvent $e ) {
-                $this->onAfterRestoreElement($e);
+            function ( ElementEvent $event ) {
+                $this->onAfterRestoreElement($event);
             }
         );
 
         Event::on(
             Assets::class,
             Assets::EVENT_AFTER_REPLACE_ASSET,
-            function ( AssetEvent $e ) {
-                $this->onAfterReplaceAsset($e);
+            function ( AssetEvent $event ) {
+                $this->onAfterReplaceAsset($event);
             }
         );
 
@@ -228,8 +228,8 @@ class Coconut extends Plugin
         Event::on(
             Elements::class,
             Elements::EVENT_AFTER_DELETE_ELEMENT,
-            function( ElementEvent $e ) {
-                $this->onAfterDeleteElement($e);
+            function( ElementEvent $event ) {
+                $this->onAfterDeleteElement($event);
             }
         );
     }
@@ -545,48 +545,50 @@ class Coconut extends Plugin
      * @param \craft\events\ElementEvent
      */
 
-    protected function onAfterSaveElement( ElementEvent $e )
+    protected function onAfterSaveElement( ElementEvent $event )
     {
-        // if ($e->isNew && $e->element instanceof Asset
-        //     && !ElementHelper::isDraftOrRevision($e->element)
-        // ) {
-        //     $this->checkWatchAsset($e->element);
-        // }
+        if ($event->isNew && $event->element instanceof Asset
+            && !ElementHelper::isDraftOrRevision($event->element)
+        ) {
+            $this->checkWatchAsset($event->element);
+        }
     }
 
     /**
      * @param \craft\events\ElementEvent
      */
 
-    protected function onAfterDeleteElement( ElementEvent $e )
+    protected function onAfterDeleteElement( ElementEvent $event )
     {
-        // if ($e->element instanceof Asset
-        //     && !ElementHelper::isDraftOrRevision($e->element)
-        // ) {
-        //     $this->getOutputs()->clearSourceOutputs($e->element);
-        // }
+        if ($event->element instanceof Asset
+            && $element->kind == 'video' // only videos can be inputs
+            && !ElementHelper::isDraftOrRevision($event->element)
+        ) {
+            Craft::error('CLEAR OUTPUTS FOR DELETED ASSET');
+            $this->getOutputs()->clearOutputsForInput($event->element);
+        }
     }
 
     /**
      * @param \craft\events\ElementEvent
      */
 
-    protected function onAfterRestoreElement( ElementEvent $e )
+    protected function onAfterRestoreElement( ElementEvent $event )
     {
-        // if ($e->isNew && $e->element instanceof Asset
-        //     && !ElementHelper::isDraftOrRevision($e->element)
-        // ) {
-        //     $this->checkWatchAsset($e->element);
-        // }
+        if ($event->isNew && $event->element instanceof Asset
+            && !ElementHelper::isDraftOrRevision($event->element)
+        ) {
+            $this->checkWatchAsset($event->element);
+        }
     }
 
     /**
      * @param \craft\events\AssetEvent
      */
 
-    protected function onAfterReplaceAsset( AssetEvent $e )
+    protected function onAfterReplaceAsset( AssetEvent $event )
     {
-        // $this->checkWatchAsset($e->asset);
+        $this->checkWatchAsset($event->asset);
     }
 
     /**
@@ -601,20 +603,22 @@ class Coconut extends Plugin
     protected function checkWatchAsset( Asset $asset ): bool
     {
         // to avoid creating 2x coconut jobs in case there is a conflicting
-        // filename, let the "replaceAsset" event handler decide whether asset
-        // should be automatically transcoded or not.
+        // filename on upload, let the "replaceAsset" event handler decide
+        // whether asset should be automatically transcoded or not
         if (!$asset->kind == 'video'
             || !empty($asset->conflictingFilename))
         {
             return false;
         }
 
+        Craft::error('CHECK WATCH ASSET:: '.$asset->volume->handle.' > '.$asset->filename);
+
         $settings = $this->getSettings();
         $volume = $asset->getVolume();
 
         if (in_array($volume->handle, $settings->watchVolumes))
         {
-            $this->transcodeSource($asset, null);
+            $this->transcodeVideo($asset, null);
             return true;
         }
 
