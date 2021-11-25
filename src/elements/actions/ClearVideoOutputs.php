@@ -87,7 +87,7 @@ EOD;
 
         foreach ($videos as $video)
         {
-            if ($coconutOutputs->clearOutputsForInput($video)) {
+            if ($coconutOutputs->clearOutputsForInput($video) !== false) {
                 $anySuccess = true;
             }
         }

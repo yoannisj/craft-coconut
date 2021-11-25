@@ -1071,15 +1071,16 @@ class Output extends Model
 
         if ($inputAsset)
         {
-            // prepend with volume handle if the output will not be
-            // stored in same volume
-            if (!$job->storageVolumeId
-                || $job->storageVolumeId != $inputAsset->volumeId)
+            // prepend with input asset's volume handle,
+            // but only if the output will not be stored in the same volume
+            $storage = $job->getStorage();
+
+            if ($storage->volumeId
+                && $storage->volumeId == $inputAsset->volumeId)
             {
-                $path = ($inputAsset->volume->handle
-                    .'/'.$inputAsset->folderPath);
-            } else {
                 $path = $inputAsset->folderPath;
+            } else {
+                $path = $inputAsset->volume->handle.'/'.$inputAsset->folderPath;
             }
 
             $filename = pathinfo($inputAsset->filename, PATHINFO_FILENAME);
@@ -1124,34 +1125,33 @@ class Output extends Model
             'format',
         ];
 
-        switch ($this->type)
+        if ($this->type == 'video' || $this->type == 'image') {
+            $fields[] = 'fit';
+            $fields[] = 'transpose';
+            $fields[] = 'vflip';
+            $fields[] = 'hflip';
+            $fields[] = 'watermark';
+        }
+
+        if ($this->type == 'video' || $this->type == 'audio') {
+            $fields[] = 'offset';
+            $fields[] = 'duration';
+        }
+
+        if ($this->type == 'image')
         {
-            case 'video':
-            case 'image':
-                $fields[] = 'fit';
-                $fields[] = 'transpose';
-                $fields[] = 'vflip';
-                $fields[] = 'hflip';
-                $fields[] = 'watermark';
-            case 'video':
-            case 'audio':
-                $fields[] = 'offset';
-                $fields[] = 'duration';
-                break;
-            case 'image':
-                $fields[] = 'square';
-                $fields[] = 'blur';
-                if ($this->getContainer() == 'gif')
-                {
-                    $fields[] = 'scene';
-                } else {
-                    $fields[] = 'offsets';
-                    $fields[] = 'interval';
-                    $fields[] = 'number';
-                    $fields[] = 'sprite';
-                    $fields[] = 'vtt';
-                }
-                break;
+            $fields[] = 'square';
+            $fields[] = 'blur';
+
+            if ($this->getContainer() == 'gif') {
+                $fields[] = 'scene';
+            } else {
+                $fields[] = 'offsets';
+                $fields[] = 'interval';
+                $fields[] = 'number';
+                $fields[] = 'sprite';
+                $fields[] = 'vtt';
+            }
         }
 
         return $fields;

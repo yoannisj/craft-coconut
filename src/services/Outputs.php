@@ -214,7 +214,7 @@ class Outputs extends Component
 
         // delete output files from volume storages
         $job = $output->getJob();
-        $storageVolume = $job->getStorageVolume();
+        $storageVolume = $job->getStorage()->getVolume();
 
         if ($storageVolume) {
             $storageVolume->deleteFile($output->path);
@@ -241,41 +241,20 @@ class Outputs extends Component
     }
 
     /**
-     * @param array $criteria
-     *
-     * @return bool
-     */
-
-    public function clearOutputs( array $criteria = [] )
-    {
-        $records = OutputRecord::find()
-            ->where($criteria)
-            ->all();
-
-        $success = true;
-
-        foreach ($records as $record)
-        {
-            if ($record->delete() === false) {
-                $success = false;
-            }
-        }
-
-        return $success;
-    }
-
-    /**
      * Clears all outputs for given input
      *
      * @param mixed $input
      *
-     * @return bool
+     * @return integer|false
      */
 
     public function clearOutputsForInput( $input )
     {
         $outputs = $this->getOutputsForInput($input);
         $success = true;
+
+        $success = true;
+        $count = 0;
 
         foreach ($outputs as $output)
         {
@@ -284,13 +263,25 @@ class Outputs extends Component
 
             // @todo: check if job output has id before deleting it?
             // -> might change whether this is considered successfull or not
-            if (!$this->deleteOutput($output))  {
+            if ($this->deleteOutput($output))  {
+                $count++;
+            } else {
                 $success = false;
             }
         }
 
-        return $success;
+        return $success ? $count : false;
     }
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Initializes outputs for given job

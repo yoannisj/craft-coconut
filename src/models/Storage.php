@@ -128,6 +128,24 @@ class Storage extends Model
 
     public $forcePathStyle;
 
+    /**
+     * @param string|null Handle for named storage or Craft volume storage
+     */
+
+    private $_handle;
+
+    /**
+     * @param int Id of Craft volume for storage
+     */
+
+    private $_volumeId;
+
+    /**
+     * @param VolumeInterface|null Craft volume for storage
+     */
+
+    private $_volume;
+
     // =Public Methods
     // =========================================================================
 
@@ -187,6 +205,115 @@ class Storage extends Model
 
         return $this->_credentials;
     }
+
+    /**
+     * @param string|null $handle
+     */
+
+    public function setHandle( string $handle = null )
+    {
+        $this->_handle = $handle;
+        $this->_volumeId = null;
+
+        if ($this->_volume && $this->_volume->handle != $handle) {
+            $this->_volume = null;
+        }
+    }
+
+    /**
+     * @return string|null
+     */
+
+    public function getHandle()
+    {
+        if (!isset($this->_handle)
+            && ($volume = $this->getVolume()))
+        {
+            $this->_handle = $volume->handle;
+        }
+
+        return $this->_handle;
+    }
+
+    /**
+     * @param integer|null $volumeId
+     */
+
+    public function setVolumeId( int $volumeId = null )
+    {
+        $this->_volumeId = $volumeId;
+
+        if ($this->_volume && $this->_volumeId != $volumeId) {
+            $this->_volume = null;
+        }
+
+        if ($volumeId) {
+            $this->_handle = null;
+        }
+    }
+
+    /**
+     * @return integer|null
+     */
+
+    public function getVolumeId()
+    {
+        if (!isset($this->_volumeId) && $this->_volume)
+        {
+            $this->_volumeId = $this->_volume->id;
+        }
+
+        return $this->_volumeId;
+    }
+
+    /**
+     * @param VolumeInterface|null $volume
+     */
+
+    public function setVolume( VolumeInterface $volume = null )
+    {
+        $this->_volume = $volume;
+
+        if ($volume) {
+            $this->_handle = $volume->handle;
+            $this->_volumeId = $volume->id;
+        } else {
+            $this->_volumeId = null;
+        }
+    }
+
+    /**
+     * @return VolumeInterface|null
+     */
+
+    public function getVolume()
+    {
+        if (!isset($this->_volume) && $this->_volumeId)
+        {
+            $this->_volume = Craft::$app->getVolumes()
+                ->getVolumeById($this->_volumeId);
+        }
+
+        return $this->_volume;
+    }
+
+    // =Attributes
+    // -------------------------------------------------------------------------
+
+    /**
+     * @inheritdoc
+     */
+
+    public function attributes()
+    {
+        $attributes = parent::attributes();
+
+        $attributes[] = 'handle';
+        $attributes[] = 'volumeId';
+
+        return $attributes;
+    }
+
 
     // =Validation
     // -------------------------------------------------------------------------
@@ -273,6 +400,19 @@ class Storage extends Model
     // -------------------------------------------------------------------------
 
     /**
+     * @inheritdoc
+     */
+
+    public function extraFields()
+    {
+        $fields = parent::extraFields();
+
+        $fields[] = 'volume';
+
+        return $fields;
+    }
+
+    /**
      * Returns Coconut API params for this job output
      *
      * @return array
@@ -328,41 +468,42 @@ class Storage extends Model
             'path',
         ];
 
-        switch ($this->service)
+        // s3 and s3-compatible
+        if ($this->service == 's3'
+            || $this->service == 'gcs'
+            || $this->service == 'dospaces'
+            || $this->service == 'linode'
+            || $this->service == 'wasabi'
+            || $this->service == 's3other')
         {
-            // =s3 & s3-compatible
-            case 's3':
-            case 'gcs':
-            case 'dospaces':
-            case 'linode':
-            case 'wasabi':
-            case 's3other':
-                $fields[] = 'bucket';
-                $fields[] = 'acl';
-            case 's3':
-            case 'dospaces':
-            case 'linode':
-            case 'wasabi':
-            case 's3other':
+            $fields[] = 'bucket';
+            $fields[] = 'acl';
+
+            if ($this->service != 'gcs') {
                 $fields[] = 'region';
-            case 's3':
+            }
+
+            if ($this->service == 's3') {
                 $fields[] = 'expires';
                 $fields[] = 'cache_control';
-                break;
-            case 's3other':
+            }
+
+            else if ($this->service == 's3other') {
                 $fields[] = 'endpoint';
                 $fieldS[] = 'force_path_style';
-                break;
-            // =rackspace
-            // =azure
-            case 'rackspace':
-            case 'azure':
-                $fields[] = 'container';
-                break;
-            // =backblaze
-            case 'backblaze':
-                $fields[] = 'bucket_id';
-                break;
+            }
+        }
+
+        // rackspace and azure
+        else if ($this->service == 'rackspace'
+            || $this->service == 'azure')
+        {
+            $fields[] = 'container';
+        }
+
+        // backblaze
+        if ($this->service == 'backblaze') {
+            $fields[] = 'bucket_id';
         }
 
         return $fields;

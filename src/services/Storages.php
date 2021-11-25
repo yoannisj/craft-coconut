@@ -61,8 +61,14 @@ class Storages extends Component
     public function getNamedStorage( string $handle )
     {
         $storages = Coconut::$plugin->getSettings()->getStorages();
+        $storage = $storages[$handle] ?? null;
 
-        return $storages[$handle] ?? null;
+        if ($storage) {
+            $storage->handle = $handle;
+            return $storage;
+        }
+
+        return null;
     }
 
     /**
@@ -125,48 +131,14 @@ class Storages extends Component
                     'Resolved volume storage must be an instance of '.Storage::class);
             }
 
+            // set volume-related storage attributes
+            $storage->handle = $volume->handle;
+            $storage->volumeId = $volume->id;
+
             $this->_volumeStoragesById[$volume->id] = $storage;
         }
 
         return $this->_volumeStoragesById[$volume->id];
-    }
-
-    /**
-     * @param string|array|VolumeInterface $storage
-     *
-     * @return Storage|null
-     */
-
-    public function parseStorage( $storage )
-    {
-        if ($storage instanceof Storage) {
-            return $storage;
-        }
-
-        else if (is_array($storage)) {
-            return new Storage($storage);
-        }
-
-        else if (is_string($storage))
-        {
-            // check if this is a named storage handle
-            $handle = $storage;
-            $storage = $this->getNamedStorage($handle);
-
-            if ($storage) {
-                return $storage;
-            }
-
-            // or, assume this is a volume handle
-            $storage = Craft::$app->getVolumes()
-                ->getVolumeByHandle($handle);
-        }
-
-        if ($storage instanceof VolumeInterface) {
-            return $this->getVolumeStorage($storage);
-        }
-
-        return null;
     }
 
     // =Protected Methods

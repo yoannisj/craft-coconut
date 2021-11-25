@@ -20,6 +20,7 @@ use yii\base\InvalidArgumentException;
 
 use Craft;
 use craft\base\Component;
+use craft\base\VolumeInterface;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
 

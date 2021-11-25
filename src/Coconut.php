@@ -301,6 +301,17 @@ class Coconut extends Plugin
                 "Could not resolve `\$input` video argument to transcode");
         }
 
+        // if input is an asset, then we want to use it's volume job as base
+        if (($inputAsset = $input->getAsset()))
+        {
+            $volume = $inputAsset->getVolume();
+            $job = $this->getJobs()->getVolumeJob($volume);
+            $job->setInput($input);
+
+            // in this case, we want to override the volume jobs' outputs
+            if ($job && $outputs) $job->setOutputs($outputs);
+        }
+
         if ($job)
         {
             $input = $job->getInput();

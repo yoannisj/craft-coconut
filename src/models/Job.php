@@ -100,12 +100,6 @@ class Job extends Model
     private $_legacyOutputIds;
 
     /**
-     * @var string
-     */
-
-    private $_storageHandle;
-
-    /**
      * @var Storage The storage settings for output files
      */
 
@@ -116,18 +110,6 @@ class Job extends Model
      */
 
     protected $isNormalizedStorage;
-
-    /**
-     * @var integer
-     */
-
-    private $_storageVolumeId;
-
-    /**
-     * @var VolumeInterface|null
-     */
-
-    private $_storageVolume;
 
     /**
      * @var Storage|null
@@ -414,131 +396,6 @@ class Job extends Model
     }
 
     /**
-     * Setter method for reactive `storageHandle` property
-     *
-     * @param string|null $handle
-     */
-
-    public function setStorageHandle( string $handle = null )
-    {
-        if ($handle != $this->_storageHandle
-            && (!($volume = $this->getStorageVolume()) || $volume->handle != $handle)
-        ) {
-            $this->_storageHandle = $handle;
-            $this->_storageVolumeId = null;
-            $this->_storageVolume = null;
-            $this->_storage = null;
-
-            // force re-calculation next time storage is accessed
-            $this->isNormalizedStorage = false;
-        }
-    }
-
-    /**
-     * @return string|null
-     */
-
-    public function getStorageHandle()
-    {
-        return $this->_storageHandle;
-    }
-
-    /**
-     * Setter method for reactive 'storageVolumeId' property
-     *
-     * @param integer|null $volumeId
-     */
-
-    public function setStorageVolumeId( int $volumeId = null )
-    {
-        if (!$this->_storageVolumeId == $volumeId
-            && (!($volume = $this->getStorageVolume()) || $volume->id != $volumeId)
-        ) {
-            $this->_storageVolumeId = $volumeId;
-            $this->_storageVolume = null;
-            $this->_storageHandle = null;
-            $this->_storage = null;
-
-            // force re-calculation next time storage is accessed
-            $this->isNormalizedStorage = false;
-        }
-    }
-
-    /**
-     * Getter method for reactive `storageVolumeId` property
-     *
-     * @return integer|null
-     */
-
-    public function getStorageVolumeId()
-    {
-        if (!isset($this->_storageVolumeId)
-            && ($volume = $this->getStorageVolume())
-        ) {
-            $this->_storageVolumeId = $volume->id;
-        }
-
-        return $this->_storageVolumeId;
-    }
-
-    /**
-     * Setter method for reactive `storageVolume` property
-     *
-     * @param VolumeInterface|null $volume
-     */
-
-    public function setStorageVolume( VolumeInterface $volume = null )
-    {
-        if (!$volume || (!$currVolume = $this->getStorageVolume())
-            || $currVolume->id != $volume->id
-        ) {
-            $this->_storageVolume = $volume;
-            $this->_storageVolumeId = $volume ? $volume->id : null;
-            $this->_storageHandle = null;
-            $this->_storage = null;
-
-            // force re-calculation next time storage is accessed
-            $this->isNormalizedStorage = false;
-        }
-    }
-
-    /**
-     * Getter method for reactive `storageVolume` property
-     *
-     * @return VolumeInterface|null
-     */
-
-    public function getStorageVolume()
-    {
-        if (!$this->isNormalizedStorage
-            && !isset($this->_storageVolume))
-        {
-            $volume = null;
-
-            if ($this->_storageHandle)
-            {
-                $volume = Craft::$app->getVolumes()
-                    ->getVolumeByHandle($this->_storageHandle);
-            }
-
-            else if ($this->_storageVolumeId)
-            {
-                $volume = Craft::$app->getVolumes()
-                    ->getVolumeById($this->_storageVolumeId);
-            }
-
-            if ($volume)
-            {
-                $this->_storageVolume = $volume;
-                $this->_storageVolumeId = $volume->id;
-                $this->_storageHandle = $volume->handle;
-            }
-        }
-
-        return $this->_storageVolume;
-    }
-
-    /**
      * Setter method for normalized `storage` property
      *
      * If given $storage is a string, it will first be checked against named storage
@@ -553,27 +410,7 @@ class Job extends Model
             $storage = JsonHelper::decodeIfJson($storage);
         }
 
-        if (is_numeric($storage)) {
-            $this->setStorageVolumeId((int)$storage);
-        }
-
-        else if (is_string($storage)) {
-            $this->setStorageHandle($storage);
-        }
-
-        else if ($storage instanceof VolumeInterface) {
-            $this->setStorageVolume($storage);
-        }
-
-        else
-        {
-            $this->_storage = $storage ?: null;
-            $this->_storageHandle = null;
-            $this->_storageVolumeId = null;
-            $this->_storageVolume = null;
-        }
-
-        // force re-calculation next time storage is accessed
+        $this->_storage = $storage;
         $this->isNormalizedStorage = false;
     }
 
@@ -589,32 +426,13 @@ class Job extends Model
         {
             $storage = $this->_storage;
 
-            // give priority to storage handle
-            if (!empty($this->_storageHandle))
-            {
-                // check named storage settings
-                $storage = Coconut::$plugin->getStorages()
-                    ->getNamedStorage($this->_storageHandle);
-
-                // or check volume by handle
-                if (!$storage && ($volume = $this->getStorageVolume()))
-                {
-                    $storage = Coconut::$plugin->getStorages()
-                        ->getVolumeStorage($volume);
-                }
+            // try to resolve previously set storage
+            if ($storage) {
+                $storage = JobHelper::resolveStorage($storage);
             }
 
-            else if (is_array($storage))
-            {
-                if (!array_key_exists('class', $storage)) {
-                    $storage['class'] = Storage::class;
-                }
-
-                $storage = Craft::createObject($storage);
-            }
-
-            if (!$storage)
-            {
+            // if storage was not set or could not be resolved
+            if (!$storage) {
                 $storage = $this->getFallbackStorage();
                 $this->isFallbackStorage = true;
             }
@@ -623,7 +441,8 @@ class Job extends Model
                 $this->isFallbackStorage = false;
             }
 
-            if (!$storage instanceof Storage)
+            // make sure we resolved to a valid storage
+            if ($storage && !$storage instanceof Storage)
             {
                 $class = Storage::class;
                 throw new InvalidConfigException(
@@ -649,7 +468,7 @@ class Job extends Model
 
     public function getFallbackStorage()
     {
-        if (!isset($this->_fallbackStorage))
+        if (!$this->_fallbackStorage)
         {
             $coconutSettings = Coconut::$plugin->getSettings();
             $storage = $coconutSettings->getDefaultStorage();
@@ -665,11 +484,6 @@ class Job extends Model
                 {
                     $storage = Coconut::$plugin->getStorages()
                         ->getVolumeStorage($uploadVolume);
-
-                    // @todo: store volume / handle information on storage model
-                    // instead of on job, to more easily and efficiantly recognize
-                    // and compare volume storage
-                    $this->_storageVolumeId = $uploadVolume->id;
                 }
             }
 
@@ -682,7 +496,7 @@ class Job extends Model
     /**
      * Setter method for the normalized `notification` property
      *
-     * @param bool|string|array|Notification|null $notification
+     * @param mixed $notification
      */
 
     public function setNotification( $notification )
@@ -916,8 +730,6 @@ class Job extends Model
         $attributes = parent::attributes();
 
         $attributes[] = 'outputPathFormat';
-        $attributes[] = 'storageHandle';
-        $attributes[] = 'storageVolumeId';
         $attributes[] = 'notification';
         $attributes[] = 'progress';
         $attributes[] = 'createdAt';
@@ -959,7 +771,6 @@ class Job extends Model
 
         $rules['attrInteger']  = [ [
             'id',
-            'storageVolumeId',
         ], 'integer' ];
 
         $rules['attrString'] = [ [
@@ -967,7 +778,6 @@ class Job extends Model
             'status',
             'progress',
             'outputPathFormat',
-            'storageHandle',
             'message',
             'uid',
         ], 'string' ];
@@ -1040,7 +850,6 @@ class Job extends Model
         $fields[] = 'input';
         $fields[] = 'outputs';
         $fields[] = 'storage';
-        $fields[] = 'storageVolume';
 
         return $fields;
     }

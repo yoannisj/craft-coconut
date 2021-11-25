@@ -161,6 +161,12 @@ class JobsController extends Controller
                 "Could not determine upload storage volume.");
         }
 
+
+        Craft::error('QUERY PARAMS');
+        Craft::error($request->getQueryParams());
+        Craft::error('BODY PARAMS');
+        Craft::error($request->getBodyParams());
+
         $outputPath = $request->getRequiredParam('outputPath');
         $uploadedFile = (UploadedFile::getInstanceByName('encoded_video') ?:
             UploadedFile::getInstanceByName('thumbnail'));

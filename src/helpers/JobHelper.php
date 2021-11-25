@@ -20,6 +20,7 @@ use craft\elements\Asset;
 use craft\helpers\StringHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\ArrayHelper;
+use craft\helpers\Json as JsonHelper;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\FileHelper;
 
@@ -438,7 +439,52 @@ class JobHelper
         }
 
         return $resolved;
+    }
 
+    /**
+     * @param mixed $storage
+     *
+     * @return Storage|null
+     */
+
+    public static function resolveStorage( $storage )
+    {
+        if ($storage instanceof Storage) {
+            return $storage;
+        }
+
+        else if (is_array($storage)) {
+            return new Storage($storage);
+        }
+
+        else if (is_numeric($storage))
+        {
+            $storage = Craft::$app->getVolumes()
+                ->getVolumeById($storage);
+        }
+
+        else if (is_string($storage))
+        {
+            $handle = $storage;
+
+            // check if this is a named storage handle
+            $storage = Coconut::$plugin->getStorages()
+                ->getNamedStorage($handle);
+
+            if ($storage) return $storage;
+
+            // or, assume this is a volume handle
+            $storage = Craft::$app->getVolumes()
+                ->getVolumeByHandle($handle);
+        }
+
+        if ($storage instanceof VolumeInterface)
+        {
+            return Coconut::$plugin->getStorages()
+                ->getVolumeStorage($storage);
+        }
+
+        return null;
     }
 
     /**
@@ -1006,21 +1052,47 @@ class JobHelper
     {
         $attrs = $record->getAttributes();
 
-        $job->setInput(new Input([
-            'assetId' => ArrayHelper::remove($attrs, 'inputAssetId'),
-            'url' => ArrayHelper::remove($attrs, 'inputUrl'),
-            // 'urlHash' => ArrayHelper::remove($attrs, 'inputUrlHash'),
-            'status' => ArrayHelper::remove($attrs, 'inputStatus'),
-            'metadata' => ArrayHelper::remove($attrs, 'inputMetadata'),
-            'error' => ArrayHelper::remove($attrs, 'inputError'),
-            'expires' => ArrayHelper::remove($attrs, 'inputExpires'),
-        ]));
 
+        $inputAssetId = ArrayHelper::remove($attrs, 'inputAssetId');
+        $inputUrl = ArrayHelper::remove($attrs, 'inputUrl');
+
+        if ($inputAssetId || $inputUrl)
+        {
+            $input = new Input([
+                'assetId' => $inputAssetId,
+                'url' => $inputUrl,
+                // 'urlHash' => ArrayHelper::remove($attrs, 'inputUrlHash'),
+                'status' => ArrayHelper::remove($attrs, 'inputStatus'),
+                'metadata' => ArrayHelper::remove($attrs, 'inputMetadata'),
+                'error' => ArrayHelper::remove($attrs, 'inputError'),
+                'expires' => ArrayHelper::remove($attrs, 'inputExpires'),
+            ]);
+
+            $job->setInput($input);
+        }
+
+        $storageParams = ArrayHelper::remove($attrs,'storageParams');
         $storageHandle = ArrayHelper::remove($attrs, 'storageHandle');
         $storageVolumeId = ArrayHelper::remove($attrs,'storageVolumeId');
-        $storageParams = ArrayHelper::remove($attrs,'storageParams');
-        $storage = ($storageHandle ?? $storageVolumeId ?? $storageParams);
-        if ($storage) $job->setStorage($storage);
+
+        if ($storageParams)
+        {
+            if (is_string($storageParams)) {
+                $storageParams = JsonHelper::decode($storageParams);
+            }
+
+            $storage = new Storage(array_merge($storageParams, [
+                'handle' => $storageHandle,
+                'volumeId' => $storageVolumeId,
+            ]));
+
+            $job->setStorage($storage);
+        }
+
+        else {
+            // will be resolved into a Storage model when needed
+            $job->setStorage($storageHandle ?: $storageVolumeId);
+        }
 
         // $notification = ArrayHelper::remove($attrs, 'notification');
         // if ($notification) $job->setNotification($notification);
@@ -1043,6 +1115,7 @@ class JobHelper
     {
         $attrs = $job->getAttributes();
         $input = $job->getInput();
+        $storage = $job->getStorage();
 
         if ($input)
         {
@@ -1055,15 +1128,10 @@ class JobHelper
             $record->inputError = $input->error;
         }
 
-        // prioritize storage handle over storage volume id over plain storage params
-        $storageHandle = ArrayHelper::remove($attrs, 'storageHandle');
-        $storageVolumeId = ArrayHelper::remove($attrs, 'storageVolumeId');
-
-        if ($storageHandle) {
-            $record->storageHandle = $storageHandle;
-        } else if ($storageVolumeId) {
-            $record->storageVolumeId = $storageVolumeId;
-        } else if (($storage = $job->getStorage())) {
+        if ($storage)
+        {
+            $record->storageHandle = $storage->handle;
+            $record->storageVolumeId = $storage->volumeId;
             $record->storageParams = $storage->toParams();
         }
 

@@ -80,18 +80,30 @@ EOD;
             ->kind('video')
             ->all();
 
-        if (empty($videos)) return true;
+        if (empty($videos))
+        {
+            // Craft::$app->getSession()->setNotice(
+            //     Craft::t('coconut', "No videos to transcode"));
 
-        $anySuccess = false;
+            return true;
+        }
+
+        $videosCount = count($videos);
+        $outputsCount = 0;
 
         foreach ($videos as $video)
         {
-            if (Coconut::$plugin->transcodeVideo($video, null)) {
-                $anySuccess = true;
-            }
+            $videoOutputs = Coconut::$plugin->transcodeVideo($video, null);
+            $outputsCount += count($videoOutputs);
         }
 
-        return $anySuccess;
+        // Craft::$app->getSession()->setNotice(Craft::t('coconut',
+        //     'Transcoded {outputsCount} outputs for {videosCount} video assets', [
+        //         'outputsCount' => $outputsCount,
+        //         'videosCount' => $videosCount,
+        //     ]));
+
+        return true;
     }
 
 }
