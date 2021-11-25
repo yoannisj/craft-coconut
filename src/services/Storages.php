@@ -22,6 +22,7 @@ use craft\helpers\UrlHelper;
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\events\VolumeStorageEvent;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Singleton class to work with Coconut storages
@@ -103,12 +104,13 @@ class Storages extends Component
             // no need to resolve volume storage if module/plugin already did
             if (!$storage)
             {
-                $url = UrlHelper::actionUrl('coconut/jobs/upload', [
-                    'volume' => $volume->handle,
-                ]);
+
+                // the Upload URL needs to end with '/' because coconut will append
+                // the output file path
+                $uploadUrl = JobHelper::publicUrl('/coconut/uploads/'.$volume->handle.'/');
 
                 // @todo: resolve storage settings for services supported by Coconut
-                $storage = new Storage([ 'url' => $url.'&outputPath=' ]);
+                $storage = new Storage([ 'url' => $uploadUrl ]);
             }
 
             // allow modules/plugins to further customise storage settings

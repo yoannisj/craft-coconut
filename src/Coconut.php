@@ -23,10 +23,12 @@ use craft\base\Plugin;
 use craft\base\Element;
 use craft\models\Volume;
 use craft\elements\Asset;
+use craft\web\UrlManager;
 use craft\services\Elements;
 use craft\services\Assets;
 use craft\web\twig\variables\CraftVariable;
 use craft\events\RegisterElementActionsEvent;
+use craft\events\RegisterUrlRulesEvent;
 use craft\events\ElementEvent;
 use craft\events\AssetEvent;
 use craft\helpers\ArrayHelper;
@@ -161,6 +163,31 @@ class Coconut extends Plugin
                 $variable->set('coconut', CoconutVariable::class);
             }
         );
+
+        $request = Craft::$app->getRequest();
+
+        // register URL rules
+        if ($request->getIsCpRequest())
+        {
+            Event::on(
+                UrlManager::class,
+                UrlManager::EVENT_REGISTER_CP_URL_RULES,
+                function( RegisterUrlRulesEvent $event ) {
+                    $this->onRegisterUrlRules($event);
+                }
+            );
+        }
+
+        else
+        {
+            Event::on(
+                UrlManager::class,
+                UrlManager::EVENT_REGISTER_SITE_URL_RULES,
+                function( RegisterUrlRulesEvent $event ) {
+                    $this->onRegisterUrlRules($event);
+                }
+            );
+        }
 
         // register action types
         Event::on(
@@ -356,6 +383,11 @@ class Coconut extends Plugin
 
             $coconutJobs = $this->getJobs();
 
+            Craft::error('RUN JOBS...');
+            Craft::error($job->toParams());
+
+            // return [];
+
             // Run job via Coconut.co API (updates the job properties)
             // @todo: implement UI for job's feedback progress (based on notifications)
             if (!$coconutJobs->runJob($job))
@@ -495,6 +527,19 @@ class Coconut extends Plugin
     {
         return new Settings();
     }
+
+    /**
+     * @param RegisterUrlRulesEvent $event
+     */
+
+    protected function onRegisterUrlRules( RegisterUrlRulesEvent $event )
+    {
+        $uploadUrlPattern = '/coconut/uploads/<volumeHandle:{handle}>/<outputPath:(?:\S+)>';
+
+        $event->rules["POST $uploadUrlPattern"] = '/coconut/jobs/upload';
+        $event->rules["GET $uploadUrlPattern"] = '/coconut/jobs/output';
+    }
+
 
     /**
      * @param \craft\events\ElementEvent

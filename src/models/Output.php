@@ -957,7 +957,6 @@ class Output extends Model
             'if',
             'fit',
             'url',
-            'urls',
             'type',
             'error',
             'uid',
@@ -967,6 +966,9 @@ class Output extends Model
             'dateCreated',
             'dateUpdated'
         ], DateTimeValidator::class ];
+
+        $rules['urlsEachString'] = [ 'urls', 'each',
+            'rule' => [ 'string' ] ];
 
         $rules['offsetsEachInteger'] = [ 'offsets', 'each',
             'rule' => ['integer', 'min' => 0] ];

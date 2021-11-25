@@ -39,6 +39,8 @@ class JobsController extends Controller
     // =Static
     // =========================================================================
 
+    const FORBIDDEN_PATH_PATTERN = '/^\.{2}\/[\s\S]+/';
+
     // =Properties
     // =========================================================================
 
@@ -136,38 +138,20 @@ class JobsController extends Controller
      * @todo: use a setting to configure the `encoded_video` parameter name?
      */
 
-    public function actionUpload()
+    public function actionUpload( string $volumeHandle, string $outputPath )
     {
         Craft::error('UPLOAD!');
-
         $this->requirePostRequest();
-        $request = Craft::$app->getRequest();
 
-        $volumeHandle = $request->getParam('volume');
-        $volumeId = $request->getParam('volumeId');
-
-        if ($volumeHandle) {
-            $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
-        } else if ($volumeId) {
-            $volume = Craft::$app->getVolumes()->getVolumeById($volumeId);
-        } else {
-            throw new BadRequestHttpException(
-                "Missing one of required parameters `volume` or `volumeId`.");
-        }
+        // get volume model based on given handle
+        $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
 
         if (!$volume)
         {
             throw new NotFoundHttpException(
-                "Could not determine upload storage volume.");
+                "Could not find storage volume '$volumeHandle'.");
         }
 
-
-        Craft::error('QUERY PARAMS');
-        Craft::error($request->getQueryParams());
-        Craft::error('BODY PARAMS');
-        Craft::error($request->getBodyParams());
-
-        $outputPath = $request->getRequiredParam('outputPath');
         $uploadedFile = (UploadedFile::getInstanceByName('encoded_video') ?:
             UploadedFile::getInstanceByName('thumbnail'));
 
@@ -217,6 +201,37 @@ class JobsController extends Controller
         return $this->response;
     }
 
+    /**
+     *
+     */
+
+    public function actionOutput( string $volumeHandle, string $outputPath )
+    {
+        $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
+
+        if (!$volume) {
+            throw new NotFoundHttpException(
+                "Could not find storage volume '$volumeHandle'.");
+        }
+
+        // check filename for allowed chars (do not allow ../ to avoid security issue: downloading arbitrary files)
+        if (preg_match(static::FORBIDDEN_PATH_PATTERN, $outputPath)
+            || !$volume->fileExists($outputPath)
+        ) {
+            throw new NotFoundHttpException('The output file does not exists.');
+        }
+
+        $fileName = basename($outputPath);
+        $mimeType = FileHelper::getMimeTypeByExtension($outputPath);
+        $stream = $volume->getFileStream($outputPath);
+
+        return $this->response->setCacheHeaders()
+            ->sendStreamAsFile($stream, $fileName, [
+                'mimeType' => $mimeType,
+                'inline' => true,
+            ]);
+    }
+
     // =Protected Methods
     // =========================================================================
 
@@ -249,6 +264,9 @@ class JobsController extends Controller
 
         return $tempPath;
     }
+
+
+
 
 
 

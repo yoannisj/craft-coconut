@@ -329,7 +329,7 @@ class JobHelper
      * Regex patterns to parse file paths and urls
      */
 
-    const FILE_EXTENSION_PATTERN = '/\.([a-z0-9]{2,5}$)/';
+    const FILE_EXTENSION_PATTERN = '/\.([a-zA-Z0-9]{2,5}$)/';
 
     /**
      * Regex patterns to parse sequence options
@@ -916,7 +916,7 @@ class JobHelper
         if (!empty($publicBaseUrl))
         {
             if (UrlHelper::isRootRelativeUrl($url)) {
-                return rtrim($publicBaseUrl, '/').'/'.$url;
+                return rtrim($publicBaseUrl, '/').'/'.ltrim($url, '/');
             }
 
             // is this a Craft URL ?
