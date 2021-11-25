@@ -240,7 +240,13 @@ class Output extends Model
      * @var integer The duration (in seconds) at which resulting output should be cut
      */
 
-    public $duration;
+    private $_duration;
+
+    /**
+     * @var bool Whether `duration` property has already been normalized
+     */
+
+    protected $isNormalizedDuration;
 
     /**
      * @var integer Number of image outputs generated
@@ -333,6 +339,30 @@ class Output extends Model
      */
 
     private $_metadata;
+
+    /**
+     * @var integer Width dimension of output
+     */
+
+    private $_width;
+
+    /**
+     * @var integer Height dimension of output
+     */
+
+    private $_height;
+
+    /**
+     * @var float Aspect ratio of output (i.e. `width / height`, rounded up to 4 decimal points)
+     */
+
+    private $_ratio;
+
+    /**
+     * @var bool Whether dimension properties have been already computed/normalized
+     */
+
+    protected $isNormalizedDimensions;
 
     /**
      * @var \Datetime
@@ -805,6 +835,54 @@ class Output extends Model
     }
 
     /**
+     * Setter method for defaulted `duration` property
+     *
+     * @param float|null $duration
+     */
+
+    public function setDuration( float $duration = null )
+    {
+        $this->_duration = $duration;
+
+        if ($duration === null) {
+            $this->isNormalizedDuration = false;
+        }
+    }
+
+    /**
+     * Getter method for defaulted `duration` property
+     *
+     * @return float|null
+     */
+
+    public function getDuration()
+    {
+        if (!$this->isNormalizedDuration)
+        {
+            // get duration from metadata
+            if ($this->type != 'image'
+                && !empty($metadata = $this->getMetadata())
+                && !empty($format = $metadata['format'] ?? null))
+            {
+                $this->_duration = floatval($format['duration']);
+            }
+
+            // get duration from input metadata
+            else if (($job = $this->getJob())
+                && ($input = $this->getInput())
+                && !empty($metadata = $input->getMetadata())
+                && !empty($format = $metadata['format'] ?? null))
+            {
+                $this->_duration = floatval($format['duration']);
+            }
+
+            $this->isNormalizedDuration = true;
+        }
+
+        return $this->_duration;
+    }
+
+    /**
      * Getter method for read-only `explicitPath` property
      *
      * @return string|null
@@ -883,6 +961,51 @@ class Output extends Model
     public function getIsFruitless(): bool
     {
         return in_array($this->status, static::FRUITLESS_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `width` property
+     *
+     * @return integer|null
+     */
+
+    public function getWidth()
+    {
+        if (!$this->isNormalizedDimensions) {
+            $this->computeDimensions();
+        }
+
+        return $this->_width;
+    }
+
+    /**
+     * Getter method for computed `height` property
+     *
+     * @return integer|null
+     */
+
+    public function getHeight()
+    {
+        if (!$this->isNormalizedDimensions) {
+            $this->computeDimensions();
+        }
+
+        return $this->_height;
+    }
+
+    /**
+     * Getter method for computed `ratio` property
+     *
+     * @return float|null
+     */
+
+    public function getRatio()
+    {
+        if (!$this->isNormalizedDimensions) {
+            $this->computeDimensions();
+        }
+
+        return $this->_ratio;
     }
 
     // =Attributes
@@ -1157,5 +1280,92 @@ class Output extends Model
         }
 
         return $fields;
+    }
+
+    /**
+     *
+     */
+
+    protected function computeDimensions()
+    {
+        if ($this->type == 'audio')
+        {
+            $width = null;
+            $height = null;
+            $ratio = null;
+        }
+
+        // get dimensions from metadata
+        else if ($this->type == 'video'
+            && !empty($metadata = $this->getMetadata())
+            && !empty($vstream = $this->videoStream($metadata)))
+        {
+            $width = $vstream['width'] ?? null;
+            $height = $vstream['height'] ?? null;
+            $ratio = $this->calcRatio($width, $height);
+        }
+
+        else
+        {
+            // get dimensions from output format params
+            $format = $this->getFormat();
+            $resolution = explode('x', $format['resolution'] ?? '');
+            $width = (int)$resolution[0];
+            $height = (int)$resolution[1];
+
+            // calculate missing dimension(s) based on input metadata
+            if ((!$width || !$height)
+                && ($job = $this->getJob())
+                && ($input = $job->getInput())
+                && !empty($metadata = $input->getMetadata())
+                && !empty($vstream = $this->videoStream($metdata)))
+            {
+                $inputWidth = $vstream['width'] ?? null;
+                $inputHeight = $vstream['height'] ?? null;
+                $inputRatio = $this->calcRatio($inputWidth, $inputHeight);
+
+                if ($inputRatio)
+                {
+                    if (!$width) $width = round($height * $inputRatio);
+                    if (!$height) $height = round($width / $inputRatio);
+                }
+            }
+
+            $ratio = $this->calcRatio($width, $height);
+        }
+
+        $this->_width = $width;
+        $this->_height = $height;
+        $this->_ratio = $ratio;
+
+        $this->isNormalizedDimensions = true;
+    }
+
+    /**
+     * @param array $metadata
+     *
+     * @return array|null
+     */
+
+    protected function videoStream( array $metadata )
+    {
+        if (empty($streams = $metadata['streams'] ?? null)) {
+            return null;
+        }
+
+        return ArrayHelper::firstWhere($streams, 'codec_type', 'video');
+    }
+
+    /**
+     * @param integer|null $width
+     * @param integer|null $height
+     *
+     * @return float|null
+     */
+
+    protected function calcRatio( $width, $height )
+    {
+        return ($width && $height ?
+            ceil(1000 * ($width / $height)) / 1000 : null);
     }
 }
