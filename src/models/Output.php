@@ -869,7 +869,7 @@ class Output extends Model
 
             // get duration from input metadata
             else if (($job = $this->getJob())
-                && ($input = $this->getInput())
+                && ($input = $job->getInput())
                 && !empty($metadata = $input->getMetadata())
                 && !empty($format = $metadata['format'] ?? null))
             {
@@ -1060,6 +1060,10 @@ class Output extends Model
             'vtt',
         ], 'boolean' ];
 
+        $rules['attrNumber'] = [ [
+            'duration',
+        ], 'number' ];
+
         $rules['attrInteger'] = [ [
             'id',
             'jobId',
@@ -1067,7 +1071,6 @@ class Output extends Model
             'blur',
             'transpose',
             'offset',
-            'duration',
             'number',
             'interval',
         ], 'integer', 'min' => 0 ];
@@ -1102,7 +1105,7 @@ class Output extends Model
         ] ];
 
         $rules['sceneArrayKeys'] = [ 'scene', AssociativeArrayValidator::class,
-            'allowedKeys' => [ 'number', 'duration' ],
+            'allowedKeys' => [ 'number', 'x' ],
             'requiredKeys' => [ 'number', 'duration' ],
         ];
 
@@ -1170,6 +1173,10 @@ class Output extends Model
 
         // 'container' is not a format param supported by Coconut
         ArrayHelper::remove($params['format'], 'container');
+
+        // when sent as parameter, duration must be an integer
+        $duration = $params['duration'] ?? null;
+        if ($duration) $params['duration'] = round($duration, 0);
 
         return JobHelper::cleanParams($params);
     }
@@ -1288,15 +1295,12 @@ class Output extends Model
 
     protected function computeDimensions()
     {
-        if ($this->type == 'audio')
-        {
-            $width = null;
-            $height = null;
-            $ratio = null;
-        }
+        $width = null;
+        $height = null;
+        $ratio = null;
 
         // get dimensions from metadata
-        else if ($this->type == 'video'
+        if ($this->type == 'video'
             && !empty($metadata = $this->getMetadata())
             && !empty($vstream = $this->videoStream($metadata)))
         {
@@ -1305,7 +1309,7 @@ class Output extends Model
             $ratio = $this->calcRatio($width, $height);
         }
 
-        else
+        else if ($this->type != 'audio')
         {
             // get dimensions from output format params
             $format = $this->getFormat();
@@ -1318,7 +1322,7 @@ class Output extends Model
                 && ($job = $this->getJob())
                 && ($input = $job->getInput())
                 && !empty($metadata = $input->getMetadata())
-                && !empty($vstream = $this->videoStream($metdata)))
+                && !empty($vstream = $this->videoStream($metadata)))
             {
                 $inputWidth = $vstream['width'] ?? null;
                 $inputHeight = $vstream['height'] ?? null;
