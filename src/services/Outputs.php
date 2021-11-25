@@ -216,8 +216,23 @@ class Outputs extends Component
         $job = $output->getJob();
         $storageVolume = $job->getStorage()->getVolume();
 
-        if ($storageVolume) {
-            $storageVolume->deleteFile($output->path);
+        if ($storageVolume)
+        {
+            if ($output->url) {
+                $storageVolume->deleteFile($output->path);
+            }
+
+            if ($output->urls)
+            {
+                $urlsCount = count($output->urls);
+
+                for ($i = 1; $i <= $urlsCount; $i++)
+                {
+                    $urlPath = sprintf($output->path, $i);
+
+                    $storageVolume->deleteFile($urlPath);
+                }
+            }
         }
 
         if ($record->delete())

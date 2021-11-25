@@ -895,7 +895,7 @@ class JobHelper
             $path = (
                 pathinfo($path, PATHINFO_DIRNAME).'/'.
                 pathinfo($path, PATHINFO_FILENAME).
-                '-%.2d.'.pathinfo($path, PATHINFO_EXTENSION)
+                '-%02d.'.pathinfo($path, PATHINFO_EXTENSION)
             );
         }
 
