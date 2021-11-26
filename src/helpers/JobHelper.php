@@ -935,6 +935,10 @@ class JobHelper
             }
         }
 
+        else if (UrlHelper::isRootRelativeUrl($url)) {
+            $url = rtrim(UrlHelper::baseUrl(), '/').'/'.ltrim($url, '/');
+        }
+
         return $url;
     }
 
