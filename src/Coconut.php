@@ -17,6 +17,7 @@ use yii\base\Exception;
 use yii\base\InvalidArgumentException;
 use yii\base\InvalidConfigException;
 
+
 use Craft;
 use craft\base\VolumeInterface;
 use craft\base\Plugin;
@@ -34,6 +35,8 @@ use craft\events\AssetEvent;
 use craft\helpers\ArrayHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\ElementHelper;
+
+use Coconut\Client as CoconutClient;
 
 use yoannisj\coconut\services\Storages;
 use yoannisj\coconut\services\Jobs;
@@ -443,7 +446,13 @@ class Coconut extends Plugin
     public function createClient()
     {
         $apiKey = $this->getSettings()->apiKey;
-        return new \Coconut\Client($apiKey);
+        $endpoint = $this->getSettings()->endpoint;
+        $region = $this->getSettings()->region;
+
+        return new CoconutClient($apiKey, [
+            'endpoint' => $endpoint,
+            'region' => $region,
+        ]);
     }
 
     /**

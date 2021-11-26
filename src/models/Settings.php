@@ -57,6 +57,27 @@ class Settings extends Model
     private $_apiKey = null;
 
     /**
+     * @var string|null The endpoint to use for Coconut API calls.
+     *
+     * @note: This will override the `region` setting.
+     * @note: Coconut API Keys are bound to the Endpoint/Region, so if you change
+     *  this you probably want to change the `apiKey` setting as well
+     */
+
+    private $_endpoint = null;
+
+    /**
+     * @var string|null The region of the Coconut.co cloud infrastructure to use
+     *  for Coconut API calls.
+     *
+     * @note: This will have no effect if the `endpoint` setting is also set.
+     * @note: Coconut API Keys are bound to the Endpoint/Region, so if you change
+     *  this you probably want to change the `apiKey` setting as well
+     */
+
+    private $_region = null;
+
+    /**
      * @var string Public URL to use as *base* for all URLs sent to the Coconut API
      * (i.e. local asset URLs and notification webhooks)
      */
@@ -291,6 +312,50 @@ class Settings extends Model
         }
 
         return $this->_apiKey;
+    }
+
+    /**
+     * @param string|null $endpoint
+     */
+
+    public function setEndpoint( string $endpoint = null )
+    {
+        $this->_endpoint = $endpoint;
+    }
+
+    /**
+     * @return string|null
+     */
+
+    public function getEndpoint()
+    {
+        if (!isset($this->_endpoint)) {
+            $this->_endpoint = AppHelper::env('COCONUT_ENDPOINT');
+        }
+
+        return empty($this->_endpoint) ? null : $this->_endpoint;
+    }
+
+    /**
+     * @param string|null $endpoint
+     */
+
+    public function setRegion( string $region = null )
+    {
+        $this->_region = $region;
+    }
+
+    /**
+     * @return string|null
+     */
+
+    public function getRegion()
+    {
+        if (!isset($this->_region)) {
+            $this->_region = AppHelper::env('COCONUT_REGION');
+        }
+
+        return empty($this->_region) ? null : $this->_region;
     }
 
     /**
