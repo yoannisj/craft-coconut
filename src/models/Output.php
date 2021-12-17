@@ -787,17 +787,6 @@ class Output extends Model
     }
 
     /**
-     * Setter method for defaulted `type` property
-     *
-     * @param string|null $type
-     */
-
-    public function setType( string $type = null )
-    {
-        $this->_type = $type;
-    }
-
-    /**
      * Getter method for the defaulted `type` property
      *
      * @return string|null

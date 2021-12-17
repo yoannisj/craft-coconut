@@ -78,7 +78,7 @@ class JobsController extends Controller
         $hasMetadata = $params['metadata'] ?? false;
         $data = $params['data'] ?? [];
 
-        Craft::error("NOTIFY [#$jobId] $event");
+        Craft::error("NOTIFY [#$jobId] $event", 'coconut-debug');
 
         $coconutJobs = Coconut::$plugin->getJobs();
         $job = $coconutJobs->getJobByCoconutId($jobId);
@@ -116,14 +116,14 @@ class JobsController extends Controller
 
         if (!$success)
         {
-            Craft::error('JOB ERRORS');
+            Craft::error('JOB ERRORS', 'coconut-debug');
             Craft::error($job->getErrorSummary(true));
 
-            Craft::error('OUTPUT ERRORS');
+            Craft::error('OUTPUT ERRORS', 'coconut-debug');
             foreach ($job->getOutputs() as $output)
             {
-                Craft::error('> '.$output->key);
-                Craft::error($output->getErrorSummary(true));
+                Craft::error('> '.$output->key, 'coconut-debug');
+                Craft::error($output->getErrorSummary(true), 'coconut-debug');
             }
 
             throw new ServerErrorHttpException("Could not handle job notification");
@@ -140,7 +140,7 @@ class JobsController extends Controller
 
     public function actionUpload( string $volumeHandle, string $outputPath )
     {
-        Craft::error('UPLOAD:: '. $volumeHandle . ' > '.$outputPath);
+        Craft::error('UPLOAD:: '. $volumeHandle . ' > '.$outputPath, 'coconut-debug');
         $this->requirePostRequest();
 
         // get volume model based on given handle

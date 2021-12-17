@@ -124,6 +124,7 @@ class Jobs extends Component
         }
 
         $volumeJobs = Coconut::$plugin->getSettings()->getvolumeJobs();
+
         return $volumeJobs[$handle] ?? null;
     }
 
@@ -224,7 +225,8 @@ class Jobs extends Component
                 // make sure output records are linked to the job record
                 $output->jobId = $job->id;
 
-                if (!$coconutOutputs->saveOutput($output, $runValidation)) {
+                if (!$coconutOutputs->saveOutput($output, $runValidation))
+                {
                     $transaction->rollBack();
                     return false;
                 }
@@ -377,7 +379,6 @@ class Jobs extends Component
 
         // we are updating the input on the job
         $data = [ 'input' => $inputData, ];
-
         $job = JobHelper::populateJobFromData($job, $data);
 
         return $this->saveJob($job, $runValidation);

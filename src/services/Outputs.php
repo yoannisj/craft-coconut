@@ -156,9 +156,8 @@ class Outputs extends Component
             OutputRecord::findOne($output->id));
 
         // update the record attributes and try saving
-        $record->setAttributes($output->getAttributes(), false);
+        JobHelper::populateRecordFromOutput($record, $output);
 
-        // $record->type = $output->getType(); // read-only, but searchable attribute
         if (!$record->save()) return false;
 
         // update output model's attributes based on what's now saved in the database
@@ -298,6 +297,8 @@ class Outputs extends Component
 
 
 
+
+
     /**
      * Initializes outputs for given job
      */
@@ -360,7 +361,7 @@ class Outputs extends Component
         foreach ($records as $record)
         {
             $output = new Output();
-            $output->setAttributes($record->getAttributes(), false);
+            JobHelper::populateOutputFromRecord($output, $record);
 
             $outputs[] = $output;
         }
@@ -450,7 +451,7 @@ class Outputs extends Component
             foreach ($records as $record)
             {
                 $output = new Output();
-                $output->setAttributes($record->getAttributes(), false);
+                JobHelper::populateOutputFromRecord($output, $record);
 
                 $outputs[] = $output;
             }

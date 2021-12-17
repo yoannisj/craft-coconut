@@ -30,6 +30,7 @@ use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\models\Notification;
 use yoannisj\coconut\models\Job;
+use yoannisj\coconut\records\OutputRecord;
 use yoannisj\coconut\records\JobRecord;
 
 /**
@@ -1030,7 +1031,7 @@ class JobHelper
 
     public static function populateJobOutput( Output $output, array $data ): Output
     {
-        $dataType = ArrayHelper::getValue($output, 'type');
+        $dataType = ArrayHelper::remove($data, 'type');
 
         if ($dataType && $dataType != Output::TYPE_VIDEO
             && $dataType != Output::TYPE_IMAGE
@@ -1142,6 +1143,109 @@ class JobHelper
         $record->setAttributes($attrs, false);
 
         return $record;
+    }
+
+    /**
+     * @param Job $job
+     *
+     * @return Job
+     */
+
+    public static function jobAsConfig( Job $job ): Job
+    {
+        $attrs = $job->getAttributes([
+            'input',
+            'outputPathFormat',
+            'storage',
+            'notification',
+        ]);
+
+        $config = new Job();
+        $config->setAttributes($attrs, false);
+
+        $configOutputs = [];
+
+        foreach ($outputs as $output) {
+            $configOutputs[] = static::outputAsConfig§($output);
+        }
+
+        $config->outputs = $configOutputs;
+
+        return $config;
+    }
+
+    /**
+     * @param Output $output
+     * @param OutputRecord $record
+     *
+     * @return Output
+     */
+
+    public static function populateOutputFromRecord( Output $output, OutputRecord $record ): Output
+    {
+        $attrs = $record->getAttributes();
+
+        // remove readonly attrs that are searchable (therefore saved in the DB)
+        unset($attrs['type']);
+
+        $output->setAttributes($attrs, false);
+
+        return $output;
+    }
+
+    /**
+     * @param OutputRecord $record
+     * @param Output $output
+     *
+     * @return OutputRecord
+     */
+
+    public static function populateRecordFromOutput( OutputRecord $record, Output $output ): OutputRecord
+    {
+        $attrs = $output->getAttributes();
+        $record->setAttributes($attrs, false);
+
+        return $record;
+    }
+
+    /**
+     * Returns an Output config based on given output
+     *
+     * @param Output $output
+     *
+     * @return Output
+     */
+
+    public static function outputAsConfig( Output $output ): Output
+    {
+        $attrs = $output->getAttributes([
+            'key',
+            'format',
+            'formatIndex',
+            'path',
+            'if',
+            'deinterlace',
+            'square',
+            'blur',
+            'fit',
+            'transpose',
+            'vflip',
+            'hflip',
+            'offset',
+            'duration',
+            'number',
+            'interval',
+            'offsets',
+            'sprite',
+            'vtt',
+            'scene',
+            'watermark',
+        ]);
+
+        $config = new Output();
+        $config->setAttributes($attrs, false);
+
+        return $config;
     }
 
     /**

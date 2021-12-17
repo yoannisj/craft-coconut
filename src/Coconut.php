@@ -334,8 +334,7 @@ class Coconut extends Plugin
         // if input is an asset, then we want to use it's volume job as base
         if (($inputAsset = $input->getAsset()))
         {
-            $volume = $inputAsset->getVolume();
-            $job = $this->getJobs()->getVolumeJob($volume);
+            $job = $this->getJobs()->getVolumeJob($inputAsset->getVolume());
             $job->setInput($input);
 
             // in this case, we want to override the volume jobs' outputs
@@ -368,7 +367,7 @@ class Coconut extends Plugin
             if ($savedOutput && !$savedOutput->getIsFruitless()) {
                 $transcodedOutputs[$key] = $savedOutput;
             } else {
-                $missingOutputs[$key] = $output;
+                $missingOutputs[$key] = JobHelper::outputAsConfig($output);
             }
         }
 
@@ -386,7 +385,7 @@ class Coconut extends Plugin
 
             $coconutJobs = $this->getJobs();
 
-            Craft::error('RUN JOBS...');
+            Craft::error('RUN JOB...');
             Craft::error($job->toParams());
 
             // return [];

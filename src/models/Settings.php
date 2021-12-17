@@ -655,7 +655,7 @@ class Settings extends Model
                 $this->_volumeJobs[$handle] = $job;
             }
 
-            $this->isNormalizedJobs = true;
+            $this->isNormalizedVolumeJobs = true;
         }
 
         return $this->_volumeJobs;
