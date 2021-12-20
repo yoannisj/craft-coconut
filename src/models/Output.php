@@ -45,7 +45,10 @@ use yoannisj\coconut\helpers\JobHelper;
  * @property bool $isDefaultPath Whether this output uses the default path or note
  * @property bool $isFinished Wether transcoding the output has come to an end
  * @property bool $isFruitfull Wether transcoding resulted in an output file
- * @property bool $isFruitless Wether transcoding failed to result in an output file
+ * @property bool $isSuccessfull Wether transcoding did not result in an output file
+ * @property bool $isFailed Wether transcoding failed
+ * @property bool $isSkipped Wether the output was skipped (due to if condition)
+ * @property bool $isAborted Wether transcoding was aborted
  */
 
 class Output extends Model
@@ -101,6 +104,22 @@ class Output extends Model
         'video.failed', 'video.skipped', 'video.aborted',
         'image.failed', 'image.skipped', 'image.aborted',
         'httpstream.failed', 'httpstream.skipped', 'httpstream.aborted',
+    ];
+
+    const SUCCESSFUL_STATUSES = [
+        'video.encoded', 'image.created', 'httpstream.packaged',
+    ];
+
+    const FAILED_STATUSES = [
+        'video.failed', 'image.failed', 'httpstream.failed',
+    ];
+
+    const SKIPPED_STATUSES = [
+        'video.skipped', 'image.skipped', 'httpstream.skipped',
+    ];
+
+    const ABORTED_STATUSES = [
+        'video.aborted', 'image.aborted', 'httpstream.aborted',
     ];
 
     // =Properties
@@ -923,7 +942,6 @@ class Output extends Model
         return in_array($this->status, static::FINAL_STATUSES);
     }
 
-
     /**
      * Getter method for computed `isFruitfull` property
      *
@@ -950,6 +968,62 @@ class Output extends Model
     public function getIsFruitless(): bool
     {
         return in_array($this->status, static::FRUITLESS_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isSuccessfull` property
+     *
+     * Note: will return false if output transcoding is still in progress,
+     *  but the output could later end up being fruitless.
+     *
+     * @return bool
+     */
+
+    public function getIsSuccessfull(): bool
+    {
+        return in_array($this->status, static::SUCESSFULL_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isFailed` property
+     *
+     * Note: will return false if output transcoding is still in progress,
+     *  but the output could later end up being fruitless.
+     *
+     * @return bool
+     */
+
+    public function getIsFailed(): bool
+    {
+        return in_array($this->status, static::FAILED_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isSkipped` property
+     *
+     * Note: will return false if output transcoding is still in progress,
+     *  but the output could later end up being fruitless.
+     *
+     * @return bool
+     */
+
+    public function getIsSkipped(): bool
+    {
+        return in_array($this->status, static::SKIPPED_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isAborted` property
+     *
+     * Note: will return false if output transcoding is still in progress,
+     *  but the output could later end up being fruitless.
+     *
+     * @return bool
+     */
+
+    public function getIsAborted(): bool
+    {
+        return in_array($this->status, static::ABORTED_STATUSES);
     }
 
     /**

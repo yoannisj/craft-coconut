@@ -353,7 +353,7 @@ class Coconut extends Plugin
         $missingOutputs = [];
         $transcodedOutputs = [];
 
-        foreach ($outputs as $key => $output)
+        foreach ($outputs as $k => $output)
         {
             // @todo: check output key vs. output params?
             // -> checking key might result in multiple identical outputs (from ≠ jobs)
@@ -364,10 +364,10 @@ class Coconut extends Plugin
             $savedOutput = ArrayHelper::firstWhere($savedOutputs,
                 'key', $output->key);
 
-            if ($savedOutput && !$savedOutput->getIsFruitless()) {
-                $transcodedOutputs[$key] = $savedOutput;
+            if ($savedOutput) {
+                $transcodedOutputs[$k] = $savedOutput;
             } else {
-                $missingOutputs[$key] = JobHelper::outputAsConfig($output);
+                $missingOutputs[$k] = JobHelper::outputAsConfig($output);
             }
         }
 
