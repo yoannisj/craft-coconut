@@ -269,18 +269,6 @@ class OutputTest extends UnitTest
             $this->assertSame( "_coconut/outputs", $output->path );
         });
 
-        $this->specify("Renders the `{key}` placeholder to a path-compatible version of the output's `key`",
-            function()
-        {
-            $output = new Output();
-            $output->path = '_coconut/outputs/{key}.mp4';
-            $output->key = 'mp4:1080p';
-
-            $keyAsPath = JobHelper::keyAsPath($output->key);
-
-            $this->assertSame( '_coconut/outputs/'.$keyAsPath.'.mp4', $output->path );
-        });
-
         $this->specify("Renders the `{ext}` placeholder to the file extension corresponding to the output's `format`",
             function()
         {

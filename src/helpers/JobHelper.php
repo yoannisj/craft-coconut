@@ -824,19 +824,19 @@ class JobHelper
     }
 
     /**
-     * Returns the path-friendly version for given format key
+     * Returns the key-friendly version of given format string
      *
-     * @param string $key The format key
+     * @param string $format The format string
      *
-     * @return string A path-friendly version of given key
+     * @return string A key-friendly version of given format
      */
 
-    public static function keyAsPath( string $key )
+    public static function formatAsKey( string $format )
     {
         return str_replace(
             [':', '=', ','],
             ['-', '_', '__'],
-        $key);
+        $format);
     }
 
     /**

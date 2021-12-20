@@ -531,11 +531,11 @@ class Output extends Model
     public function getKey(): string
     {
         if (empty($this->_key) && !empty($this->_format)) {
-            $this->_key = $this->getFormatString();
+            $this->_key = JobHelper::formatAsKey($this->getFormatString());
         }
 
         if ($this->formatIndex) {
-            return ltrim($this->_key . ':'.$this->formatIndex, ':');
+            return ltrim($this->_key . '--'.$this->formatIndex, '--');
         }
 
         return $this->_key ?? '';
@@ -1221,7 +1221,7 @@ class Output extends Model
         }
 
         $vars = [
-            'key' => JobHelper::keyAsPath($key),
+            'key' => $this->getKey(),
             'hash' => $input ? $input->getUrlHash() : null,
             'path' => $path,
             'filename' => $filename,
