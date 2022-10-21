@@ -21,6 +21,7 @@ use craft\base\VolumeInterface;
 use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\elements\Asset;
+use craft\helpers\App as AppHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\FileHelper;
 
@@ -368,7 +369,18 @@ class Config extends Model
 
     public function getWebhook(): string
     {
-        return UrlHelper::actionUrl('coconut/jobs/complete');
+        $actionUrl = UrlHelper::actionUrl('coconut/jobs/complete');
+
+        if (!UrlHelper::isAbsoluteUrl($actionUrl))
+        {
+            if (method_exists(AppHelper::class, 'parseEnv')) {
+                $actionUrl = AppHelper::parseEnv('@web/'.ltrim($actionUrl, '/'));
+            } else {
+                $actionUrl = Craft::parseEnv('@web/'.ltrim($actionUrl, '/'));
+            }
+        }
+
+        return $actionUrl;
     }
 
     /**
