@@ -54,6 +54,7 @@ class Install extends Migration
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
+                'metadata' => $this->string()->null(),
             ]);
 
             $this->createIndex(null, $outputsTable, 'sourceAssetId', false);
