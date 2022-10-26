@@ -46,10 +46,12 @@ class Settings extends Model
     // =========================================================================
 
     /**
-     * @var string The API key of the Coconut.co account used to convert videos.
+     * The API key of the Coconut.co account used to convert videos.
      *
      * If this is not set, the plugin will check for an environment variable
      * named `COCONUT_API_KEY` (using `\craft\helper\App::env()`).
+     *
+     * @var string
      *
      * @default null
      */
@@ -57,36 +59,40 @@ class Settings extends Model
     private $_apiKey = null;
 
     /**
-     * @var string|null The endpoint to use for Coconut API calls.
+     * The endpoint to use for Coconut API calls.
      *
      * @note: This will override the `region` setting.
      * @note: Coconut API Keys are bound to the Endpoint/Region, so if you change
      *  this you probably want to change the `apiKey` setting as well
+     *
+     * @var string|null
      */
 
     private $_endpoint = null;
 
     /**
-     * @var string|null The region of the Coconut.co cloud infrastructure to use
+     * The region of the Coconut.co cloud infrastructure to use
      *  for Coconut API calls.
      *
      * @note: This will have no effect if the `endpoint` setting is also set.
      * @note: Coconut API Keys are bound to the Endpoint/Region, so if you change
      *  this you probably want to change the `apiKey` setting as well
+     *
+     * @var string|null
      */
 
     private $_region = null;
 
     /**
-     * @var string Public URL to use as *base* for all URLs sent to the Coconut API
+     * Public URL to use as *base* for all URLs sent to the Coconut API
      * (i.e. local asset URLs and notification webhooks)
+     *
+     * @var string
      */
 
     private $_publicBaseUrl;
 
     /**
-     * @var integer
-     *
      * Depending on your Coconut plan and the parameters you are using to transcode
      * your video, jobs can take a long time. To avoid jobs to fail with a timeout
      * error, this plugin sets a high `Time to Reserve` on the jobs it pushes to
@@ -95,16 +101,20 @@ class Settings extends Model
      * More info:
      *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
      *
+     * @var integer
+     *
      * @default 900
      */
 
     public $transcodeJobTtr = 900;
 
     /**
-     * @var array Named storage settings to use in Coconut transcoding jobs.
+     * Named storage settings to use in Coconut transcoding jobs.
      *
      * Each key defines a named storage, and its value should be an array of
      * storage settings as defined here: https://docs.coconut.co/jobs/storage
+     *
+     * @var array
      *
      * @example [
      *      'myS3Bucket' => [
@@ -128,8 +138,6 @@ class Settings extends Model
     private $_storages = [];
 
     /**
-     * @var string|array|\yoannisj\coconut\models\Storage
-     *
      * The storage name or settings used to store Coconut output files when none
      * is given in transcoding job parameters.
      *
@@ -139,6 +147,8 @@ class Settings extends Model
      * If this is set to `null`, the plugin will try to generate storage settings
      * based on the input asset's volume, or fallback to use the HTTP upload method
      * to store files in the volume defined by the 'defaultUploadVolume' setting.
+     *
+     * @var string|array|\yoannisj\coconut\models\Storage
      *
      * @default null
      */
@@ -152,11 +162,11 @@ class Settings extends Model
     protected $isNormalizedDefaultStorage;
 
     /**
-     * @var string|\craft\models\Volume
-     *
      * The default volume used to store output files when the `storage` parameter
-     * was omitted and no asset volume could be determined (.e.g. if the `input`
-     * parameter was a URL and not a Craft asset).
+     * was omitted and the input asset's volume could be determined (.e.g. if the
+     * `input` parameter was a URL and not a Craft asset).
+     *
+     * @var string|\craft\models\Volume
      *
      * @default 'coconut'
      */
@@ -170,7 +180,7 @@ class Settings extends Model
     protected $isNormalizedDefaultUploadVolume;
 
     /**
-     * @var string Format used to generate default path for output files
+     * Format used to generate default path for output files
      * saved in storages.
      *
      * Supports the following placeholder strings:
@@ -186,16 +196,20 @@ class Settings extends Model
      * Craft's asset indexes, the path will be prefixed with an '_' character
      * (if it is not already).
      *
+     * @var string
+     *
      * @default '_coconut/{path}/{key}.{ext}'
      */
 
     public $defaultOutputPathFormat = '_coconut/{path}/{filename}--{key}.{ext}';
 
     /**
-     * @var string|array|Notification|null Notification param to use if job
-     * notifications are enabled but job's own notification param is not set.
+     * Notification param to use if job notifications are enabled but job's own
+     * notification param is not set.
      *
      * @Note: it is recommended not to change this setting
+     *
+     * @var string|array|Notification|null
      *
      * @default Notification settings for plugin's 'coconut/jobs/notify' controller action
      */
@@ -203,7 +217,7 @@ class Settings extends Model
     private $_defaultJobNotification = null;
 
     /**
-     * @var array Named coconut job settings.
+     * Named coconut job settings.
      *
      * Each key defines a named job, and its value should be an array setting
      * the 'storage' and 'outputs' parameters.
@@ -229,6 +243,8 @@ class Settings extends Model
      * The 'input' and 'notification' parameters are not supported, as the plugin will
      * set those programatically.
      *
+     * @var array
+     *
      * @example [
      *      'videoSources' => [
      *          'storage' => 'coconut', // assuming there is a volume with handle 'coconut'
@@ -250,35 +266,43 @@ class Settings extends Model
     private $_jobs = [];
 
     /**
-     * @var bool Whether `jobs` property was normalized or not (internal flag)
+     * Whether `jobs` property was normalized or not (internal flag)
+     *
+     * @var bool
      */
 
     protected $isNormalizedJobs;
 
     /**
-     * @var array Sets default job parameters for craft assets in given volumes.
+     * Sets default job parameters for craft assets in given volumes.
      *
      * Each key should match the handle of a craft volume, and the its value should
      * be either a key from the `jobs` setting, or an array of parameters (in the
      * same format as the `jobs` setting).
      *
      * @var array
+     *
+     * @default []
      */
 
     private $_volumeJobs = [];
 
     /**
-     * @var bool Whether volumeJobs property was normalized or not (internal flag)
+     * Whether volumeJobs property was normalized or not (internal flag)
+     *
+     * @var bool
      */
 
     protected $isNormalizedVolumeJobs;
 
     /**
-     * @var array List of input volumes handles, for which the plugin should
+     * List of input volumes handles, for which the plugin should
      *  automatically create a Coconut conversion job every time a video asset is
      *  added or updated.
      *
-     * @default `[]`
+     * @var array
+     *
+     * @default []
      */
 
     public $watchVolumes = [];
