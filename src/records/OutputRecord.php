@@ -17,21 +17,20 @@ use yii\db\ActiveQueryInterface;
 use Craft;
 use craft\db\ActiveRecord;
 use craft\records\Volume as VolumeRecord;
-use craft\records\Asset as AssetRecord;
 use craft\errors\VolumeException;
 
 use yoannisj\coconut\Coconut;
+use yoannisj\coconut\records\JobRecord;
 
 /**
  * @property $id
- * @property $volumeId
- * @property $sourceAssetId
- * @property $source
+ * @property $inputId
+ * @property $coconutJobId
  * @property $format
  * @property $url
- * @property $inProgress
- * @property $coconutJobId
  * @property $metadata
+ * @property $volumeId
+ * @property $status
  * @property $dateCreated
  * @property $dateUpdated
  * @property $uid
@@ -44,8 +43,6 @@ class OutputRecord extends ActiveRecord
 
     /**
      * @inheritdoc
-     *
-     * @return string
      */
 
     public static function tableName(): string
@@ -59,29 +56,73 @@ class OutputRecord extends ActiveRecord
     // =Public Methods
     // =========================================================================
 
+    // =Attributes
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param string|array
+     */
+
+    public function setOffsets( $offsets )
+    {
+        if (is_array($offsets)) {
+            $offsets = implode(',', $offsets);
+        }
+
+        $this->offsets = $offsets;
+    }
+
+    /**
+     * @param string|array
+     */
+
+    public function setUrls( $urls )
+    {
+        if (is_array($urls)) {
+            $this->urls = JsonHelper::encode($urls);
+        }
+    }
+
+    /**
+     * @param string|array $metadata
+     */
+
+    public function setMetadata( $metadata )
+    {
+        if ($metadata && !is_string($metadata)) {
+            $metadata = JsonHelper::encode($metadata);
+        }
+
+        $this->metadata = $metadata;
+    }
+
+    /**
+     * @return array
+     */
+
+    public function getMetadata(): array
+    {
+        $metadata = $this->metadata ?? [];
+
+        if (is_string($metadata)) {
+            $metadata = JsonHelper::decode($metadata);
+        }
+
+        return $metadata;
+    }
+
     // =Relations
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the output volume.
+     * Returns the coconut job
      *
-     * @return ActiveQueryInterface The relational query object.
+     * @return ActiveQueryInterface The relational query object
      */
 
-    public function getVolume(): ActiveQueryInterface
+    public function getJob(): ActiveQueryInterface
     {
-        return $this->hasOne(VolumeRecord::class, ['id' => 'volumeId']);
-    }
-
-    /**
-     * Returns the source asset.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-
-    public function getSourceAsset(): ActiveQueryInterface
-    {
-        return $this->hasOne(AssetRecord::class, ['id' => 'sourceAssetId']);
+        return $this->hasOne(JobRecord::class, ['id' => 'jobId']);
     }
 
     // =Events
@@ -93,18 +134,22 @@ class OutputRecord extends ActiveRecord
 
     public function afterDelete()
     {
-        $volume = Craft::$app->getVolumes()->getVolumeById($this->volumeId);
-
-        if ($volume)
+        if (isset($this->volumeId))
         {
-            $volumeUrl = $volume->getRootUrl();
-            $url = $this->url;
-            $path = trim(str_replace($volumeUrl, '', $url), '/');
+            $volume = Craft::$app->getVolumes()->getVolumeById($this->volumeId);
+            if ($volume)
+            {
+                $volumeUrl = $volume->getRootUrl();
+                $url = $this->url;
 
-            try {
-                $volume->deleteFile($path);
-            } catch (VolumeException $e) {
-                Craft::warning($e->getMessage());
+                $path = trim(str_replace($volumeUrl, '', $url), '/');
+
+                try {
+                    $volume->deleteFile($path);
+                } catch (VolumeException $e) {
+                    // Fail silently (log a warning instead of throwing an error)
+                    Craft::warning($e->getMessage());
+                }
             }
         }
 

@@ -1,0 +1,27 @@
+services:
+  craft-web: &craft-service-mariadb
+    environment:
+      DB_DRIVER: mariadb
+      DB_VERSION: ${MARIADB_VERSION:-10.2}
+      DB_PORT: ${MARIADB_PORT:-3306}
+  craft-cli:
+    <<: *craft-service-mariadb
+  craft-queue:
+    <<: *craft-service-mariadb
+  codecept:
+    <<: *craft-service-mariadb
+  database:
+    image: mariadb:${MARIADB_VERSION:-10.2}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-SuperPassword123456!}
+      MYSQL_USER: ${DB_USER:-craftcms}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-SecretPassword}
+      MYSQL_DATABASE: ${DB_NAME:-craftcms}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - target: '${MARIADB_PORT:-3306}'
+        published: '${PUBLIC_PORT_PREFIX}${MARIADB_PORT:-3306}'
+volumes:
+  mariadb_data:
+    driver: local

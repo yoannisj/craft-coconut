@@ -1,0 +1,14 @@
+{
+  "job_id": "2QcdNFigRRztnh",
+  "event": "output.completed",
+  "metadata": false,
+  "data": {
+    "type": "image",
+    "status": "image.created",
+    "progress": "40%",
+    "key": "gif:300x",
+    "urls": [
+      "https://s3.amazonaws.com/aws-us-east-1-media-test.coconut.co/25/18/9f948a84e3c8d5af9157dcaaaed443cd/gif/animation.gif"
+    ]
+  }
+}

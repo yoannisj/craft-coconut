@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+if [ $# -gt 0 ]; then
+
+    if [ "$1" == "start" ]; then
+        shift 1
+        docker-compose up "$@"
+
+    elif [ "$1" == "stop" ]; then
+        shift 1
+        docker-compose down "$@"
+
+    elif [ "$1" == "composer" ]; then
+        shift 1
+        docker-compose exec --user www-data craft-web composer "$@"
+
+    elif [ "$1" == "craft" ]; then
+        shift 1
+        docker-compose run --rm --user www-data craft-cli "$@"
+
+    elif [ "$1" == "codecept" ]; then
+        shift 1
+        docker-compose run --rm --user www-data codecept "$@"
+
+    fi
+fi
