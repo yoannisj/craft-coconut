@@ -49,7 +49,7 @@ class Job extends Model
     const STATUS_COMPLETED = 'job.completed';
     const STATUS_FAILED = 'job.failed';
 
-    const FINAL_STATUSES = [
+    const COMPLETED_STATUSES = [
         'job.completed', 'job.failed',
     ];
 
@@ -647,7 +647,7 @@ class Job extends Model
     {
         if (!isset($this->_progress))
         {
-            if ($this->getIsFinished()) {
+            if ($this->getIsCompleted()) {
                 $this->_progress = '100%';
             }
         }
@@ -708,14 +708,14 @@ class Job extends Model
     }
 
     /**
-     * Getter method for computed 'isFinished' property
+     * Getter method for computed 'isCompleted' property
      *
      * @return bool
      */
 
-    public function getIsFinished(): bool
+    public function getIsCompleted(): bool
     {
-        return in_array($this->status, static::FINAL_STATUSES);
+        return in_array($this->status, static::COMPLETED_STATUSES);
     }
 
     // =Attributes
