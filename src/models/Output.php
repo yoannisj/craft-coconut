@@ -1376,7 +1376,7 @@ class Output extends Model
         {
             // get dimensions from output format params
             $format = $this->getFormat();
-            $resolution = explode('x', $format['resolution'] ?? '');
+            $resolution = explode('x', $format['resolution'] ?? 'x');
             $width = (int)$resolution[0];
             $height = (int)$resolution[1];
 
