@@ -85,7 +85,10 @@ class JobHelper
      */
 
     const AUDIO_SPECS = [
-        'audio_codec', 'audio_bitrate', 'sample_rate', 'audio_channel',
+        'audio_codec',
+        'audio_bitrate',
+        'sample_rate',
+        'audio_channel',
     ];
 
     /**
@@ -94,7 +97,9 @@ class JobHelper
      */
 
     const DEFAULT_AUDIO_SPECS = [
-        'audio_bitrate' => '128k', 'sample_rate' => '44100hz', 'audio_channel' => 'stereo',
+        'audio_bitrate' => '128k',
+        'sample_rate' => '44100hz',
+        'audio_channel' => 'stereo',
     ];
 
     /**
@@ -102,7 +107,10 @@ class JobHelper
      */
 
     const DISABLED_AUDIO_SPECS = [
-        'audio_codec' => false, 'audio_bitrate' => false, 'sample_rate' => false, 'audio_channel' => false,
+        'audio_codec' => false,
+        'audio_bitrate' => false,
+        'sample_rate' => false,
+        'audio_channel' => false,
     ];
 
     /**
