@@ -539,13 +539,29 @@ class Settings extends Model
 
     public function getDefaultJobNotification()
     {
-        return $this->_defaultJobNotification ?? (new Notification([
+        if (isset($this->_defaultJobNotification)) {
+            return $this->_defaultJobNotification;
+        }
+
+        $notificationUrl = UrlHelper::actionUrl('coconut/jobs/notify', null, null, false);
+
+        $baseCpUrl = UrlHelper::baseCpUrl();
+        $baseSiteUrl = UrlHelper::baseSiteUrl();
+        $publicBaseUrl = rtrim($this->getPublicBaseUrl(), '/').'/';
+
+        $notificationUrl = str_replace(
+            [ $baseCpUrl, $baseSiteUrl, ],
+            $publicBaseUrl,
+            $notificationUrl
+        );
+
+        return new Notification([
             'type' => 'http',
-            'url' => UrlHelper::actionUrl('coconut/jobs/notify'),
+            'url' => $notificationUrl,
             'params' => [],
             'events'=> true,
             'metadata'=> true,
-        ]));
+        ]);
     }
 
     /**

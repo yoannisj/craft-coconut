@@ -516,7 +516,7 @@ class Job extends Model
         if (!$this->isNormalizedNotification)
         {
             $settings = Coconut::$plugin->getSettings();
-            $notification = $this->_notification  ?? $settings->defaultJobNotification;
+            $notification = $this->_notification ?? $settings->defaultJobNotification;
 
             if (is_string($notification)) {
                 $notification = JsonHelper::decodeIfJson($notification);
