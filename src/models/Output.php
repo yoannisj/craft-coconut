@@ -41,7 +41,9 @@ use yoannisj\coconut\helpers\JobHelper;
  * @property array $format
  * @property string $formatString
  * @property string $explicitPath
- * @property string $type
+ * @property string $type The output type (i.e. 'video', 'image' or 'audio')
+ * @property string $mimeType The output file mimeType
+ * @property string $extension The output file extension
  * @property bool $isDefaultPath Whether this output uses the default path or note
  * @property bool $isPending Wether transcoding is waiting on Coconut resources
  * @property bool $isProcessing Wether Coconut is currently transcoding
@@ -180,10 +182,22 @@ class Output extends Model
     private $_container;
 
     /**
-     * @var string
+     * @var string Output type (i.e. 'video', 'image', 'audio')
      */
 
     private $_type;
+
+    /**
+     * @var mixed Output file extension
+     */
+
+    private $_extension;
+
+    /**
+     * @var mixed Output file mimeType
+     */
+
+    private $_mimeType;
 
     /**
      * @var string Explicit output path
@@ -828,6 +842,43 @@ class Output extends Model
         }
 
         return $this->_type;
+    }
+
+    /**
+     * Getter method for computed `extension` property
+     *
+     * @return string|null
+     */
+    public function getExtension()
+    {
+        if (!isset($this->_extension))
+        {
+            if ($this->url) {
+                $this->_extension = pathinfo($this->url, FILEINFO_EXTENSION);
+            }
+
+            else if (($format = $this->getFormat())) {
+                $this->_extension = JobHelper::formatExtension($format);
+            }
+        }
+
+        return $this->_extension;
+    }
+
+    /**
+     * Getter method for computed `mimeType` property
+     *
+     * @return string|null
+     */
+    public function getMimeType()
+    {
+        if (!isset($this->_mimeType)
+            && !empty($extension = $this->getExtension()))
+        {
+            $this->_mimeType = FileHelper::getMimeTypeByExtension($extension);
+        }
+
+        return $this->_mimeType;
     }
 
     /**
