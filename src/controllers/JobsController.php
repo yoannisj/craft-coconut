@@ -85,6 +85,7 @@ class JobsController extends Controller
         $success = false;
 
         // received notification from unknown job?
+        // @todo: create job and its outputs? what about the input?
         if (!$job) {
             throw new NotFoundHttpException("Could not find job with ID '$jobId'");
         }
@@ -187,12 +188,12 @@ class JobsController extends Controller
             ]);
         }
 
-        // // Rackspace will disconnect the stream automatically
+        // Rackspace will disconnect the stream automatically
         if (is_resource($stream)) {
             fclose($stream);
         }
 
-        // Tell coconut we could upload the file successfully
+        // Tell coconut we managed to upload the file successfully
         $this->response->setStatusCode(200);
         return $this->response;
     }

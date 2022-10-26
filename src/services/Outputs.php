@@ -158,13 +158,26 @@ class Outputs extends Component
             return false;
         }
 
-        // get existing record for this output
-        $record = ($isNewOutput ? new OutputRecord() :
-            OutputRecord::findOne($output->id));
+        $wasCompleted = false;
+        $record = null;
 
-        // update the record attributes and try saving
+        if (!$isNewOutput)
+        {
+            // get existing record for this output
+            $record = OutputRecord::findOne($output->id) ?: new OutputRecord();
+
+            if ($record) { // check if it was already completed
+                $wasCompleted = in_array($record['status'], Output::COMPLETED_STATUSES);
+            }
+        }
+
+        // or get new record
+        if (!$record) $record = new OutputRecord();
+
+        // update the record attributes
         JobHelper::populateRecordFromOutput($record, $output);
 
+        // and try saving new values in the database
         if (!$record->save()) return false;
 
         // update output model's attributes based on what's now saved in the database
@@ -181,8 +194,8 @@ class Outputs extends Component
             ]));
         }
 
-        // trigger output completion event for convenience
-        if ($output->getIsCompleted()
+        // trigger output completion event
+        if (!$wasCompleted && $output->getIsCompleted()
             && $this->hasEventHandlers(self::EVENT_COMPLETE_OUTPUT))
         {
             $this->trigger(self::EVENT_COMPLETE_OUTPUT, new OutputEvent([

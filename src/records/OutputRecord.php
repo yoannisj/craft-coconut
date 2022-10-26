@@ -141,6 +141,7 @@ class OutputRecord extends ActiveRecord
             {
                 $volumeUrl = $volume->getRootUrl();
                 $url = $this->url;
+
                 $path = trim(str_replace($volumeUrl, '', $url), '/');
 
                 try {

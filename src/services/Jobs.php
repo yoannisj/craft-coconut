@@ -225,8 +225,7 @@ class Jobs extends Component
                 // make sure output records are linked to the job record
                 $output->jobId = $job->id;
 
-                if (!$coconutOutputs->saveOutput($output, $runValidation))
-                {
+                if (!$coconutOutputs->saveOutput($output, $runValidation)) {
                     $transaction->rollBack();
                     return false;
                 }
@@ -420,7 +419,7 @@ class Jobs extends Component
 
         // we need to save the whole job because of 'progress'
         // will also save the updated output
-        if (!Coconut::$plugin->getJobs()->saveJob($job, $runValidation)) {
+        if (!$this->saveJob($job, $runValidation)) {
             return false;
         }
 
