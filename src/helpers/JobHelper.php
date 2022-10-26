@@ -400,7 +400,7 @@ class JobHelper
      * @return Output[]|null()
      */
 
-    public function resolveOutputs( $outputs, Input $input = null )
+    public static function resolveOutputs( $outputs, Input $input = null )
     {
         if (empty($outputs)) return [];
 
@@ -492,7 +492,8 @@ class JobHelper
      *
      */
 
-    public function resolveOutputParams( $params, string $formatKey = null, int $formatIndex = null )
+    public static function resolveOutputParams(
+        $params, string $formatKey = null, int $formatIndex = null )
     {
         if (!$formatKey)
         {
@@ -876,7 +877,7 @@ class JobHelper
      * @return string
      */
 
-    public function normalizePath( string $path ): string
+    public static function normalizePath( string $path ): string
     {
         return trim(preg_replace(static::PATH_EXTRA_SEPARATORS_PATTERN, '/', $path), '/');
     }
@@ -1181,7 +1182,8 @@ class JobHelper
      * @return Output
      */
 
-    public static function populateOutputFromRecord( Output $output, OutputRecord $record ): Output
+    public static function populateOutputFromRecord(
+        Output $output, OutputRecord $record ): Output
     {
         $attrs = $record->getAttributes();
 
@@ -1200,7 +1202,8 @@ class JobHelper
      * @return OutputRecord
      */
 
-    public static function populateRecordFromOutput( OutputRecord $record, Output $output ): OutputRecord
+    public static function populateRecordFromOutput(
+        OutputRecord $record, Output $output ): OutputRecord
     {
         $attrs = $output->getAttributes();
         $record->setAttributes($attrs, false);
@@ -1278,7 +1281,8 @@ class JobHelper
                 && ($currValue = ArrayHelper::getValue($object, $prop))
                 && (is_object($currValue) || ArrayHelper::isAssociative($currValue))
             ) {
-                ArrayHelper::setValue($object, $prop, static::populateObject($currValue, $value, $recursive));
+                ArrayHelper::setValue($object, $prop,
+                    static::populateObject($currValue, $value, $recursive));
             }
 
             else {
@@ -1326,7 +1330,8 @@ class JobHelper
      * @return array
      */
 
-    private static function _containerFormatDefaults( string $container, string $type ): array
+    private static function _containerFormatDefaults(
+        string $container, string $type ): array
     {
         $defaults = [];
 
@@ -1365,7 +1370,8 @@ class JobHelper
      * @return array All corresponding video specification values (implicit and explicit)
      */
 
-    private static function _decodeFormatVideoSpecs( string $container, string $segment, string $options = null )
+    private static function _decodeFormatVideoSpecs(
+        string $container, string $segment, string $options = null )
     {
         // support disabling video by using 'x'
         if ($segment == 'x') return [ 'video_disabled' => true ];
@@ -1448,7 +1454,8 @@ class JobHelper
      * @return array All corresponding audio specification values (implicit and explicit)
      */
 
-    private static function _decodeFormatAudioSpecs( string $container, string $segment = null )
+    private static function _decodeFormatAudioSpecs(
+        string $container, string $segment = null )
     {
         // support disabling audio by using 'x'
         if ($segment == 'x') return [ 'audio_disabled' => true ];
@@ -1544,7 +1551,8 @@ class JobHelper
      * @param string $container
      */
 
-    private static function _decodeFormatOptions( string $container, string $codec, string $segment )
+    private static function _decodeFormatOptions(
+        string $container, string $codec, string $segment )
     {
         $options = [];
 
@@ -1613,7 +1621,8 @@ class JobHelper
      * @return array
      */
 
-    private static function _normalizeFormatSpecs( array $specs, string $container = null, string $type = null )
+    private static function _normalizeFormatSpecs(
+        array $specs, string $container = null, string $type = null )
     {
         // make sure we know which output container we are working with
         if (!$container) {
@@ -1819,7 +1828,8 @@ class JobHelper
      * @return array
      */
 
-    private static function _resolveDefinitionInFormatSpecs( array $specs, string $type = null ): array
+    private static function _resolveDefinitionInFormatSpecs(
+        array $specs, string $type = null ): array
     {
         if (array_key_exists('resolution', $specs))
         {
