@@ -1266,6 +1266,9 @@ class Output extends Model
 
         ArrayHelper::removeValue($fields, 'metadata');
 
+        $fields[] = 'extension';
+        $fields[] = 'mimeType';
+
         $fields[] = 'isPending';
         $fields[] = 'isSkipped';
         $fields[] = 'isAborted';
