@@ -1275,6 +1275,10 @@ class Output extends Model
         $fields[] = 'isSuccessfull';
         $fields[] = 'isFailed';
 
+        $fields[] = 'width';
+        $fields[] = 'height';
+        $fields[] = 'ratio';
+
         return $fields;
     }
 
