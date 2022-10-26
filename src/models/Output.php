@@ -36,11 +36,11 @@ use yoannisj\coconut\helpers\JobHelper;
 /**
  * Model representing Coconut job outputs
  *
- * @property Job $job
+ * @property Job $job The job that was used to transcode this output
  * @property string|null $progress Progress of the output transcoding (in percentage)
- * @property array $format
- * @property string $formatString
- * @property string $explicitPath
+ * @property array $format Parsed output format
+ * @property string $formatString String representation of the output format
+ * @property string $explicitPath The output path that was explicitly set (i.e. if not the default path)
  * @property string $type The output type (i.e. 'video', 'image' or 'audio')
  * @property string $mimeType The output file mimeType
  * @property string $extension The output file extension

@@ -170,7 +170,8 @@ class Settings extends Model
     protected $isNormalizedDefaultUploadVolume;
 
     /**
-     * @var string Format used to generate default path to output files in storages.
+     * @var string Format used to generate default path for output files
+     * saved in storages.
      *
      * Supports the following placeholder strings:
      * - '{path}' the input folder path, relative to the volume base path (asset input),
@@ -178,11 +179,12 @@ class Settings extends Model
      * - '{filename}' the input filename (without extension)
      * - '{hash}' a unique md5 hash based on the input URL
      * - '{shortHash}' a shortened version of the unique md5 hash
-     * - '{key}' the outputs `key` parameter (a path-friendly version of it)
+     * - '{key}' the output `key` parameter (a path-friendly version of it)
      * - '{ext}' the output file extension
      *
-     * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
-     * the path will be prefixed with an '_' (if it is not already).
+     * @tip To prevent outputs which are saved in asset volumes to end up in
+     * Craft's asset indexes, the path will be prefixed with an '_' character
+     * (if it is not already).
      *
      * @default '_coconut/{path}/{key}.{ext}'
      */
@@ -195,7 +197,7 @@ class Settings extends Model
      *
      * @Note: it is recommended not to change this setting
      *
-     * @default Notification for plugin's 'coconut/jobs/notify' controller action
+     * @default Notification settings for plugin's 'coconut/jobs/notify' controller action
      */
 
     private $_defaultJobNotification = null;
@@ -207,20 +209,22 @@ class Settings extends Model
      * the 'storage' and 'outputs' parameters.
      *
      * The 'storage' parameter can be a string, which will be matched against
-     * one of the named storages defined, or a volume handle.
+     * one of the named storages defined in the `storages` setting, or a
+     * volume handle.
      *
-     * If the 'storage' parameter is omitted, to plugin wil try to generate store
-     * settings for the input asset's volume, or fallback to use the HTTP upload method
-     * to store files in the volume defined by the 'defaultUploadVolume' setting.
+     * If the 'storage' parameter is omitted, the plugin will try to generate
+     * storage settings for the input asset's volume, or fallback to use the
+     * HTTP upload method to store files in the volume defined by the
+     * `defaultUploadVolume` setting.
      *
-     * The 'outputs' parameter can have indexed string items, in which case the string
-     * will be used as `format` parameter, and the `path` parameter will be generated
-     * based on the `defaultOutputPathFormat` setting.
+     * The 'outputs' parameter can have indexed string items, in which case
+     * the string will be used as the output’s `format` parameter, and the
+     * output’s `path` parameter will be generated based on the
+     * `defaultOutputPathFormat` setting.
      *
-     * Note: to prevent outputs saved in asset volumes to end up in Craft's asset indexes,
-     * their `path` parameter will be prefixed with an '_' (if it is not already).
-     * This can be disabled if the storage is not a volume by adding the custom
-     * 'isVolumeStorage' parameter, although it is not recommended.
+     * @tip To prevent outputs which are saved in asset volumes to end up in
+     * Craft's asset indexes, their path parameter will be prefixed with an '_'
+     * character (if it is not already).
      *
      * The 'input' and 'notification' parameters are not supported, as the plugin will
      * set those programatically.
