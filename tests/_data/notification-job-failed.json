@@ -1,0 +1,253 @@
+{
+  "job_id": "gFvuAVKheVSqdp",
+  "event": "job.failed",
+  "metadata": true,
+  "data": {
+    "type": "job",
+    "status": "job.failed",
+    "progress": "100%",
+    "id": "gFvuAVKheVSqdp",
+    "created_at": "2021-08-31 07:57:06 +0000",
+    "completed_at": "2021-08-31 07:58:06 +0000",
+    "input": {
+      "status": "input.transferred",
+      "metadata": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "h264",
+            "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+            "profile": "High",
+            "codec_type": "video",
+            "codec_time_base": "1/48",
+            "codec_tag_string": "avc1",
+            "codec_tag": "0x31637661",
+            "width": 1280,
+            "height": 720,
+            "coded_width": 1280,
+            "coded_height": 720,
+            "has_b_frames": 0,
+            "pix_fmt": "yuv420p",
+            "level": 31,
+            "chroma_location": "left",
+            "refs": 1,
+            "is_avc": "true",
+            "nal_length_size": "4",
+            "r_frame_rate": "24/1",
+            "avg_frame_rate": "24/1",
+            "time_base": "1/48",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 721,
+            "duration": "15.020833",
+            "bit_rate": "1027518",
+            "bits_per_raw_sample": "8",
+            "nb_frames": "361",
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "VideoHandler"
+            }
+          },
+          {
+            "index": 1,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_time_base": "1/44100",
+            "codec_tag_string": "mp4a",
+            "codec_tag": "0x6134706d",
+            "sample_fmt": "fltp",
+            "sample_rate": "44100",
+            "channels": 2,
+            "channel_layout": "stereo",
+            "bits_per_sample": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/44100",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 663552,
+            "duration": "15.046531",
+            "bit_rate": "192035",
+            "max_bit_rate": "201616",
+            "nb_frames": "648",
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0
+            },
+            "tags": {
+              "creation_time": "2013-11-12T06:38:58.000000Z",
+              "language": "und",
+              "handler_name": "IsoMedia File Produced by Google, 5-11-2011"
+            }
+          }
+        ],
+        "format": {
+          "filename": "http://aws-us-east-1-media.coconut.co.s3.amazonaws.com/31/07/5d3c1ffbb71a56a43c893931b512df44/0",
+          "nb_streams": 2,
+          "nb_programs": 0,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+          "format_long_name": "QuickTime / MOV",
+          "start_time": "0.000000",
+          "duration": "15.045000",
+          "size": "2299653",
+          "bit_rate": "1222813",
+          "probe_score": 100,
+          "tags": {
+            "major_brand": "mp42",
+            "minor_version": "0",
+            "compatible_brands": "isommp42",
+            "creation_time": "2013-11-12T06:38:58.000000Z"
+          }
+        }
+      }
+    },
+    "outputs": [
+      {
+        "key": "intro:webm:480p",
+        "type": "video",
+        "format": "webm:0x480",
+        "url": "https://s3.amazonaws.com/aws-us-east-1-media-test.coconut.co/31/07/a1cb04688d860a1033c90315e2f59e8c/_coconut//intro-webm-480p.webm",
+        "status": "video.encoded",
+        "metadata": {
+          "streams": [
+            {
+              "index": 0,
+              "codec_name": "vp8",
+              "codec_long_name": "On2 VP8",
+              "profile": "0",
+              "codec_type": "video",
+              "codec_time_base": "1/24",
+              "codec_tag_string": "[0][0][0][0]",
+              "codec_tag": "0x0000",
+              "width": 270,
+              "height": 480,
+              "coded_width": 270,
+              "coded_height": 480,
+              "has_b_frames": 0,
+              "sample_aspect_ratio": "1:1",
+              "display_aspect_ratio": "9:16",
+              "pix_fmt": "yuv420p",
+              "level": -99,
+              "chroma_location": "left",
+              "field_order": "progressive",
+              "refs": 1,
+              "r_frame_rate": "24/1",
+              "avg_frame_rate": "24/1",
+              "time_base": "1/1000",
+              "start_pts": 3,
+              "start_time": "0.003000",
+              "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0
+              },
+              "tags": {
+                "HANDLER_NAME": "VideoHandler",
+                "ENCODER": "Lavc58.54.100 libvpx",
+                "DURATION": "00:00:06.003000000"
+              }
+            },
+            {
+              "index": 1,
+              "codec_name": "vorbis",
+              "codec_long_name": "Vorbis",
+              "codec_type": "audio",
+              "codec_time_base": "1/44100",
+              "codec_tag_string": "[0][0][0][0]",
+              "codec_tag": "0x0000",
+              "sample_fmt": "fltp",
+              "sample_rate": "44100",
+              "channels": 2,
+              "channel_layout": "stereo",
+              "bits_per_sample": 0,
+              "r_frame_rate": "0/0",
+              "avg_frame_rate": "0/0",
+              "time_base": "1/1000",
+              "start_pts": 0,
+              "start_time": "0.000000",
+              "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0
+              },
+              "tags": {
+                "HANDLER_NAME": "IsoMedia File Produced by Google, 5-11-2011",
+                "ENCODER": "Lavc58.54.100 libvorbis",
+                "DURATION": "00:00:06.003000000"
+              }
+            }
+          ],
+          "format": {
+            "filename": "https://s3.amazonaws.com/aws-us-east-1-media-test.coconut.co/31/07/a1cb04688d860a1033c90315e2f59e8c/_coconut//intro-webm-480p.webm",
+            "nb_streams": 2,
+            "nb_programs": 0,
+            "format_name": "matroska,webm",
+            "format_long_name": "Matroska / WebM",
+            "start_time": "0.000000",
+            "duration": "6.003000",
+            "size": "892172",
+            "bit_rate": "1188968",
+            "probe_score": 100,
+            "tags": {
+              "COMPATIBLE_BRANDS": "isommp42",
+              "MAJOR_BRAND": "mp42",
+              "MINOR_VERSION": "0",
+              "ENCODER": "Lavf58.29.100"
+            }
+          }
+        }
+      },
+      {
+        "key": "webm:480p",
+        "type": "video",
+        "format": "webm:0x480",
+        "error": "The media file couldn't be encoded because of a FFmpeg error.",
+        "status": "video.failed"
+      }
+    ]
+  }
+}

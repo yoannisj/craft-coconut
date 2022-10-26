@@ -1,0 +1,27 @@
+actor: Tester
+paths:
+  tests: tests
+  log: tests/_output
+  data: tests/_data
+  support: tests/_support
+  envs: tests/_envs
+bootstrap: _bootstrap.php
+params:
+  - env
+modules:
+  config:
+    \craft\test\Craft:
+      configFile: "tests/_craft/config/test.php"
+      entryUrl: "%WEB_URL%/index.php"
+      projectConfig: {}
+      edition: "%CRAFT_EDITION%"
+      migrations: [] # list of migrations to apply before running the tests
+      plugins: # craft plugins to install before running the tests
+        - class: yoannisj\\coconut\\Coconut
+          handle: coconut
+      cleanup: true # cleanup fixtures after each test
+      transaction: true # use transactions for db operations in each test (rolled-back before next test)
+      dbSetup:
+        clean: true # whether to delete all existing table before running the tests
+        setupCraft: true # whether to install craft-cms in db before running the tests
+        applyMigrations: true # whether to apply migration files in migrations folder before running the tests

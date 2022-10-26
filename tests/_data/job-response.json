@@ -1,0 +1,36 @@
+{
+  "id": "S9BkOufdntiPR9",
+  "created_at": "2021-09-25 17:45:59 +0000",
+  "completed_at": null,
+  "status": "job.starting",
+  "progress": "0%",
+  "input": {
+    "status": "input.starting"
+  },
+  "outputs": [
+    {
+      "key": "mp4:720p",
+      "type": "video",
+      "format": "mp4:720p",
+      "status": "video.waiting"
+    },
+    {
+      "key": "httpstream",
+      "type": "httpstream",
+      "format": "httpstream",
+      "status": "httpstream.waiting"
+    },
+    {
+      "key": "jpg:480x",
+      "type": "image",
+      "format": "jpg:480x",
+      "status": "image.waiting"
+    },
+    {
+      "key": "gif:300x",
+      "type": "image",
+      "format": "gif:300x",
+      "status": "image.waiting"
+    }
+  ]
+}

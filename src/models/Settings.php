@@ -21,11 +21,23 @@ use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\volumes\Local as LocalVolume;
 use craft\helpers\StringHelper;
+use craft\helpers\UrlHelper;
+use craft\helpers\App as AppHelper;
+use craft\helpers\Component as ComponentHelper;
 
-use yoannisj\coconut\models\Config;
+use yoannisj\coconut\Coconut;
+use yoannisj\coconut\models\Job;
+use yoannisj\coconut\models\Storage;
 
 /**
- * 
+ * Model representing and validation Coconut plugin settings
+ *
+ * @property string $apiKey
+ * @property Storage[] $storages
+ * @property Storage|null $defaultStorage
+ * @property VolumeInterface|null $defaultUploadVolume
+ * @property Job[] $jobs
+ * @property Job[] $volumeJobs
  */
 
 class Settings extends Model
@@ -34,146 +46,686 @@ class Settings extends Model
     // =========================================================================
 
     /**
-     * @var string The API key of the coconut.co account used to convert videos.
+     * The API key of the Coconut.co account used to convert videos.
+     *
+     * If this is not set, the plugin will check for an environment variable
+     * named `COCONUT_API_KEY` (using `\craft\helper\App::env()`).
+     *
+     * @var string
+     *
+     * @default null
      */
 
-    public $apiKey;
+    private $_apiKey = null;
 
     /**
-     * @var bool Whether transcoding videos should default to using the queue,
-     * or run synchonously. It is highly recommended to use the queue whenever
-     * possible, but if your craft environment is not running queued jobs in the
-     * background, you may want to default to running jobs synchronously if.
+     * The endpoint to use for Coconut API calls.
      *
-     * More info on how to run queued jobs in the background:
-     *  https://nystudio107.com/blog/robust-queue-job-handling-in-craft-cms
+     * @note: This will override the `region` setting.
+     * @note: Coconut API Keys are bound to the Endpoint/Region, so if you change
+     *  this you probably want to change the `apiKey` setting as well
+     *
+     * @var string|null
      */
 
-    public $preferQueue = true;
+    private $_endpoint = null;
 
     /**
-     * @var int
+     * The region of the Coconut.co cloud infrastructure to use
+     *  for Coconut API calls.
      *
-     * Depending on your Coconut plan and the config you are using to transcode
-     * your video, Transcoding jobs can take a long time. To avoid jobs to fail
-     * with a timeout error, this plugin sets a high `Time to Reserve` on jobs
-     * pushed to Yii's queue.
+     * @note: This will have no effect if the `endpoint` setting is also set.
+     * @note: Coconut API Keys are bound to the Endpoint/Region, so if you change
+     *  this you probably want to change the `apiKey` setting as well
+     *
+     * @var string|null
+     */
+
+    private $_region = null;
+
+    /**
+     * Public URL to use as *base* for all URLs sent to the Coconut API
+     * (i.e. local asset URLs and notification webhooks)
+     *
+     * @var string
+     */
+
+    private $_publicBaseUrl;
+
+    /**
+     * Depending on your Coconut plan and the parameters you are using to transcode
+     * your video, jobs can take a long time. To avoid jobs to fail with a timeout
+     * error, this plugin sets a high `Time to Reserve` on the jobs it pushes to
+     * Craft's queue.
      *
      * More info:
      *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
+     *
+     * @var integer
+     *
+     * @default 900
      */
 
-    public $transcodeJobTtr = 600;
+    public $transcodeJobTtr = 900;
 
     /**
-     * @var int | string | \craft\base\VolumeInterface The default volume
-     * where coconut output files are uploaded, when the transcoding config does
-     * not specify its own outputVolume. If this is set to a string which does
-     * not correspond to an existing volume, a new local volume will be created
-     * in the webroot directory.
+     * Named storage settings to use in Coconut transcoding jobs.
+     *
+     * Each key defines a named storage, and its value should be an array of
+     * storage settings as defined here: https://docs.coconut.co/jobs/storage
+     *
+     * @var array
+     *
+     * @example [
+     *      'myS3Bucket' => [
+     *          'service' => 's3',
+     *          'region' => 'us-east-1',
+     *          'bucket' => 'mybucket',
+     *          'path' = '/coconut/outputs',
+     *          'credentials' => [
+     *              'access_key_id' => '...',
+     *              'secret_access_key' = '...',
+     *          ]
+     *      ],
+     *      'httpUpload' => [
+     *          'url' => 'https://remote.server.com/coconut/upload',
+     *      ],
+     * ]
+     *
+     * @default []
      */
 
-    private $_outputVolume;
+    private $_storages = [];
 
     /**
-     * @var bool Whether the output volume was initialized
+     * The storage name or settings used to store Coconut output files when none
+     * is given in transcoding job parameters.
+     *
+     * This can be set to a string which must be either a key from the `storages`
+     * setting, or a volume handle.
+     *
+     * If this is set to `null`, the plugin will try to generate storage settings
+     * based on the input asset's volume, or fallback to use the HTTP upload method
+     * to store files in the volume defined by the 'defaultUploadVolume' setting.
+     *
+     * @var string|array|\yoannisj\coconut\models\Storage
+     *
+     * @default null
      */
 
-    private $_isOutputVolumeNormalized;
+    private $_defaultStorage = null;
 
     /**
-     * @var string Relative path to folder where coconut output files are
-     * uploaded in volumes. This may contain the following placeholder strings:
-     * - '{path}' the source folder path (relative to asset volume or url host)
-     * - '{filename}' the source filename (without extension)
-     * - '{hash}' a unique md5 hash based on the source url
+     * @var bool
      */
 
-    public $outputPathFormat = '/_coconut/{hash}-{format}.{ext}';
+    protected $isNormalizedDefaultStorage;
 
     /**
-     * @var array Named coconut job config settings. Only the 'outputs' and
-     * optional 'vars'* keys are supported. The plugin will set the 'source' and
-     * 'webhook' settings programatically.
+     * The default volume used to store output files when the `storage` parameter
+     * was omitted and the input asset's volume could be determined (.e.g. if the
+     * `input` parameter was a URL and not a Craft asset).
+     *
+     * @var string|\craft\models\Volume
+     *
+     * @default 'coconut'
      */
 
-    public $configs = [];
+    private $_defaultUploadVolume = 'coconut';
 
     /**
-     * @var array Sets default coconut config for source asset volumes.
-     *  Keys should be the handle of a craft volume, and values should be a
-     *  key from the "configs" setting, or an array defining job settings.
+     * @var boolean
      */
 
-    public $volumeConfigs = [];
+    protected $isNormalizedDefaultUploadVolume;
 
     /**
-     * @var array List of source volumes handles, for which the plugin should
-     *  automatically create a Coconut conversion job (when a video asset is
-     *  added or updated). 
+     * Format used to generate default path for output files
+     * saved in storages.
+     *
+     * Supports the following placeholder strings:
+     * - '{path}' the input folder path, relative to the volume base path (asset input),
+     *      or the URL path (external URL input)
+     * - '{filename}' the input filename (without extension)
+     * - '{hash}' a unique md5 hash based on the input URL
+     * - '{shortHash}' a shortened version of the unique md5 hash
+     * - '{key}' the output `key` parameter (a path-friendly version of it)
+     * - '{ext}' the output file extension
+     *
+     * @tip To prevent outputs which are saved in asset volumes to end up in
+     * Craft's asset indexes, the path will be prefixed with an '_' character
+     * (if it is not already).
+     *
+     * @var string
+     *
+     * @default '_coconut/{path}/{key}.{ext}'
+     */
+
+    public $defaultOutputPathFormat = '_coconut/{path}/{filename}--{key}.{ext}';
+
+    /**
+     * Notification param to use if job notifications are enabled but job's own
+     * notification param is not set.
+     *
+     * @Note: it is recommended not to change this setting
+     *
+     * @var string|array|Notification|null
+     *
+     * @default Notification settings for plugin's 'coconut/jobs/notify' controller action
+     */
+
+    private $_defaultJobNotification = null;
+
+    /**
+     * Named coconut job settings.
+     *
+     * Each key defines a named job, and its value should be an array setting
+     * the 'storage' and 'outputs' parameters.
+     *
+     * The 'storage' parameter can be a string, which will be matched against
+     * one of the named storages defined in the `storages` setting, or a
+     * volume handle.
+     *
+     * If the 'storage' parameter is omitted, the plugin will try to generate
+     * storage settings for the input asset's volume, or fallback to use the
+     * HTTP upload method to store files in the volume defined by the
+     * `defaultUploadVolume` setting.
+     *
+     * The 'outputs' parameter can have indexed string items, in which case
+     * the string will be used as the output’s `format` parameter, and the
+     * output’s `path` parameter will be generated based on the
+     * `defaultOutputPathFormat` setting.
+     *
+     * @tip To prevent outputs which are saved in asset volumes to end up in
+     * Craft's asset indexes, their path parameter will be prefixed with an '_'
+     * character (if it is not already).
+     *
+     * The 'input' and 'notification' parameters are not supported, as the plugin will
+     * set those programatically.
+     *
+     * @var array
+     *
+     * @example [
+     *      'videoSources' => [
+     *          'storage' => 'coconut', // assuming there is a volume with handle 'coconut'
+     *          'outputs' => [
+     *              'webm', // will generate the output's `path` parameter based on `defaultOutputPathFormat`
+     *              'mp4:360p',
+     *              'mp4:720p',
+     *              'mp4:1080p::quality=4' => [
+     *                  'key' => 'mp4:1080p',
+     *                  'if' => "{{ input.width }} >= 1920
+     *              ]
+     *          ],
+     *      ],
+     * ]
+     *
+     * @default []
+     */
+
+    private $_jobs = [];
+
+    /**
+     * Whether `jobs` property was normalized or not (internal flag)
+     *
+     * @var bool
+     */
+
+    protected $isNormalizedJobs;
+
+    /**
+     * Sets default job parameters for craft assets in given volumes.
+     *
+     * Each key should match the handle of a craft volume, and the its value should
+     * be either a key from the `jobs` setting, or an array of parameters (in the
+     * same format as the `jobs` setting).
+     *
+     * @var array
+     *
+     * @default []
+     */
+
+    private $_volumeJobs = [];
+
+    /**
+     * Whether volumeJobs property was normalized or not (internal flag)
+     *
+     * @var bool
+     */
+
+    protected $isNormalizedVolumeJobs;
+
+    /**
+     * List of input volumes handles, for which the plugin should
+     *  automatically create a Coconut conversion job every time a video asset is
+     *  added or updated.
+     *
+     * @var array
+     *
+     * @default []
      */
 
     public $watchVolumes = [];
 
+    // @todo: add `fieldJobs` and `watchFields` settings to automatically
+    // transcode video assets in asset fields when saving a Craft element.
+
     // =Public Methods
     // =========================================================================
 
+    // =Properties
+    // -------------------------------------------------------------------------
+
     /**
-     * @inheritdoc
+     * @param string|null $apiKey
      */
 
-    public function init()
+    public function setApiKey( string $apiKey = null )
     {
-        if (!isset($this->apiKey)) {
-            $this->apiKey = getenv('COCONUT_API_KEY');
+        $this->_apiKey = $apiKey;
+    }
+
+    /**
+     * @return string
+     */
+
+    public function getApiKey(): string
+    {
+        if (!isset($this->_apiKey)) {
+            $this->_apiKey = AppHelper::env('COCONUT_API_KEY');
         }
 
-        parent::init();
+        if (empty($this->_apiKey)) {
+            throw new InvalidConfigException("Missing required `apiKey` setting");
+        }
+
+        return $this->_apiKey;
+    }
+
+    /**
+     * @param string|null $endpoint
+     */
+
+    public function setEndpoint( string $endpoint = null )
+    {
+        $this->_endpoint = $endpoint;
+    }
+
+    /**
+     * @return string|null
+     */
+
+    public function getEndpoint()
+    {
+        if (!isset($this->_endpoint)) {
+            $this->_endpoint = AppHelper::env('COCONUT_ENDPOINT');
+        }
+
+        return empty($this->_endpoint) ? null : $this->_endpoint;
+    }
+
+    /**
+     * @param string|null $endpoint
+     */
+
+    public function setRegion( string $region = null )
+    {
+        $this->_region = $region;
+    }
+
+    /**
+     * @return string|null
+     */
+
+    public function getRegion()
+    {
+        if (!isset($this->_region)) {
+            $this->_region = AppHelper::env('COCONUT_REGION');
+        }
+
+        return empty($this->_region) ? null : $this->_region;
+    }
+
+    /**
+     * Setter method for parsed `publicBaseUrl` property
+     *
+     * @param string|null $url
+     */
+
+    public function setPublicBaseUrl( string $url = null )
+    {
+        $this->_publicBaseUrl = $url;
+    }
+
+    /**
+     * Getter method for parsed `publicBaseUrl` property
+     *
+     * @return string|null
+     */
+
+    public function getPublicBaseUrl()
+    {
+        if ($this->_publicBaseUrl) {
+            return Craft::parseEnv($this->_publicBaseUrl);
+        }
+
+        return null;
+    }
+
+    /**
+     * Setter method for normalized `storages` setting
+     *
+     * @param array $storages Map of names storages, where each key is a storage name
+     */
+
+    public function setStorages( array $storages )
+    {
+        $this->_storages = [];
+
+        foreach ($storages as $name => $storage)
+        {
+            if (!is_string($name))
+            {
+                throw new InvalidConfigException(
+                    "Setting `storages` must be an associative array where keys are storage names");
+            }
+
+            if (is_array($storage)) {
+                $storage = new Storage($storage);
+            }
+
+            else if (!$storage instanceof Storage)
+            {
+                throw new InvalidConfigException(
+                    'Setting `storages` must resolve to a list of'.Storage::class.' models');
+            }
+
+            $this->_storages[$name] = $storage;
+        }
+    }
+
+    /**
+     * Getter method for normalized `storages` setting
+     *
+     * @return Storage[]
+     */
+
+    public function getStorages(): array
+    {
+        return $this->_storages;
+    }
+
+    /**
+     * Setter method for normalized `defaultStorage` setting
+     *
+     * @param string|array|Storage $storage
+     */
+
+    public function setDefaultStorage( $storage )
+    {
+        $this->_defaultStorage = $storage;
+        $this->isNormalizedDefaultStorage = false;
+    }
+
+    /**
+     * Getter method for normalized `defaultStorage` setting
+     *
+     * @return Storage|null
+     */
+
+    public function getDefaultStorage()
+    {
+        if (!$this->isNormalizedDefaultStorage)
+        {
+            $storage = $this->_defaultStorage;
+
+            if ($storage)
+            {
+                if (is_string($storage)) {
+                    $storage = Craft::parseEnv($storage);
+                }
+
+                $storage = Coconut::$plugin->getStorages()
+                    ->parseStorage($storage);
+            }
+
+            $this->_defaultStorage = $storage;
+            $this->isNormalizedDefaultStorage = true;
+        }
+
+        return $this->_defaultStorage;
+    }
+
+    /**
+     * Setter method for normalized `defaultUploadVolume` property
+     *
+     * @param string|array|VolumeInterfece
+     */
+
+    public function setDefaultUploadVolume( $volume )
+    {
+        $this->_defaultUploadVolume = $volume;
+        $this->isNormalizedDefaultUploadVolume = false;
+    }
+
+    /**
+     * @param bool $createMissing Whether to create the volume if it does not exist
+     *
+     * @return VolumeInterface|null
+     */
+
+    public function getDefaultUploadVolume( $createMissing = false )
+    {
+        if (!$this->isNormalizedDefaultUploadVolume)
+        {
+            $volume = $this->_defaultUploadVolume;
+
+            if (!$volume) {
+                $volume = null;
+            }
+
+            else if (is_array($volume)) {
+                $volume = $this->getVolumeModel($volume, true);
+            }
+
+            else if (is_string($volume))
+            {
+                $volume = $this->getVolumeModel([
+                    'handle' => $volume,
+                ], true);
+            }
+
+            else if (!$volume instanceof VolumeInterface)
+            {
+                throw new InvalidConfigException(
+                    "Setting `defaultUploadVolume` must resolve to a model that implements ".VolumeInterface::class);
+            }
+
+            $this->_defaultUploadVolume = $volume;
+            $this->isNormalizedDefaultUploadVolume = true;
+        }
+
+        return $this->_defaultUploadVolume;
+    }
+
+    /**
+     * Setter method for defaulted 'defaultJobNotification' property
+     *
+     * @param string|array|Notification|null $notification
+     */
+
+    public function setDefaultJobNotification( $notification )
+    {
+        $this->_defaultJobNotification = $notification;
+    }
+
+    /**
+     * Getter method for defaulted 'defaultJobNotification' property
+     *
+     * @return string|array|Notification
+     */
+
+    public function getDefaultJobNotification()
+    {
+        if (isset($this->_defaultJobNotification)) {
+            return $this->_defaultJobNotification;
+        }
+
+        $notificationUrl = UrlHelper::actionUrl('coconut/jobs/notify', null, null, false);
+
+        $baseCpUrl = UrlHelper::baseCpUrl();
+        $baseSiteUrl = UrlHelper::baseSiteUrl();
+        $publicBaseUrl = rtrim($this->getPublicBaseUrl(), '/').'/';
+
+        $notificationUrl = str_replace(
+            [ $baseCpUrl, $baseSiteUrl, ],
+            $publicBaseUrl,
+            $notificationUrl
+        );
+
+        return new Notification([
+            'type' => 'http',
+            'url' => $notificationUrl,
+            'params' => [],
+            'events'=> true,
+            'metadata'=> true,
+        ]);
+    }
+
+    /**
+     * Setter method for normalized `jobs` setting
+     *
+     * @param array Map of named jobs where each key is a job name
+     */
+
+    public function setJobs( array $jobs )
+    {
+        $this->_jobs = $jobs;
+        $this->isNormalizedJobs = false;
+    }
+
+    /**
+     * Getter method for normalized `jobs` setting
+     *
+     * @return Job[]
+     */
+
+    public function getJobs()
+    {
+        if (!$this->isNormalizedJobs)
+        {
+            foreach ($this->_jobs as $name => $job)
+            {
+                if (!is_string($name))
+                {
+                    throw new InvalidConfigException(
+                        'Setting `jobs` must be an array where each key is a job name.');
+                }
+
+                if (is_array($job)) {
+                    $job = Craft::configure(new Job(), $job);
+                }
+
+                else if (!$job instanceof Job)
+                {
+                    throw new InvalidConfigException(
+                        'Setting `jobs` must resolve to a list of `'.Job::class.'` models');
+                }
+
+                $this->_jobs[$name] = $job;
+            }
+
+            $this->isNormalizedJobs = true;
+        }
+
+        return $this->_jobs;
+    }
+
+    /**
+     * Setter method for normalized `volumeJobs` setting
+     *
+     * @param array Map of volume jobs, where each key is a volume handle
+     */
+
+    public function setVolumeJobs( array $jobs )
+    {
+        $this->_volumeJobs = $jobs;
+        $this->isNormalizedVolumeJobs = false;
+
+    }
+
+    /**
+     * Getter method for normalized `volumeJobs` setting
+     *
+     * @return Job[]
+     */
+
+    public function getVolumeJobs()
+    {
+        if (!$this->isNormalizedVolumeJobs)
+        {
+            foreach ($this->_volumeJobs as $handle => $job)
+            {
+                if (!is_string($handle))
+                {
+                    throw new InvalidConfigException(
+                        "Setting `volumeJobs` must be an associative array"
+                        ." where each key is a volume handle");
+                }
+
+                if (is_string($job))
+                {
+                    $jobs = $this->getJobs();
+
+                    if (!array_key_exists($job, $jobs))
+                    {
+                        throw new InvalidConfigException(
+                            "Could not find job named '$job'.");
+                    }
+
+                    $job = $jobs[$job];
+                }
+
+                if (is_array($job)) {
+                    $job = new Job($job);
+                }
+
+                else if (!$job instanceof Job)
+                {
+                    throw new InvalidConfigException(
+                        'Setting `volumeJobs` must resolve to a list of `'.Job::class.'` models');
+                }
+
+                $this->_volumeJobs[$handle] = $job;
+            }
+
+            $this->isNormalizedVolumeJobs = true;
+        }
+
+        return $this->_volumeJobs;
     }
 
     // =Attributes
     // -------------------------------------------------------------------------
 
     /**
-     * 
+     * @inheritdoc
      */
 
-    public function setOutputVolume( $value )
+    public function attributes()
     {
-        $this->_outputVolume = $value;
-        $this->_isOutputVolumeNormalized = false;
-    }
+        $attributes = parent::attributes();
 
-    /**
-     * 
-     */
+        $attributes[] = 'apiKey';
+        $attributes[] = 'publicBaseUrl';
+        $attributes[] = 'storages';
+        $attributes[] = 'defaultStorage';
+        $attributes[] = 'defaultUploadVolume';
+        $attributes[] = 'defaultJobNotification';
+        $attributes[] = 'jobs';
+        $attributes[] = 'volumeJobs';
 
-    public function getOutputVolume()
-    {
-        if (!$this->_isOutputVolumeNormalized)
-        {
-            $volume = $this->_outputVolume;
-
-            if (empty($volume)) {
-                $volume = 'coconut';
-            }
-
-            if (is_numeric($volume)) {
-                $volume = Craft::$app->getVolumes()->getVolumeById($volume);
-            }
-
-            else if (is_string($volume)) {
-                $volume = $this->getOrCreateOutputVolume($volume);
-            }
-
-            if (!$volume instanceof VolumeInterface) {
-                throw new InvalidConfigException('Could not determine output volume.');
-            }
-
-            $this->_outputVolume = $volume;
-        }
-
-        return $this->_outputVolume;
+        return $attributes;
     }
 
     // =Validation
@@ -187,39 +739,121 @@ class Settings extends Model
     {
         $rules = parent::rules();
 
-        $rules['attrsRequired'] = [ ['apiKey', 'outputVolume'], 'required' ];
-        $rules['attrsString'] = [ ['apiKey', 'outputPathFormat'], 'string' ];
-        $rules['attrsHandle'] = [ ['outputVolume'], HandleValidator::class ];
-        $rules['attrsConfigMap'] = [ ['configs', 'volumeConfigs'], 'validateConfigMap', 'baseAttribute' => 'configs' ];
+        $rules['attrsRequired'] = [ ['apiKey', 'defaultUploadVolume', 'defaultOutputPathFormat'], 'required' ];
+        $rules['attrsString'] = [ ['apiKey', 'defaultOutputPathFormat'], 'string' ];
+
+        // $rules['storagesStorageMap'] = [ ['storages'], 'validateStorageMap' ];
+        // $rules['configsConfigMap'] = [ ['configs'], 'validateJobsMap' ];
+        // $rules['volumeJobsConfigMap'] = [ ['volumeJobs'], 'validateJobsMap', 'registryAttribute' => 'configs' ];
+
         $rules['wathVolumesEach'] = [ 'watchVolumes', 'each', 'rule' => HandleValidator::class ];
 
         return $rules;
     }
 
     /**
-     * 
+     * Validation method for maps of storage parameters
      */
 
-    public function validateConfigMap( $attribute, array $params = [], InlineValidator $validator )
+    public function validateStorageMap( $attribute, array $params, InlineValidator $validator )
     {
-        $configs = $this->$attribute;
-        $baseAttribute = $params['baseAttribute'] ?? null;
+        $storages = $this->$attribute;
+        $registryAttribute = $params['registryAttribute'] ?? null;
 
-        if (!is_array($configs) || !ArrayHelper::isAssociative($configs)) {
+        if (!is_array($storages) && !ArrayHelper::isAssociative($storages))
+        {
             $validator->addError($this, $attribute,
-                '{attribute} must be an array mapping volume handles with config settings');
+                "{attribute} must be an array mapping storage names to Coconut storage parameters");
+            return; // no need to continue validation
         }
 
-        foreach ($configs as $handle => $config)
+        foreach ($storages as $key => $storage)
         {
-            if (is_string($config) && $baseAttribute) {
-                $config = $this->$baseAttribute[config] ?? null;
+            if (is_string($storage) && $registryAttribute)
+            {
+                $name = $storage;
+                $storage = $this->$registryAttribute[$name] ?? null;
+
+                if (!$storage)
+                {
+                    $label = $this->getAttributeLabel($registryAttribute);
+                    $validator->addError($this, $attribute,
+                        "Could not find {attribute}'s named config '$name' in '$label'");
+                    return; // no need to continue validation
+                }
             }
 
-            if (!is_array($config))
+            if (is_array($storage) && ArrayHelper::isAssociative($storage))
+            {
+                if (!array_key_exists('class', $storage)) $storage['class'] = Storage::class;
+                $storage = Craft::createObject($storage);
+            }
+
+            if (!$storage instanceof Storage)
+            {
+                $class = Storage::class;
+                $validator->addError($this, $attribute,
+                    "Storage with key '$key' in {attribute} must resolve to a $class model");
+                return; // no need to continue validation
+            }
+
+            else if (!$storage->validate())
             {
                 $validator->addError($this, $attribute,
-                    'Each value in {attribute} must be a config name, or an array of config params.');
+                    "Invalid storage with key '$key' in {attribute}");
+            }
+        }
+    }
+
+    /**
+     * Validation method for maps of job parameters
+     */
+
+    public function validateJobsMap( $attribute, array $params = [], InlineValidator $validator )
+    {
+        $jobs = $this->$attribute;
+        $registryAttribute = $params['registryAttribute'] ?? null;
+
+        if (!is_array($jobs) || !ArrayHelper::isAssociative($jobs))
+        {
+            $validator->addError($this, $attribute,
+                '{attribute} must be an array mapping volume handles to Coconut job parameters');
+            return; // no need to continue validation
+        }
+
+        foreach ($jobs as $key => $job)
+        {
+            if (is_string($job) && $registryAttribute)
+            {
+                $name = $job;
+                $job = $this->$registryAttribute[$name] ?? null;
+
+                if (!$job)
+                {
+                    $label = $this->getAttributeLabel($registryAttribute);
+                    $validator->addError($this, $attribute,
+                        "Could not find {attribute}'s named job '$name' in '$label'");
+                    return; // no need to continue validation
+                }
+            }
+
+            if (is_array($job) && ArrayHelper::isAssociative($job))
+            {
+                if (!array_key_exists('class', $job)) $job['class'] = $job;
+                $job = Craft::createObject($job);
+            }
+
+            if (!$job instanceof Job)
+            {
+                $validator->addError($this, $attribute,
+                    "Job with key '$key' in {attribute} must resolve to a `".Job::class."` instance");
+                return; // no need to continue validation
+            }
+
+            if (!$job->validate())
+            {
+                $validator->addError($this, $attribute,
+                    "Invalid job with key '$key' in {attribute}");
             }
         }
     }
@@ -227,80 +861,49 @@ class Settings extends Model
     // =Operations
     // -------------------------------------------------------------------------
 
-    /**
-     * @return array | false
-     */
-
-    public function getConfig( string $name )
-    {
-        $config = $this->configs[$name] ?? false;
-
-
-        if (is_array($config))
-        {
-            $config['class'] = Config::class;
-            $config = Craft::createObject($config);
-        }
-
-        else if (!($config instanceof Config)) {
-            $this->configs[$name] = false;
-        }
-
-        return $config;
-    }
-
-    /**
-     * @return array | false
-     */
-
-    public function getVolumeConfig( string $handle )
-    {
-        $config = $this->volumeConfigs[$handle] ?? false;
-
-        if (is_string($config)) {
-            $config = $this->getConfig($config);
-        }
-
-        else if (is_array($config)) {
-            $config['class'] = Config::class;
-            $config = Craft::createObject($config);
-        }
-
-        return $config;
-    }
-
     // =Protected Methods
     // =========================================================================
 
     /**
+     * @param
+     *
      * @return \craft\base\VolumeInterface
      */
 
-    protected function getOrCreateOutputVolume( string $handle )
+    protected function getVolumeModel( array $config = [], bool $createMissing = false )
     {
-        $volumes = Craft::$app->getVolumes();
-        $volume = $volumes->getVolumeByHandle($handle);
+        $config = ComponentHelper::mergeSettings($config);
+        $handle = $config['handle'] ?? 'coconut';
 
-        if ($volume) {
+        $craftVolumes = Craft::$app->getVolumes();
+        $volume = $craftVolumes->getVolumeByHandle($handle);
+
+        if ($volume || !$createMissing) {
             return $volume;
         }
 
-        // create local volume based on handle
-        $name = $this->humanizeHandle($handle);
-        $slug = StringHelper::toKebabCase($handle);
-        $props = [
-            'type' => LocalVolume::class,
-            'settings' => [
-                'name' => $name,
-                'handle' => $handle,
-                'hasUrls' => true,
-                'url' => '@web/'.$slug,
-                'path' => '@webroot/'.$slug,
-            ],
+        // create missing volume
+        $type = $config['type'] ?? $config['class'] ?? LocalVolume::class;
+
+        $defaults = [
+            'type' => $type,
+            'handle' => $handle,
+            'name'=> ($config['name'] ?? $this->humanizeHandle($handle)),
         ];
 
-        $volume = $volumes->createVolume($props);
-        if ($volumes->saveVolume($volume)) {
+        if ($type == LocalVolume::class)
+        {
+            $slug = StringHelper::toKebabCase($handle);
+
+            $defaults['hasUrls'] = true;
+            $defaults['path'] = '@webroot/'.$slug;
+            $defaults['url'] = '@web/'.$slug;
+        }
+
+        $config = array_merge($defaults, $config);
+        $volume = $craftVolumes->createVolume($config);
+
+        if ($craftVolumes->saveVolume($volume)) {
             return $volume;
         }
 

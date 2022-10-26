@@ -1,0 +1,26 @@
+services:
+  craft-web: &craft-service-postgres
+    environment:
+      DB_DRIVER: postgres
+      DB_VERSION: ${POSTGRES_VERSION:-13.3}
+      DB_PORT: ${POSTGRES_PORT:-5432}
+  craft-cli:
+    <<: *craft-service-postgres
+  craft-queue:
+    <<: *craft-service-postgres
+  codecept:
+    <<: *craft-service-postgres
+  database:
+    image: postgres:${POSTGRES_VERSION:-13.3}-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-craftcms}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SecretPassword}
+      POSTGRES_DB: ${DB_NAME:-craftcms}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - target: '${POSTGRES_PORT:-5432}'
+        published: '${PUBLIC_PORT_PREFIX}${POSTGRES_PORT:-5432}'
+volumes:
+  postgres_data:
+    driver: local

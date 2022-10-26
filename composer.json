@@ -16,13 +16,32 @@
     "docs": "https://github.com/yoannisj/craft-coconut/blob/master/README.md"
   },
   "require": {
+    "php": "^7.2.5|^8.0",
     "craftcms/cms": "^3.1.0",
-    "opencoconut/coconut": "2.*"
+    "opencoconut/coconut": "3.*"
+  },
+  "require-dev": {
+    "codeception/codeception": "^4.1",
+    "codeception/module-phpbrowser": "^1.0.0",
+    "codeception/module-asserts": "^1.3",
+    "codeception/module-yii2": "^1.1",
+    "codeception/specify": "^1.4",
+    "codeception/assert-throws": "^1.1"
   },
   "autoload": {
     "psr-4": {
-      "yoannisj\\coconut\\": "src/"
+      "yoannisj\\coconut\\": "./src/",
+      "yoannisj\\coconuttests\\fixtures\\": "./tests/fixtures/"
     }
+  },
+  "archive": {
+    "exclude": [
+      "tests",
+      "docker",
+      "docker-compose.yml",
+      ".env.example",
+      ".editorconfig"
+    ]
   },
   "extra": {
     "handle": "coconut",

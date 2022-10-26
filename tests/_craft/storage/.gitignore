@@ -1,0 +1,3 @@
+# Adds this directory without its contents to the git repo
+*
+!.gitignore

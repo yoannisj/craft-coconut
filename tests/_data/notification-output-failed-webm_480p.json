@@ -1,0 +1,12 @@
+{
+  "job_id": "gFvuAVKheVSqdp",
+  "event": "output.failed",
+  "metadata": false,
+  "data": {
+    "type": "video",
+    "status": "video.failed",
+    "progress": "66%",
+    "key": "webm:480p",
+    "error": "The media file couldn't be encoded because of a FFmpeg error."
+  }
+}

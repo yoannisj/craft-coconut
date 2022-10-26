@@ -18,10 +18,10 @@ use craft\elements\db\ElementQueryInterface;
 use craft\helpers\Json;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\helpers\ConfigHelper;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
- * 
+ *
  */
 
 class TranscodeVideo extends ElementAction
@@ -42,7 +42,7 @@ class TranscodeVideo extends ElementAction
     public function getTriggerHtml()
     {
         $type = Json::encode(static::class);
-        $fileExtensions = implode('|', ConfigHelper::SOURCE_FILE_EXTENSIONS);
+        $fileExtensions = implode('|', JobHelper::INPUT_CONTAINERS);
 
         $js = <<<EOD
 (function()
@@ -52,7 +52,7 @@ class TranscodeVideo extends ElementAction
         batch: true,
         validateSelection: function(\$selectedItems)
         {
-            var videoRe = /\.({$fileExtensions})$/;
+            var videoRe = /\.({$fileExtensions})$/i;
             for (var i = 0; i < \$selectedItems.length; i++)
             {
                 var url = \$selectedItems.eq(i).find('.element').data('url');
@@ -80,19 +80,30 @@ EOD;
             ->kind('video')
             ->all();
 
-        $anySuccess = false;
+        if (empty($videos))
+        {
+            // Craft::$app->getSession()->setNotice(
+            //     Craft::t('coconut', "No videos to transcode"));
+
+            return true;
+        }
+
+        $videosCount = count($videos);
+        $outputsCount = 0;
 
         foreach ($videos as $video)
         {
-            try {
-                Coconut::$plugin->transcodeSource($video, null, true);
-                $anySuccess = true;
-            } catch (\Throwable $e) {
-                $anySuccess = false;
-            }
+            $videoOutputs = Coconut::$plugin->transcodeVideo($video, null);
+            $outputsCount += count($videoOutputs);
         }
 
-        return $anySuccess;
+        // Craft::$app->getSession()->setNotice(Craft::t('coconut',
+        //     'Transcoded {outputsCount} outputs for {videosCount} video assets', [
+        //         'outputsCount' => $outputsCount,
+        //         'videosCount' => $videosCount,
+        //     ]));
+
+        return true;
     }
 
 }
