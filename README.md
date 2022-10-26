@@ -24,13 +24,12 @@ The syntax for the `outputs` parameter is explained in the config file (see comm
 
 - [ ] Better job error handling
 - [ ] Preserve `coconutJobId` value in database (check if it is of any use after the job has completed)?
+- [ ] Add file path to outputs db so legacy files can be deleted even if volume's baseUrl changes (e.g. a CDN/proxy was added)
 - [ ] Write tests for the upload controller action
 - [ ] Write tests for the webhook controller action
 - [ ] Better management of output files
-    - 1. Save output files into same volume as source (make sure they are not indexed as assets, e.g. when running the "update Asset index" utility)
-    - 2. Delete file in output record's `afterDelete()` method
-    - 3. Check if output record was deleted in upload action, and don't create corresponding file
-    - 4. Check if output record was deleted in webhook action, and remove corresponding file from volume (careful if newer job uses the output url)
+    - 1. Check if output record was deleted in upload action, and don't create corresponding file
+    - 2. Check if output record was deleted in webhook action, and remove corresponding file from volume (careful if newer job uses the output url)
 - [ ] Check asset file modified date in `TranscodeVideo` action
 - [ ] Implement "Transcode Video Assets" utility
 - [ ] Implement "Clear Video Outputs" utility

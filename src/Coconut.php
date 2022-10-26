@@ -17,7 +17,6 @@ use yii\base\Exception;
 use yii\base\InvalidArgumentException;
 use yii\base\InvalidConfigException;
 
-
 use Craft;
 use craft\base\VolumeInterface;
 use craft\base\Plugin;
@@ -126,7 +125,7 @@ class Coconut extends Plugin
      * @inheritdoc
      */
 
-    public $schemaVersion = '1.1.0';
+    public $schemaVersion = '2.0.0';
 
     /**
      * @var array List of resolved volume storages
