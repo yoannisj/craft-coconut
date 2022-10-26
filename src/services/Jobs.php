@@ -409,7 +409,7 @@ class Jobs extends Component
 
         // set output progress based on it's status
         if (($outputStatus = $outputData['status'] ?? null)
-            && in_array($outputStatus, Output::FINAL_STATUSES))
+            && in_array($outputStatus, Output::COMPLETED_STATUSES))
         {
             $outputData['progress'] = '100%'; // we're done working with this output
         }

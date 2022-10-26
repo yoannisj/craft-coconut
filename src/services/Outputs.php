@@ -175,7 +175,7 @@ class Outputs extends Component
         }
 
         // trigger output completion event for convenience
-        if ($output->getIsFinished()
+        if ($output->getIsCompleted()
             && $this->hasEventHandlers(self::EVENT_COMPLETE_OUTPUT))
         {
             $this->trigger(self::EVENT_COMPLETE_OUTPUT, new OutputEvent([
@@ -273,7 +273,7 @@ class Outputs extends Component
         foreach ($outputs as $output)
         {
             // only delete finished outputs
-            if (!$output->getIsFinished()) continue;
+            if (!$output->getIsCompleted()) continue;
 
             // @todo: check if job output has id before deleting it?
             // -> might change whether this is considered successfull or not

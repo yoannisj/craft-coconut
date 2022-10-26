@@ -43,12 +43,14 @@ use yoannisj\coconut\helpers\JobHelper;
  * @property string $explicitPath
  * @property string $type
  * @property bool $isDefaultPath Whether this output uses the default path or note
- * @property bool $isFinished Wether transcoding the output has come to an end
- * @property bool $isFruitfull Wether transcoding resulted in an output file
- * @property bool $isSuccessfull Wether transcoding did not result in an output file
- * @property bool $isFailed Wether transcoding failed
+ * @property bool $isPending Wether transcoding is waiting on Coconut resources
+ * @property bool $isProcessing Wether Coconut is currently transcoding
  * @property bool $isSkipped Wether the output was skipped (due to if condition)
  * @property bool $isAborted Wether transcoding was aborted
+ * @property bool $isDiscontinued Wether Coconut skipped or aborted transcoding the output
+ * @property bool $isCompleted Wether transcoding the output has come to an end
+ * @property bool $isSuccessfull Wether transcoding did not result in an output file
+ * @property bool $isFailed Wether transcoding failed
  */
 
 class Output extends Model
@@ -90,20 +92,31 @@ class Output extends Model
     const STATUS_HTTPSTREAM_SKIPPED = 'httpstream.skipped';
     const STATUS_HTTPSTREAM_ABORTED = 'httpstream.aborted';
 
-    const FINAL_STATUSES = [
+    const PENDING_STATUSES = [
+        'video.waiting', 'video.queued',
+        'image.waiting', 'image.queued',
+        'httpstream.waiting', 'httpstream.queued',
+        'httpstream.variants.waiting', 'httpstream.variants.queued',
+    ];
+
+    const PROCESSING_STATUSES = [
+        'video.encoding',
+        'image.processing',
+        'httpstream.variants.encoding',
+    ];
+
+    const SKIPPED_STATUSES = [
+        'video.skipped', 'image.skipped', 'httpstream.skipped',
+    ];
+
+    const ABORTED_STATUSES = [
+        'video.aborted', 'image.aborted', 'httpstream.aborted',
+    ];
+
+    const COMPLETED_STATUSES = [
         'video.encoded', 'video.failed', 'video.skipped', 'video.aborted',
         'image.created', 'image.failed', 'image.skipped', 'image.aborted',
         'httpstream.packaged', 'httpstream.failed', 'httpstream.skipped', 'httpstream.aborted',
-    ];
-
-    const FRUITFULL_STATUSES = [
-        'video.encoded', 'image.created', 'httpstream.packaged',
-    ];
-
-    const FRUITLESS_STATUSES = [
-        'video.failed', 'video.skipped', 'video.aborted',
-        'image.failed', 'image.skipped', 'image.aborted',
-        'httpstream.failed', 'httpstream.skipped', 'httpstream.aborted',
     ];
 
     const SUCCESSFUL_STATUSES = [
@@ -114,13 +127,6 @@ class Output extends Model
         'video.failed', 'image.failed', 'httpstream.failed',
     ];
 
-    const SKIPPED_STATUSES = [
-        'video.skipped', 'image.skipped', 'httpstream.skipped',
-    ];
-
-    const ABORTED_STATUSES = [
-        'video.aborted', 'image.aborted', 'httpstream.aborted',
-    ];
 
     // =Properties
     // =========================================================================
@@ -468,8 +474,10 @@ class Output extends Model
     {
         if (!isset($this->_progress))
         {
-            if ($this->getIsFinished()) {
+            if ($this->getIsCompleted()) {
                 $this->_progress = '100%';
+            } else if ($this->getIsPending()) {
+                $this->_progress = '0%';
             }
         }
 
@@ -932,77 +940,21 @@ class Output extends Model
     }
 
     /**
-     * Getter method for computed `isFinished` property
+     * Getter method for computed `isSkipped` property
      *
      * @return bool
      */
 
-    public function getIsFinished(): bool
+    public function getIsPending(): bool
     {
-        return in_array($this->status, static::FINAL_STATUSES);
-    }
-
-    /**
-     * Getter method for computed `isFruitfull` property
-     *
-     * Note: will return `false` if output transcoding is still in progress,
-     *  but the output could later end up being fruitfull.
-     *
-     * @return bool
-     */
-
-    public function getIsFruitfull(): bool
-    {
-        return in_array($this->status, static::FRUITFULL_STATUSES);
-    }
-
-    /**
-     * Getter method for computed `isFruitless` property
-     *
-     * Note: will return false if output transcoding is still in progress,
-     *  but the output could later end up being fruitless.
-     *
-     * @return bool
-     */
-
-    public function getIsFruitless(): bool
-    {
-        return in_array($this->status, static::FRUITLESS_STATUSES);
-    }
-
-    /**
-     * Getter method for computed `isSuccessfull` property
-     *
-     * Note: will return false if output transcoding is still in progress,
-     *  but the output could later end up being fruitless.
-     *
-     * @return bool
-     */
-
-    public function getIsSuccessfull(): bool
-    {
-        return in_array($this->status, static::SUCESSFULL_STATUSES);
-    }
-
-    /**
-     * Getter method for computed `isFailed` property
-     *
-     * Note: will return false if output transcoding is still in progress,
-     *  but the output could later end up being fruitless.
-     *
-     * @return bool
-     */
-
-    public function getIsFailed(): bool
-    {
-        return in_array($this->status, static::FAILED_STATUSES);
+        return in_array($this->status, static::PENDING_STATUSES);
     }
 
     /**
      * Getter method for computed `isSkipped` property
      *
-     * Note: will return false if output transcoding is still in progress,
-     *  but the output could later end up being fruitless.
+     * Note: will return `false` if output transcoding is still pending,
+     *  but the output could later end up being skipped.
      *
      * @return bool
      */
@@ -1015,8 +967,8 @@ class Output extends Model
     /**
      * Getter method for computed `isAborted` property
      *
-     * Note: will return false if output transcoding is still in progress,
-     *  but the output could later end up being fruitless.
+     * Note: will return `false` if output transcoding is still in progress,
+     *  but the output could later end up being aborted.
      *
      * @return bool
      */
@@ -1024,6 +976,67 @@ class Output extends Model
     public function getIsAborted(): bool
     {
         return in_array($this->status, static::ABORTED_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isDiscontinued` property
+     *
+     * @return bool
+     */
+
+    public function getIsDiscontinued(): bool
+    {
+        return $this->getIsSkipped() || $this->getIsAborted();
+    }
+
+    /**
+     * Getter method for computed `isProcessing` property
+     *
+     * @return bool
+     */
+
+    public function getIsProcessing(): bool
+    {
+        return in_array($this->status, static::PROCESSING_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isCompleted` property
+     *
+     * @return bool
+     */
+
+    public function getIsCompleted(): bool
+    {
+        return in_array($this->status, static::COMPLETED_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isSuccessfull` property
+     *
+     * Note: will return false if output transcoding is still in progress,
+     *  but the output could later end up being successful.
+     *
+     * @return bool
+     */
+
+    public function getIsSuccessfull(): bool
+    {
+        return in_array($this->status, static::SUCCESSFUL_STATUSES);
+    }
+
+    /**
+     * Getter method for computed `isFailed` property
+     *
+     * Note: will return false if output transcoding is still in progress,
+     *  but the output could later end up being failed.
+     *
+     * @return bool
+     */
+
+    public function getIsFailed(): bool
+    {
+        return in_array($this->status, static::FAILED_STATUSES);
     }
 
     /**
@@ -1201,6 +1214,15 @@ class Output extends Model
         $fields = parent::fields();
 
         ArrayHelper::removeValue($fields, 'metadata');
+
+        $fields[] = 'isPending';
+        $fields[] = 'isSkipped';
+        $fields[] = 'isAborted';
+        $fields[] = 'isDiscontinued';
+        $fields[] = 'isProcessing';
+        $fields[] = 'isCompleted';
+        $fields[] = 'isSuccessfull';
+        $fields[] = 'isFailed';
 
         return $fields;
     }
