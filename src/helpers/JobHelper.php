@@ -913,6 +913,26 @@ class JobHelper
     }
 
     /**
+     * Creates a Craft Action URL that can be visited by external services
+     *
+     * @param string $action Action ID segments
+     * @param array $params Action parameters to include in the URL
+     * @param string|null $scheme Whether to include the URL scheme (i.e. 'http' or 'https')
+     *
+     * @return string
+     */
+    public static function publicActionUrl(
+        string $action,
+        array $params = null,
+        string $scheme = null
+    ): string
+    {
+        // always include script name to avoid 404s trying to render a template
+        return static::publicUrl(
+            UrlHelper::actionUrl($action, $params, $scheme, true));
+    }
+
+    /**
      * Turns given URL public by replacing it's base wtih the
      * 'publicBaseUrl' setting
      *
@@ -929,23 +949,30 @@ class JobHelper
                 return rtrim($publicBaseUrl, '/').'/'.ltrim($url, '/');
             }
 
-            // is this a Craft URL ?
+            // is this a Craft URL?
+            $baseSiteUrl = UrlHelper::baseSiteUrl();
+            $baseCpUrl = UrlHelper::baseCpUrl();
+
             // (compare hosts to work around scheme inconsistencies)
-            $baseUrl = UrlHelper::baseUrl();
-            $protoRelativeBase = rtrim(preg_replace('/(http|https):\/\//', '://', $baseUrl), '/');
+            $protoCpBase = rtrim(preg_replace('/(http|https):\/\//', '://', $baseCpUrl), '/');
+            $protoSiteBase = rtrim(preg_replace('/(http|https):\/\//', '://', $baseSiteUrl), '/');
 
-            if (strpos($url, $protoRelativeBase) !== false)
-            {
-                // replace base URL (with whatever scheme it uses) by public base URL
-                $baseUrlPattern = str_replace('/', '\/', preg_quote($protoRelativeBase));
-                $baseUrlPattern = '/(http|https)?'.$baseUrlPattern.'/';
+            // (get a replacement pattern based on craft url type)
+            $replacePattern = null;
+            if (strpos($url, $protoCpBase) !== false) {
+                $replacePattern = str_replace('/', '\/', preg_quote($protoCpBase));
+            } else if (strpos($url, $protoSiteBase) !== false) {
+                $replacePattern = str_replace('/', '\/', preg_quote($protoSiteBase));
+            }
 
-                // use public version of base URL
-                $url = preg_replace($baseUrlPattern, rtrim($publicBaseUrl, '/'), $url);
+            if ($replacePattern) { // replace with public version of base URL
+                $replacePattern = '/(http|https)?'.$replacePattern.'/';
+                $url = preg_replace($replacePattern, rtrim($publicBaseUrl, '/'), $url);
             }
         }
 
         else if (UrlHelper::isRootRelativeUrl($url)) {
+            // prepend base URL so it can be visited from external services
             $url = rtrim(UrlHelper::baseUrl(), '/').'/'.ltrim($url, '/');
         }
 

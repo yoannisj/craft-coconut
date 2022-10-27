@@ -18,7 +18,7 @@ return [
         ],
 
         'httpUploadStorage' => [
-            'url' => UrlHelper::actionUrl('coconut/jobs/upload'),
+            'url' => UrlHelper::actionUrl('coconut/jobs/upload', null, null, true),
         ],
 
     ],

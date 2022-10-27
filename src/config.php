@@ -67,6 +67,43 @@ return [
     'transcodeJobTtr' => 900,
 
     /**
+     * Named storage settings to use in Coconut transcoding jobs.
+     *
+     * Each key defines a named storage, and its value should be an array of
+     * storage settings as defined here: https://docs.coconut.co/jobs/storage
+     *
+     * @note For HTTP uploads, Coconut will give the outputs a URL based on the
+     * upload URL by appending the output file path. This means that the same
+     * URL needs to function for both uploading the asset file (POST) and serving
+     * the outptut file (GET).
+     * To achieve this , the Coconut plugin for Craft registers a custom route
+     * `/coconut/uploads/<volume-handle>/<output-path>` which maps to:
+     * - the 'coconut/jobs/upload' action for POST requests (saves file in volume)
+     * - the 'coconut/jobs/output' action for GET requests (serves file from volume)
+     *
+     * @var array
+     *
+     * @example [
+     *      'myS3Bucket' => [
+     *          'service' => 's3',
+     *          'region' => 'us-east-1',
+     *          'bucket' => 'mybucket',
+     *          'path' = '/coconut/outputs',
+     *          'credentials' => [
+     *              'access_key_id' => '...',
+     *              'secret_access_key' = '...',
+     *          ]
+     *      ],
+     *      'httpUpload' => [
+     *          'url' => 'https://remote.server.com/coconut/upload',
+     *      ],
+     * ]
+     *
+     * @default []
+     */
+    'storages' => [],
+
+    /**
      * The storage name or settings used to store Coconut output files when none
      * is given in transcoding job parameters.
      *

@@ -140,7 +140,7 @@ class StoragesTest extends UnitTest
     public function getVolumeStorageReturnsStorageModelWithUploadActionUrl()
     {
         $volume = Craft::$app->getVolumes()->getVolumeByHandle('localUploads');
-        $httpUploadUrl = UrlHelper::actionUrl('coconut/jobs/upload', [
+        $httpUploadUrl = JobHelper::publicActionUrl('coconut/jobs/upload', [
             'volume' => $volume->handle,
         ]);
 
