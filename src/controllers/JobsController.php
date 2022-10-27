@@ -199,7 +199,7 @@ class JobsController extends Controller
     }
 
     /**
-     *
+     * Serves given output file if it exists
      */
 
     public function actionOutput( string $volumeHandle, string $outputPath )

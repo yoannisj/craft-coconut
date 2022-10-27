@@ -22,6 +22,10 @@ The syntax for the `outputs` parameter is explained in the config file (see comm
 
 ### Todo
 
+- [ ] Fix "Transcode Video Assets" element action
+- [ ] Fix "Clear Coconut Outputs" element action
+
+- [ ] Add support for job settings (e.g. ultra-fast mode)
 - [ ] Better job error handling
 - [ ] Preserve `coconutJobId` value in database (check if it is of any use after the job has completed)?
 - [ ] Add file path to outputs db so legacy files can be deleted even if volume's baseUrl changes (e.g. a CDN/proxy was added)
@@ -31,5 +35,7 @@ The syntax for the `outputs` parameter is explained in the config file (see comm
     - 1. Check if output record was deleted in upload action, and don't create corresponding file
     - 2. Check if output record was deleted in webhook action, and remove corresponding file from volume (careful if newer job uses the output url)
 - [ ] Check asset file modified date in `TranscodeVideo` action
+- [ ] Implement "Transcode Video Assets" CLI command
 - [ ] Implement "Transcode Video Assets" utility
-- [ ] Implement "Clear Video Outputs" utility
+- [ ] Implement "Clear Coconut Outputs" CLI command
+- [ ] Implement "Clear Coconut Outputs" utility

@@ -28,6 +28,7 @@ use craft\helpers\Component as ComponentHelper;
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Storage;
+use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Model representing and validation Coconut plugin settings
@@ -93,26 +94,19 @@ class Settings extends Model
     private $_publicBaseUrl;
 
     /**
-     * Depending on your Coconut plan and the parameters you are using to transcode
-     * your video, jobs can take a long time. To avoid jobs to fail with a timeout
-     * error, this plugin sets a high `Time to Reserve` on the jobs it pushes to
-     * Craft's queue.
-     *
-     * More info:
-     *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
-     *
-     * @var integer
-     *
-     * @default 900
-     */
-
-    public $transcodeJobTtr = 900;
-
-    /**
      * Named storage settings to use in Coconut transcoding jobs.
      *
      * Each key defines a named storage, and its value should be an array of
      * storage settings as defined here: https://docs.coconut.co/jobs/storage
+     *
+     * @note For HTTP uploads, Coconut will give the outputs a URL based on the
+     * upload URL by appending the output file path. This means that the same
+     * URL needs to function for both uploading the asset file (POST) and serving
+     * the outptut file (GET).
+     * To achieve this , the Coconut plugin for Craft registers a custom route
+     * `/coconut/uploads/<volume-handle>/<output-path>` which maps to:
+     * - the 'coconut/jobs/upload' action for POST requests (saves file in volume)
+     * - the 'coconut/jobs/output' action for GET requests (serves file from volume)
      *
      * @var array
      *
@@ -308,7 +302,23 @@ class Settings extends Model
     public $watchVolumes = [];
 
     // @todo: add `fieldJobs` and `watchFields` settings to automatically
-    // transcode video assets in asset fields when saving a Craft element.
+    // transcode video Assets in specific fields when saving a Craft element.
+
+    /**
+     * Depending on your Coconut plan and the parameters you are using to transcode
+     * your video, jobs can take a long time. To avoid jobs to fail with a timeout
+     * error, this plugin sets a high `Time to Reserve` on the jobs it pushes to
+     * Craft's queue.
+     *
+     * More info:
+     *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
+     *
+     * @var integer
+     *
+     * @default 900
+     */
+
+    public $transcodeJobTtr = 900;
 
     // =Public Methods
     // =========================================================================
@@ -571,17 +581,18 @@ class Settings extends Model
             return $this->_defaultJobNotification;
         }
 
-        $notificationUrl = UrlHelper::actionUrl('coconut/jobs/notify', null, null, false);
+        $notificationUrl = JobHelper::publicActionUrl(
+            'coconut/jobs/notify', null, null, true);
 
-        $baseCpUrl = UrlHelper::baseCpUrl();
-        $baseSiteUrl = UrlHelper::baseSiteUrl();
-        $publicBaseUrl = rtrim($this->getPublicBaseUrl(), '/').'/';
+        // $baseCpUrl = UrlHelper::baseCpUrl();
+        // $baseSiteUrl = UrlHelper::baseSiteUrl();
+        // $publicBaseUrl = rtrim($this->getPublicBaseUrl(), '/').'/';
 
-        $notificationUrl = str_replace(
-            [ $baseCpUrl, $baseSiteUrl, ],
-            $publicBaseUrl,
-            $notificationUrl
-        );
+        // $notificationUrl = str_replace(
+        //     [ $baseCpUrl, $baseSiteUrl, ],
+        //     $publicBaseUrl,
+        //     $notificationUrl
+        // );
 
         return new Notification([
             'type' => 'http',

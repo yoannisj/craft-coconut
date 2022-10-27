@@ -104,12 +104,12 @@ class Storages extends Component
             // no need to resolve volume storage if module/plugin already did
             if (!$storage)
             {
+                // @todo: resolve storage settings for commonly used Volume types,
+                // corresponding to service supported by Coconut (e.g. AWS S3)
 
-                // the Upload URL needs to end with '/' because coconut will append
-                // the output file path
+                // @see Note about HTTP uploads in `Settings::storages` comment
                 $uploadUrl = JobHelper::publicUrl('/coconut/uploads/'.$volume->handle.'/');
 
-                // @todo: resolve storage settings for services supported by Coconut
                 $storage = new Storage([ 'url' => $uploadUrl ]);
             }
 
