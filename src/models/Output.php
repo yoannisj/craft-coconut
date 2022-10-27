@@ -854,7 +854,7 @@ class Output extends Model
         if (!isset($this->_extension))
         {
             if ($this->url) {
-                $this->_extension = pathinfo($this->url, FILEINFO_EXTENSION);
+                $this->_extension = pathinfo($this->url, PATHINFO_EXTENSION);
             }
 
             else if (($format = $this->getFormat())) {
@@ -875,7 +875,8 @@ class Output extends Model
         if (!isset($this->_mimeType)
             && !empty($extension = $this->getExtension()))
         {
-            $this->_mimeType = FileHelper::getMimeTypeByExtension($extension);
+            $file = 'foo.'.$extension; // fake file is good enough here
+            $this->_mimeType = FileHelper::getMimeTypeByExtension($file);
         }
 
         return $this->_mimeType;
