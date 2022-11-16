@@ -20,17 +20,12 @@ use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;
-use craft\base\VolumeInterface;
-use craft\db\Query;
-use craft\elements\Asset;
 use craft\validators\DateTimeValidator;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
 use craft\helpers\FileHelper;
-use craft\helpers\Assets as AssetsHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\validators\AssociativeArrayValidator;
 use yoannisj\coconut\helpers\JobHelper;

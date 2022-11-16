@@ -24,6 +24,7 @@ use craft\web\Request;
 use craft\web\Response;
 use craft\web\UploadedFile;
 use craft\errors\UploadFailedException;
+use craft\errors\FileException;
 use craft\helpers\ArrayHelper;
 use craft\helpers\FileHelper;
 
@@ -279,65 +280,6 @@ class JobsController extends Controller
         }
 
         return $tempPath;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /**
-     *
-     */
-
-    protected function getJobInfoFromPayload( Request $request )
-    {
-        $params = $request->getBodyParams();
-        return $params['data'] ?? [];
-    }
-
-    /**
-     *
-     */
-
-    protected function handleComplete( array $data )
-    {
-
-    }
-
-    /**
-     *
-     */
-
-
-    protected function handleProgress( array $data )
-    {
-
-    }
-
-    /**
-     *
-     */
-
-    protected function handleOutputs()
-    {
-
-    }
-
-    /**
-     *
-     */
-
-    protected function handleErrors()
-    {
-
     }
 
     // =Private Methods
