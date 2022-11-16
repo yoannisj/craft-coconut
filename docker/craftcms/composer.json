@@ -23,6 +23,18 @@
     "codeception/specify": "^1.4",
     "codeception/assert-throws": "^1.1"
   },
+  "autoload": {
+    "classmap": [
+      "vendor/yiisoft/yii2/Yii.php",
+      "vendor/craftcms/cms/src/Craft.php"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+        "yiisoft/yii2-composer": true,
+        "craftcms/plugin-installer": true
+    }
+  },
   "repositories": [
     {
       "type": "path",

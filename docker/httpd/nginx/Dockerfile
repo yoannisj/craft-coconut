@@ -15,11 +15,11 @@ ENV NGINX_ENVSUBST_TEMPLATE_DIR=${NGINX_ENVSUBST_TEMPLATE_DIR}
 # - replace references to environment variables using `envsubst`
 # - remove the `.template` extension
 # - put the resulting config file in `/etc/nginx/conf.d`
-COPY ./docker/httpd/nginx/includes/*.conf${NGINX_ENVSUBST_TEMPLATE_SUFFIX} ${NGINX_ENVSUBST_TEMPLATE_DIR}/includes/
-COPY ./docker/httpd/nginx/*.conf${NGINX_ENVSUBST_TEMPLATE_SUFFIX} ${NGINX_ENVSUBST_TEMPLATE_DIR}/
+COPY ./docker/httpd/nginx/conf.d/*.conf${NGINX_ENVSUBST_TEMPLATE_SUFFIX} ${NGINX_ENVSUBST_TEMPLATE_DIR}/
+# COPY ./docker/httpd/nginx/*.conf${NGINX_ENVSUBST_TEMPLATE_SUFFIX} ${NGINX_ENVSUBST_TEMPLATE_DIR}/
 
 # Copy custom NGINX config files into container
-COPY ./docker/httpd/nginx/includes/*.conf /etc/nginx/conf.d/includes/
-COPY ./docker/httpd/nginx/*.conf /etc/nginx/conf.d/
+COPY ./docker/httpd/nginx/conf.d/*.conf /etc/nginx/conf.d/
+# COPY ./docker/httpd/nginx/*.conf /etc/nginx/conf.d/
 
 COPY --chown=www-data:www-data ./docker/craftcms/web /app/web

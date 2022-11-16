@@ -12,7 +12,7 @@ services:
       WEB_PORT: ${WEB_PORT:-8080}
       WEB_HOSTNAME: ${WEB_HOSTNAME:-localhost}
     volumes:
-      - ./docker/httpd/nginx/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./docker/httpd/nginx/conf.d/default.conf.template:/etc/nginx/conf.d/default.conf.template
       - cpresources:/app/web/cpresources
     networks:
       - craftcms_tests_net
@@ -33,7 +33,7 @@ services:
         CRAFT_VERSION: ${CRAFT_VERSION:-3.7}
         PACKAGE_NAME: $PACKAGE_NAME
     env_file:
-      - coconut.env
+      - .env
     environment: &craft-service-environment
       NGINX_VERSION: ${NGINX_VERSION:-7.4}
       PHP_VERSION: ${PHP_VERSION:-7.4}
@@ -71,6 +71,8 @@ services:
       - cpresources:/app/web/cpresources
       - ./src:/app/packages/$PACKAGE_NAME/src
       - ./composer.json:/app/packages/$PACKAGE_NAME/composer.json
+      - ./docker/craftcms/composer.json:/app/composer.json
+      - ./vendor:/app/vendor
       - ./tests:/app/packages/$PACKAGE_NAME/tests
       - ./codeception.yml:/app/packages/$PACKAGE_NAME/codeception.yml
     networks:
