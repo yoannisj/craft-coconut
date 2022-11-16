@@ -115,7 +115,7 @@ class Storages extends Component
                 // @todo Resolve storage settings for commonly used Filesystems which correspond to a service supported by Coconut (e.g. AWS S3)
 
                 // See note about HTTP uploads in `Settings::storages` comment
-                $uploadUrl = JobHelper::publicUrl('/coconut/uploads/'.$volume->handle.'/');
+                $uploadUrl = JobHelper::publicUrl('/coconut/outputs/'.$volume->handle.'/');
                 $storage = new Storage([ 'url' => $uploadUrl ]);
             }
 

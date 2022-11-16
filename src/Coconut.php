@@ -546,10 +546,11 @@ class Coconut extends Plugin
      */
     protected function onRegisterUrlRules( RegisterUrlRulesEvent $event ): void
     {
-        $uploadUrlPattern = '/coconut/uploads/<volumeHandle:{handle}>/<outputPath:(?:\S+)>';
+        // @todo make the '/coconut/' trigger segment in pattern configurable
+        $coconutPattern = '/coconut/outputs/<volumeHandle:{handle}>/<outputPath:(?:\S+)>';
 
-        $event->rules["POST $uploadUrlPattern"] = '/coconut/jobs/upload';
-        $event->rules["GET $uploadUrlPattern"] = '/coconut/jobs/output';
+        $event->rules["POST $coconutPattern"] = '/coconut/jobs/upload';
+        $event->rules["GET $coconutPattern"] = '/coconut/jobs/output';
     }
 
     /**
