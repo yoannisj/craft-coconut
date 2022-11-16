@@ -15,10 +15,21 @@
     "source": "https://github.com/yoannisj/craft-coconut",
     "docs": "https://github.com/yoannisj/craft-coconut/blob/master/README.md"
   },
+  "autoload": {
+    "psr-4": {
+      "yoannisj\\coconut\\": "./src/",
+      "yoannisj\\coconuttests\\fixtures\\": "./tests/fixtures/"
+    }
+  },
+  "extra": {
+    "handle": "coconut",
+    "name": "Coconut",
+    "class": "yoannisj\\coconut\\Coconut"
+  },
   "require": {
     "php": "^7.2.5|^8.0",
-    "craftcms/cms": "^3.1.0",
-    "opencoconut/coconut": "3.*"
+    "craftcms/cms": "^4.0.0",
+    "opencoconut/coconut": "^3.0"
   },
   "require-dev": {
     "codeception/codeception": "^4.1",
@@ -28,10 +39,10 @@
     "codeception/specify": "^1.4",
     "codeception/assert-throws": "^1.1"
   },
-  "autoload": {
-    "psr-4": {
-      "yoannisj\\coconut\\": "./src/",
-      "yoannisj\\coconuttests\\fixtures\\": "./tests/fixtures/"
+  "config": {
+    "allow-plugins": {
+      "yiisoft/yii2-composer": true,
+      "craftcms/plugin-installer": true
     }
   },
   "archive": {
@@ -42,10 +53,5 @@
       ".env.example",
       ".editorconfig"
     ]
-  },
-  "extra": {
-    "handle": "coconut",
-    "name": "Coconut",
-    "class": "yoannisj\\coconut\\Coconut"
   }
 }

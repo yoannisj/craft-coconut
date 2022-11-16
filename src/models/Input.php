@@ -12,6 +12,8 @@
 
 namespace yoannisj\coconut\models;
 
+use DateTime;
+
 use yii\base\InvalidArgumentException;
 use yii\base\InvalidConfigException;
 use yii\validators\InlineValidator;
@@ -33,84 +35,114 @@ use yoannisj\coconut\helpers\JobHelper;
  *
  * @todo: support service inputs (e.g. files directly uploaded from an S3 bucket, etc.)
  */
-
 class Input extends Model
 {
     // =Static
     // =========================================================================
 
+    /**
+     * @var string
+     */
     const SCENARIO_DEFAULT = 'default';
+
+    /**
+     * @var string
+     */
     const SCENARIO_CONFIG = 'config';
 
+    /**
+     * @var string
+     */
     const STATUS_STARTING = 'input.starting';
+
+    /**
+     * @var string
+     */
     const STATUS_TRANSFERRING = 'input.transferring';
+
+    /**
+     * @var string
+     */
     const STATUS_TRANSFERRED = 'input.transferred';
+
+    /**
+     * @var string
+     */
     const STATUS_FAILED = 'input.failed';
 
     // =Properties
     // =========================================================================
 
     /**
-     * @var integer|null Input ID in Craft database
+     * Input ID in Craft database
+     *
+     * @var int|null
      */
-
-    public $id;
+    public ?int $id = null;
 
     /**
-     * @var integer|null ID of input's Craft Asset element
+     * ID of input's Craft Asset element
+     * @var int|null
      */
-
-    public $assetId;
+    public ?int $assetId = null;
 
     /**
-     * @var \craft\elements\Asset The input Craft Asset element model
+     * The input Craft Asset element model
+     *
+     * @var Asset
      */
-
-    private $_asset;
+    private ?Asset $_asset = null;
 
     /**
-     * @var string URL to input file
+     * URL to input file
+     *
+     * @var string|null
      */
-
-    private $_url;
+    private ?string $_url = null;
 
     /**
-     * @var string|null Hash of input file URL (used for database indexes)
+     * Hash of input file URL (used for database indexes)
+     *
+     * @var string|null
      */
-
-    private $_urlHash;
+    private ?string $_urlHash = null;
 
     /**
-     * @var string Latest input status from Coconut job
+     * Latest input status from Coconut job
      * @see https://docs.coconut.co/jobs/api#job-status
+     *
+     * @var string|null
      */
-
-    public $status;
+    public ?string $status = null;
 
     /**
-     * @var string Progress (in percentage) of the input handling by Coconut
+     * Progress (in percentage) of the input handling by Coconut
+     *
+     * @var string
      */
-
-    public $progress = '0%';
+    public string $progress = '0%';
 
     /**
-     * @var array Metadata retrieved from Coconut API
+     * Metadata retrieved from Coconut API
+     *
+     * @var array|null
      */
-
-    private $_metadata;
+    private ?array $_metadata = null;
 
     /**
+     * Date at which the input expires (e.g. HTTP cache-expiry for external inputs)
+     *
      * @var Datetime|null
      */
-
-    public $expires;
+    public ?DateTime $expires = null;
 
     /**
-     * @var string Error message associated with this input
-     * @note This is only relevant if input has failed `status`
+     * Error message associated with this input.
+     * This is only relevant if input has failed `status`
+     *
+     * @var string|null
      */
-
-    public $error;
+    public ?string $error = null;
 
     // =Public Methods
     // =========================================================================
@@ -119,9 +151,10 @@ class Input extends Model
     // -------------------------------------------------------------------------
 
     /**
-     * Getter method for readonly `name` property
+     * Getter method for readonly `name` property.
+     *
+     * @return string
      */
-
     public function getName(): string
     {
         if (($asset = $this->getAsset())) {
@@ -133,26 +166,27 @@ class Input extends Model
         return 'Undefined';
     }
 
-
     /**
-     * Setter method for the resolved `asset` property
+     * Setter method for the resolved `asset` property.
      *
      * @param Asset|null $asset
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setAsset( Asset $asset = null )
+    public function setAsset( Asset|null $asset ): static
     {
         $this->assetId = $asset ? $asset->id : null;
         $this->_asset = $asset;
+
+        return $this;
     }
 
     /**
-     * Getter method for the resolved `asset` property
+     * Getter method for the resolved `asset` property.
      *
-     * @return \craft\elements\Asset|null
+     * @return Asset|null
      */
-
-    public function getAsset()
+    public function getAsset(): ?Asset
     {
         if ($this->assetId && !$this->_asset)
         {
@@ -170,18 +204,21 @@ class Input extends Model
     }
 
     /**
-     * Setter for normalizd `url` property
+     * Setter for normalizd `url` property.
      *
      * @param string|null $url
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setUrl( string $url = null )
+    public function setUrl( string|null $url ): static
     {
         if ($url !== $this->getUrl())
         {
             $this->_url = $url;
             $this->_urlHash = null;
         }
+
+        return $this;
     }
 
     /**
@@ -189,7 +226,6 @@ class Input extends Model
      *
      * @return string
      */
-
     public function getUrl(): string
     {
         if (!isset($this->_url) && isset($this->assetId))
@@ -206,7 +242,6 @@ class Input extends Model
      *
      * @return string
      */
-
     public function getUrlHash(): string
     {
         if (!isset($this->_urlHash))
@@ -222,9 +257,10 @@ class Input extends Model
      * Setter method for the normalized `metadata` property
      *
      * @param string|array|null $metadata
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setMetadata( $metadata )
+    public function setMetadata( string|array|null $metadata ): static
     {
         if (is_string($metadata)) {
             $metadata = JsonHelper::decodeIfJson($metadata) ?? [];
@@ -237,6 +273,8 @@ class Input extends Model
         }
 
         $this->_metadata = $metadata;
+
+        return $this;
     }
 
     /**
@@ -244,8 +282,7 @@ class Input extends Model
      *
      * @return array|null
      */
-
-    public function getMetadata()
+    public function getMetadata(): ?array
     {
         return $this->_metadata;
     }
@@ -256,7 +293,6 @@ class Input extends Model
     /**
      * @inheritdoc
      */
-
     public function attributes()
     {
         $attributes = parent::attributes();
@@ -273,10 +309,9 @@ class Input extends Model
     /**
      * @inheritdoc
      */
-
-    public function rules()
+    public function defineRules(): array
     {
-        $rules = parent::rules();
+        $rules = parent::defineRules();
 
         $rules['attrDateTime'] = [ [
             'expires',
@@ -291,8 +326,7 @@ class Input extends Model
     /**
      * @inheritdoc
      */
-
-    public function fields()
+    public function fields(): array
     {
         $fields = parent::fields();
 
@@ -308,8 +342,7 @@ class Input extends Model
     /**
      * @inheritdoc
      */
-
-    public function extraFields()
+    public function extraFields(): array
     {
         $fields = parent::extraFields();
 
@@ -325,7 +358,6 @@ class Input extends Model
      *
      * @return array
      */
-
     public function toParams(): array
     {
         return [

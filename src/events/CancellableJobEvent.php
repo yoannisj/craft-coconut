@@ -15,14 +15,12 @@ namespace yoannisj\coconut\events;
 use yoannisj\coconut\events\JobEvent;
 
 /**
- * 
+ * Model for cancellable transcoding Job events
  */
-
 class CancellableJobEvent extends JobEvent
 {
     /**
-     * @var bool
+     * @var bool Whether the event is valid or should be cancelled.
      */
-
     public $isValid = true;
 }

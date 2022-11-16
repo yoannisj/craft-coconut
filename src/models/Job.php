@@ -12,6 +12,8 @@
 
 namespace yoannisj\coconut\models;
 
+use DateTime;
+
 use yii\base\Exception;
 use yii\base\InvalidConfigException;
 use yii\base\InvalidArgumentException;
@@ -37,18 +39,31 @@ use yoannisj\coconut\validators\AssociativeArrayValidator;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
- *
+ * Model containing and validation Coconut transcoding Jobs
  */
-
 class Job extends Model
 {
     // =Static
     // =========================================================================
 
+    /**
+     * @var string
+     */
     const STATUS_STARTING = 'job.starting';
+
+    /**
+     * @var string
+     */
     const STATUS_COMPLETED = 'job.completed';
+
+    /**
+     * @var string
+     */
     const STATUS_FAILED = 'job.failed';
 
+    /**
+     * @var string[]
+     */
     const COMPLETED_STATUSES = [
         'job.completed', 'job.failed',
     ];
@@ -57,137 +72,146 @@ class Job extends Model
     // =========================================================================
 
     /**
-     * @var int|null Job's ID in Craft's database
+     * Job's ID in Craft's database
+     *
+     * @var int|null
      */
-
-    public $id;
+    public ?int $id = null;
 
     /**
-     * @var string|null Job's ID for reference in Coconut service and API
+     * Job's ID for reference in Coconut service and API
+     *
+     * @var string|null
      */
 
-    public $coconutId;
+    public ?string $coconutId = null;
 
     /**
-     * @var Input|null Model representing the job's input video to transcode
+     * Model representing the job's input video to transcode
+     *
+     * @var Input|null
      */
 
-    private $_input;
+    private ?Input $_input = null;
 
     /**
-     * @var string The format used to generate missing output paths.
-     *  Defaults to the plugin's `defaultOutputPath` setting.
+     * The format used to generate missing output paths.
+     * Defaults to the plugin's `defaultOutputPath` setting.
+     *
+     * @var string|null
      */
-
-    private $_outputPathFormat = null;
+    private ?string $_outputPathFormat = null;
 
     /**
-     * @var array List of models representing the Output files to transcode
+     * List of models representing the Output files to transcode
+     *
+     * @var array|null
      */
-
-    private $_outputs;
+    private ?array $_outputs = null;
 
     /**
-     * @var array List of output models saved for this job in the database
+     * List of output models saved for this job in the database
+     *
+     * @var array|null
      */
-
-    private $_savedOutputs;
+    private ?array $_savedOutputs = null;
 
     /**
-     * @var array IDs for saved outputs that are not relevant anymore
+     * IDs for saved outputs that are not relevant anymore
+     *
+     * @var array|null
      */
-
-    private $_legacyOutputIds;
-
-    /**
-     * @var Storage The storage settings for output files
-     */
-
-    private $_storage;
+    private ?array $_legacyOutputIds = null;
 
     /**
-     * @var boolean
-     */
-
-    protected $isNormalizedStorage;
-
-    /**
+     * The storage settings for output files
+     *
      * @var Storage|null
      */
-
-    private $_fallbackStorage;
-
-    /**
-     * @var boolean
-     */
-
-    protected $isFallbackStorage;
-
-    /**
-     * @var Notification
-     */
-
-    private $_notification;
+    private ?Storage $_storage = null;
 
     /**
      * @var bool
      */
-
-    protected $isNormalizedNotification;
-
-    /**
-     * @var string|null Latest job status
-     */
-
-    public $status;
+    protected bool $isNormalizedStorage = false;
 
     /**
-     * @var string|null Current progress of job's transcoding (in percentage)
+     * @var Storage|null
      */
-
-    private $_progress = '0%';
+    private ?Storage $_fallbackStorage = null;
 
     /**
-     * @var string
+     * @var bool|null
      */
-
-    public $message;
+    protected ?bool $isFallbackStorage = null;
 
     /**
-     * @var array
+     * @var Notification
      */
-
-    private $_metadata;
+    private ?Notification $_notification = null;
 
     /**
-     * @var Datetime|null Date at which the job was created by Coconut service
+     * @var bool
      */
-
-    private $_createdAt;
+    protected bool $isNormalizedNotification = false;
 
     /**
-     * @var Datetime|null Date at which the job was completed by Coconut service
+     * Latest Job status, as communicated by the Coconut API and Notifications.
+     *
+     * @var string|null
      */
-
-    private $_completedAt;
+    public ?string $status = null;
 
     /**
-     * @var Datetime|null Date at which the job was created in Craft's database
+     * Current progress of job's transcoding (in percentage), as communicated by
+     * the Coconut API and Notifications.
+     *
+     * @var string|null
      */
-
-    public $dateCreated;
+    private ?string $_progress = '0%';
 
     /**
-     * @var Datetime|null Date at which the job was last updated in Craft's database
+     * @var string|null
      */
-
-    public $dateUpdated;
+    public ?string $message = null;
 
     /**
-     * @var string
+     * @var array|null
      */
+    private ?array $_metadata = null;
 
-    public $uid;
+    /**
+     * Date at which the job was created by Coconut service
+     *
+     * @var Datetime|null
+     */
+    private ?DateTime $_createdAt = null;
+
+    /**
+     * Date at which the job was completed by Coconut service
+     *
+     * @var Datetime|null
+     */
+    private ?DateTime $_completedAt = null;
+
+    /**
+     * Date at which the job was created in Craft's database
+     *
+     * @var DateTime|null
+     */
+    public ?DateTime $dateCreated = null;
+
+    /**
+     * Date at which the job was last updated in Craft's database
+     *
+     * @var DateTime|null
+     */
+    public ?DateTime $dateUpdated = null;
+
+    /**
+     * @var string|null
+     */
+    public ?string $uid = null;
 
     // =Public Methods
     // =========================================================================
@@ -217,15 +241,16 @@ class Job extends Model
     // -------------------------------------------------------------------------
 
     /**
-     * Setter method for normalized `input` property
+     * Setter method for normalized `input` property.
      *
      * Given `$input` parameter can be an Input model, an array of input properties,
      * an Asset element, an Asset element ID or a URL to an external input file
      *
      * @param mixed $input
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setInput( $input )
+    public function setInput( $input ): static
     {
         $this->_input = JobHelper::resolveInput($input);
 
@@ -234,36 +259,39 @@ class Job extends Model
         if ($this->isFallbackStorage) {
             $this->isNormalizedStorage = false;
         }
+
+        return $this;
     }
 
     /**
-     * Getter method for normalized `input` property
+     * Getter method for normalized `input` property.
      *
      * @return Input|null
      */
-
     public function getInput()
     {
         return $this->_input;
     }
 
     /**
-     * Setter method for defaulted `outputPathFormat` property
+     * Setter method for defaulted `outputPathFormat` property.
      *
      * @param string $pathFormat
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setOutputPathFormat( string $pathFormat = null )
+    public function setOutputPathFormat( string $pathFormat = null ): static
     {
         $this->_outputPathFormat = $pathFormat;
+
+        return $this;
     }
 
     /**
-     * Getter method for defaulted `outputPathFormat` property
+     * Getter method for defaulted `outputPathFormat` property.
      *
      * @return string
      */
-
     public function getOutputPathFormat(): string
     {
         return ($this->_outputPathFormat ?:
@@ -271,10 +299,13 @@ class Job extends Model
     }
 
     /**
+     * Setter method for normalized `outputs` property.
+     *
      * @param Output[]|string[]|array[] $outputs
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setOutputs( array $outputs )
+    public function setOutputs( array $outputs ): static
     {
         $resolvedOutputs = [];
 
@@ -333,15 +364,16 @@ class Job extends Model
         }
 
         $this->_outputs = $resolvedOutputs;
+
+        return $this;
     }
 
     /**
-     * Getter method for normalized `outputs` property
+     * Getter method for normalized `outputs` property.
      *
      * @return Output[]
      */
-
-     public function getOutputs(): array
+    public function getOutputs(): array
     {
         // default to saved outputs
         if (!isset($this->_outputs)) {
@@ -352,13 +384,10 @@ class Job extends Model
     }
 
     /**
-     * Getter method for read-only `savedOutputs` property
+     * Getter method for read-only `savedOutputs` property.
      *
      * @return Output[] List of Output models saved in the database for this job
-     *
-     * @todo Memoize queried outputs in the Outputs service
      */
-
     public function getSavedOutputs(): array
     {
         if (!isset($this->_savedOutputs) && $this->id)
@@ -371,11 +400,10 @@ class Job extends Model
     }
 
     /**
-     * Getter method for computd `legacyOutputs` property
+     * Getter method for computd `legacyOutputs` property.
      *
      * @return Output[]
      */
-
     public function getLegacyOutputs(): array
     {
         if (empty($this->_legacyOutputIds)) {
@@ -402,9 +430,10 @@ class Job extends Model
      * settings, or it will be considered a volume handle.
      *
      * @param string|array|Storage|VolumeInterface|null $storage
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setStorage( $storage )
+    public function setStorage( mixed $storage ): static
     {
         if (is_string($storage)) {
             $storage = JsonHelper::decodeIfJson($storage);
@@ -412,6 +441,8 @@ class Job extends Model
 
         $this->_storage = $storage;
         $this->isNormalizedStorage = false;
+
+        return $this;
     }
 
     /**
@@ -419,8 +450,7 @@ class Job extends Model
      *
      * @return Storage|null
      */
-
-    public function getStorage()
+    public function getStorage(): ?Storage
     {
         if (!$this->isNormalizedStorage)
         {
@@ -465,8 +495,7 @@ class Job extends Model
      *
      * @return Storage|null
      */
-
-    public function getFallbackStorage()
+    public function getFallbackStorage(): ?Storage
     {
         if (!$this->_fallbackStorage)
         {
@@ -497,12 +526,15 @@ class Job extends Model
      * Setter method for the normalized `notification` property
      *
      * @param mixed $notification
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setNotification( $notification )
+    public function setNotification( $notification ): static
     {
         $this->_notification = $notification;
         $this->isNormalizedNotification = false;
+
+        return $this;
     }
 
     /**
@@ -510,8 +542,7 @@ class Job extends Model
      *
      * @return Notification|null
      */
-
-    public function getNotification()
+    public function getNotification(): ?Notification
     {
         if (!$this->isNormalizedNotification)
         {
@@ -552,9 +583,10 @@ class Job extends Model
      * Setter method for normalized metadata property
      *
      * @param string|array|null $metadata
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setMetadata( $metadata )
+    public function setMetadata( string|array|null $metadata ): static
     {
         if (is_string($metadata)) {
             $metadata = JsonHelper::decode($metadata);
@@ -595,15 +627,16 @@ class Job extends Model
         }
 
         $this->_metadata = $metadata;
+
+        return $this;
     }
 
     /**
-     * Getter method for normalized metadata property
+     * Getter method for normalized `metadata` property
      *
      * @return array|null
      */
-
-    public function getMetadata()
+    public function getMetadata(): ?array
     {
         // job metadata comes from Coconut, so it needs to exist there
         if (!$this->coconutId) {
@@ -630,25 +663,28 @@ class Job extends Model
      * Setter method for defaulted `progress` property
      *
      * @param string|null $progress
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setProgress( string $progress = null )
+    public function setProgress( string|null $progress ): static
     {
         $this->_progress = $progress;
+        return $this;
     }
 
     /**
      * Getter method for defaulted `progress` property
      *
-     * @return string
+     * @return string|null
      */
-
-    public function getProgress()
+    public function getProgress(): ?string
     {
         if (!isset($this->_progress))
         {
             if ($this->getIsCompleted()) {
                 $this->_progress = '100%';
+            } else if (!$this->coconutId) {
+                $this->_progress = '0%';
             }
         }
 
@@ -658,16 +694,21 @@ class Job extends Model
     /**
      * Setter method for normalized `createdAt` property
      *
-     * @param string|integer|Datetime|null $createdAt
+     * @param string|int|Datetime|null $createdAt
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setCreatedAt( $createdAt )
+    public function setCreatedAt(
+        string|int|DateTime|null $createdAt
+    ): static
     {
         if ($createdAt) {
             $createdAt = DateTimeHelper::toDateTime($createdAt);
         }
 
         $this->_createdAt = $createdAt;
+
+        return $this;
     }
 
     /**
@@ -675,8 +716,7 @@ class Job extends Model
      *
      * @return DateTime|null
      */
-
-    public function getCreatedAt()
+    public function getCreatedAt(): ?DateTime
     {
         return $this->_createdAt;
     }
@@ -684,16 +724,19 @@ class Job extends Model
     /**
      * Setter method for normalized `completedAt` property
      *
-     * @param string|integer|Datetime|null $completedAt
+     * @param string|int|Datetime|null $completedAt
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setCompletedAt( $completedAt )
+    public function setCompletedAt( $completedAt ): static
     {
         if ($completedAt) {
             $completedAt = DateTimeHelper::toDateTime($completedAt);
         }
 
         $this->_completedAt = $completedAt;
+
+        return $this;
     }
 
     /**
@@ -701,10 +744,10 @@ class Job extends Model
      *
      * @return DateTime|null
      */
-
-    public function getCompletedAt()
+    public function getCompletedAt(): ?DateTime
     {
         return $this->_completedAt;
+        return $this;
     }
 
     /**
@@ -712,7 +755,6 @@ class Job extends Model
      *
      * @return bool
      */
-
     public function getIsCompleted(): bool
     {
         return in_array($this->status, static::COMPLETED_STATUSES);
@@ -724,7 +766,6 @@ class Job extends Model
     /**
      * @inheritdoc
      */
-
     public function attributes()
     {
         $attributes = parent::attributes();
@@ -741,7 +782,6 @@ class Job extends Model
     /**
      * @inheritdoc
      */
-
     public function datetimeAttributes(): array
     {
         $attributes = parent::datetimeAttributes();
@@ -758,10 +798,9 @@ class Job extends Model
     /**
      * @inheritdoc
      */
-
-    public function rules()
+    public function defineRules(): array
     {
-        $rules = parent::rules();
+        $rules = parent::defineRules();
 
         $rules['attrRequired'] = [ [
             'input',
@@ -769,9 +808,9 @@ class Job extends Model
             'storage',
         ], 'required' ];
 
-        $rules['attrInteger']  = [ [
+        $rules['attrint']  = [ [
             'id',
-        ], 'integer' ];
+        ], 'int' ];
 
         $rules['attrString'] = [ [
             'coconutId',
@@ -804,10 +843,19 @@ class Job extends Model
 
 
     /**
+     * Validation method for attributes storing related models.
      *
+     * @param string $attribute Attribute to validate
+     * @param array $params Validation params
+     * @param InlindeValidator $validator Yii validator class
+     *
+     * @return void
      */
-
-    public function validateModels( string $attribute, array $params = null, InlineValidator $validator )
+    public function validateModels(
+        string $attribute,
+        array $params = null,
+        InlineValidator $validator
+    ): void
     {
         $models = $this->$attribute;
 
@@ -828,8 +876,7 @@ class Job extends Model
     /**
      * @inheritdoc
      */
-
-    public function fields()
+    public function fields(): array
     {
         $fields = parent::fields();
 
@@ -842,8 +889,7 @@ class Job extends Model
     /**
      * @inheritdoc
      */
-
-    public function extraFields()
+    public function extraFields(): array
     {
         $fields = parent::extraFields();
 
@@ -862,7 +908,6 @@ class Job extends Model
      *
      * @return array
      */
-
     public function toParams(): array
     {
         if (!$this->input) {
@@ -901,8 +946,7 @@ class Job extends Model
      *
      * @return Output|null
      */
-
-    public function getOutputByKey( string $key )
+    public function getOutputByKey( string $key ): ?Output
     {
         $outputs = $this->getOutputs();
 
@@ -928,35 +972,41 @@ class Job extends Model
     }
 
     /**
-     * Adds given list of output models to the job
+     * Adds given list of output models to the job.
      *
-     * The `$outputs` argument can be anything supported by the
-     *  `JobHelper::resolveOutputs()` function.
-     *  or
+     * Each value in the `$outputs` argument can be anything understood by
+     * [[JobHelper::resolveOutput()]]
      *
      * @param array $outputs List of outputs to add
      *
+     * @return static Back-reference for method chaining
+     *
      * @throws InvalidArgumentException If job has already been ran by Coconut.co
      */
-
-    public function addOutputs( array $outputs )
+    public function addOutputs( array $outputs ): static
     {
         $outputs = JobHelper::resolveOutputs($outputs);
 
         foreach ($outputs as $output) {
             $this->addOutput($output);
         }
+
+        return $this;
     }
 
     /**
-     * Adds given output model to the job
+     * Adds given output model to the job.
+     *
+     * * The `$output` argument can be anything understood by
+     * [[JobHelper::resolveOutput()]]
      *
      * @param Output $output Output model (or config array) to add
      *
+     * @return static Back-reference for method chaining
+     *
      * @throws InvalidArgumentException If job has already been ran by Coconut.co
      */
-
-    public function addOutput( Output $output )
+    public function addOutput( Output $output ): static
     {
         if ($this->coconutId)
         {
@@ -1001,6 +1051,8 @@ class Job extends Model
                 $this->_outputs[$formatString] = $output;
             }
         }
+
+        return $this;
     }
 
     /**
@@ -1053,67 +1105,62 @@ class Job extends Model
      * @param string|null $formatKey The key of the output in the config's list of `outputs`
      * @param string|null $formatIndex The output params index when more than one was given for this string index
      *
-     * @return Output
-     */
-
-    /**
      * @return Output|null
      */
+    // protected function resolveOutputParams( $params, string $formatKey = null, int $formatIndex = null )
+    // {
+    //     if (!$formatKey)
+    //     {
+    //         if (is_string($params))
+    //         {
+    //             $params =[
+    //                 'format' => JobHelper::decodeFormat($params)
+    //             ];
+    //         }
+    //     }
 
-    protected function resolveOutputParams( $params, string $formatKey = null, int $formatIndex = null )
-    {
-        if (!$formatKey)
-        {
-            if (is_string($params))
-            {
-                $params =[
-                    'format' => JobHelper::decodeFormat($params)
-                ];
-            }
-        }
+    //     $isArray = is_array($params);
+    //     $isModel = ($isArray == false && ($params instanceof Output));
 
-        $isArray = is_array($params);
-        $isModel = ($isArray == false && ($params instanceof Output));
+    //     if (!$isArray && !$isModel)
+    //     {
+    //         throw new InvalidConfigException(
+    //             "Each output must be a format string, an array of output params or an Output model");
+    //     }
 
-        if (!$isArray && !$isModel)
-        {
-            throw new InvalidConfigException(
-                "Each output must be a format string, an array of output params or an Output model");
-        }
+    //     $output = null;
 
-        $output = null;
+    //     // merge format specs from output index with output params
+    //     $keySpecs = $formatKey ? JobHelper::decodeFormat($formatKey) : [];
+    //     $container = $keySpecs['container'] ?? null; // index should always define a container
+    //     $paramSpecs = ArrayHelper::getValue($params, 'format');
 
-        // merge format specs from output index with output params
-        $keySpecs = $formatKey ? JobHelper::decodeFormat($formatKey) : [];
-        $container = $keySpecs['container'] ?? null; // index should always define a container
-        $paramSpecs = ArrayHelper::getValue($params, 'format');
+    //     if (is_array($paramSpecs))
+    //     {
+    //         if ($container) $paramSpecs['container'] = $container;
+    //         $paramSpecs = JobHelper::parseFormat($paramSpecs);
+    //     }
 
-        if (is_array($paramSpecs))
-        {
-            if ($container) $paramSpecs['container'] = $container;
-            $paramSpecs = JobHelper::parseFormat($paramSpecs);
-        }
-
-        else if (is_string($paramSpecs)) { // support defining 'format' param as a JSON or format string
-            $paramSpecs = JobHelper::decodeFormat($paramSpecs);
-            if ($container) $paramSpecs['container'] = $container;
-        }
+    //     else if (is_string($paramSpecs)) { // support defining 'format' param as a JSON or format string
+    //         $paramSpecs = JobHelper::decodeFormat($paramSpecs);
+    //         if ($container) $paramSpecs['container'] = $container;
+    //     }
 
 
-        // @todo: should index specs override param specs?
-        $formatSpecs = array_merge($keySpecs, $paramSpecs ?? []);
+    //     // @todo: should index specs override param specs?
+    //     $formatSpecs = array_merge($keySpecs, $paramSpecs ?? []);
 
-        if ($isArray)
-        {
-            $params['format'] = $formatSpecs;
-            $output = new Output($params);
-        }
+    //     if ($isArray)
+    //     {
+    //         $params['format'] = $formatSpecs;
+    //         $output = new Output($params);
+    //     }
 
-        else {
-            $output = $params;
-            $output->format = $formatSpecs;
-        }
+    //     else {
+    //         $output = $params;
+    //         $output->format = $formatSpecs;
+    //     }
 
-        return $output;
-    }
+    //     return $output;
+    // }
 }

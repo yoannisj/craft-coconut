@@ -12,6 +12,8 @@
 
 namespace yoannisj\coconut\models;
 
+use DateTime;
+
 use yii\base\InvalidArgumentException;
 use yii\base\InvalidConfigException;
 use yii\validators\InlineValidator;
@@ -53,47 +55,170 @@ use yoannisj\coconut\helpers\JobHelper;
  * @property bool $isCompleted Wether transcoding the output has come to an end
  * @property bool $isSuccessfull Wether transcoding did not result in an output file
  * @property bool $isFailed Wether transcoding failed
+ *
+ * @todo Set Output properties to their default?
+ * @body Since we only expot the Output parameters that correspond to the output type, we could set all properties to their default value without risking errors from the Coconut API. This would help with comparing output models if their media type is set dynamically. However, it would only work if the defaults are always the same (i.e. they don't depend/change based on the media type).
  */
-
 class Output extends Model
 {
     // =Static
     // =========================================================================
 
+    /**
+     * @var string
+     */
     const TYPE_VIDEO = 'video';
+
+    /**
+     * @var string
+     */
     const TYPE_AUDIO = 'audio';
+
+    /**
+     * @var string
+     */
     const TYPE_IMAGE = 'image';
 
+    /**
+     * @todo Verify that httpstream type gets returned by Coconut API
+     *
+     * @var string
+     */
+    const TYPE_HTTPSTREAM = 'httpstream';
+
+    /**
+     * @var string
+     */
     const FIT_PAD = 'pad';
+
+    /**
+     * @var string
+     */
     const FIT_CROP = 'crop';
 
+    /**
+     * @var string
+     */
     const STATUS_VIDEO_WAITING = 'video.waiting';
+
+    /**
+     * @var string
+     */
     const STATUS_VIDEO_QUEUED = 'video.queued';
+
+    /**
+     * @var string
+     */
     const STATUS_VIDEO_ENCODING = 'video.encoding';
+
+    /**
+     * @var string
+     */
     const STATUS_VIDEO_ENCODED = 'video.encoded';
+
+    /**
+     * @var string
+     */
     const STATUS_VIDEO_FAILED = 'video.failed';
+
+    /**
+     * @var string
+     */
     const STATUS_VIDEO_SKIPPED = 'video.skipped';
+
+    /**
+     * @var string
+     */
     const STATUS_VIDEO_ABORTED = 'video.aborted';
 
+    /**
+     * @var string
+     */
     const STATUS_IMAGE_WAITING = 'image.waiting';
+
+    /**
+     * @var string
+     */
     const STATUS_IMAGE_QUEUED = 'image.queued';
+
+    /**
+     * @var string
+     */
     const STATUS_IMAGE_PROCESSING = 'image.processing';
+
+    /**
+     * @var string
+     */
     const STATUS_IMAGE_CREATED = 'image.created';
+
+    /**
+     * @var string
+     */
     const STATUS_IMAGE_FAILED = 'image.failed';
+
+    /**
+     * @var string
+     */
     const STATUS_IMAGE_SKIPPED = 'image.skipped';
+
+    /**
+     * @var string
+     */
     const STATUS_IMAGE_ABORTED = 'image.aborted';
 
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_WAITING = 'httpstream.waiting';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_QUEUED = 'httpstream.queued';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_VARIANTS_WAITING = 'httpstream.variants.waiting';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_VARIANTS_QUEUED = 'httpstream.variants.queued';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_VARIANTS_ENCODING = 'httpstream.variants.encoding';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_PACKAGING = 'httpstream.packaging';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_PACKAGED = 'httpstream.packaged';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_FAILED = 'httpstream.failed';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_SKIPPED = 'httpstream.skipped';
+
+    /**
+     * @var string
+     */
     const STATUS_HTTPSTREAM_ABORTED = 'httpstream.aborted';
 
+    /**
+     * @var string[]
+     */
     const PENDING_STATUSES = [
         'video.waiting', 'video.queued',
         'image.waiting', 'image.queued',
@@ -101,325 +226,396 @@ class Output extends Model
         'httpstream.variants.waiting', 'httpstream.variants.queued',
     ];
 
+    /**
+     * @var string[]
+     */
     const PROCESSING_STATUSES = [
         'video.encoding',
         'image.processing',
         'httpstream.variants.encoding',
     ];
 
+    /**
+     * @var string[]
+     */
     const SKIPPED_STATUSES = [
         'video.skipped', 'image.skipped', 'httpstream.skipped',
     ];
 
+    /**
+     * @var string[]
+     */
     const ABORTED_STATUSES = [
         'video.aborted', 'image.aborted', 'httpstream.aborted',
     ];
 
+    /**
+     * @var string[]
+     */
     const COMPLETED_STATUSES = [
         'video.encoded', 'video.failed', 'video.skipped', 'video.aborted',
         'image.created', 'image.failed', 'image.skipped', 'image.aborted',
         'httpstream.packaged', 'httpstream.failed', 'httpstream.skipped', 'httpstream.aborted',
     ];
 
+    /**
+     * @var string[]
+     */
     const SUCCESSFUL_STATUSES = [
         'video.encoded', 'image.created', 'httpstream.packaged',
     ];
 
+    /**
+     * @var string[]
+     */
     const FAILED_STATUSES = [
         'video.failed', 'image.failed', 'httpstream.failed',
     ];
-
 
     // =Properties
     // =========================================================================
 
     /**
-     * @var integer|null
+     * ID of the transcoding Output in Craft's database
+     *
+     * @var int|null
      */
-
-    public $id;
+    public ?int $id = null;
 
     /**
-     * @var integer ID in Craft database of the Coconut job that created this output
+     * ID in Craft's database of the Coconut job transcoding this output
+     *
+     * @var ?int
      */
-
-    public $jobId;
+    public ?int $jobId = null;
 
     /**
-     * @var Job|null Coconut job model
+     * Transcoding Coconut Job model
+     *
+     * @var Job|null
      */
-
-    private $_job;
+    private ?Job $_job = null;
 
     /**
-     * @var string
+     * Output key
+     *
+     * @var string|null
      */
-
-    private $_key;
+    private ?string $_key = null;
 
     /**
+     * Output format specs (decoded and normalized)
+     *
      * @var array
      */
-
-    private $_format;
+    private ?array $_format = null;
 
     /**
+     * Output format string
+     *
      * @var string
      */
-
-    private $_formatString;
+    private ?string $_formatString = null;
 
     /**
-     * @var integer Index for output's format in the job's list of outputs (1-indexed)
+     * Index for output's format in the job's list of outputs (1-indexed)
+     *
+     * @var int|null
      */
-
-    public $formatIndex;
+    public ?int $formatIndex = null;
 
     /**
-     * @var string Output format container
+     * Output format container
+     *
+     * @var string|null
      */
-
-    private $_container;
+    private ?string $_container = null;
 
     /**
-     * @var string Output type (i.e. 'video', 'image', 'audio')
+     * Output media type (i.e. 'video', 'image', 'audio', 'httpstream')
+     *
+     * @var string|null
      */
-
-    private $_type;
+    private ?string $_type = null;
 
     /**
-     * @var mixed Output file extension
+     * Output file extension
+     *
+     * @var string|null
      */
-
-    private $_extension;
+    private ?string $_extension = null;
 
     /**
-     * @var mixed Output file mimeType
+     * Output file mimeType
+     *
+     * @var string|null
      */
-
-    private $_mimeType;
+    private ?string $_mimeType = null;
 
     /**
-     * @var string Explicit output path
+     * Explicit output path
+     *
+     * @var string|null
      */
-
-    private $_explicitPath;
+    private ?string $_explicitPath = null;
 
     /**
-     * @var string Format used to resolve output path
+     * Format used to resolve output path
+     *
+     * @var string|null
      */
-
-    private $_pathFormat;
+    private ?string $_pathFormat = null;
 
     /**
-     * @var string Conditional expression to determine whether the
-     *  output should be created or not
+     * Conditional expression to determine whether the output should be
+     * created or not.
      *
      * @see https://docs.coconut.co/jobs/api#conditional-outputs
+     *
+     * @var string|null
      */
-
-    public $if;
+    public ?string $if = null;
 
     /**
-     * @var boolean Whether to deinterlace the video output
+     * Whether to deinterlace the video output
+     *
+     * @var bool
      */
-
-    public $deinterlace = false;
+    public bool $deinterlace = false;
 
     /**
-     * @var boolean Whether to crop the resulting output image to a squae
+     * Whether to crop the resulting output image to a squae
+     *
+     * @var bool
      */
-
-    public $square = false;
+    public bool $square = false;
 
     /**
-     * @var integer Intensity of blur effect to apply to resulting image output.
-     *  Value must range from `1` to `5`.
+     * Intensity of blur effect to apply to resulting image output.
+     * Value must range from `1` to `5`.
+     *
+     * @var int|null
      */
-
-    public $blur;
+    public ?int $blur = null;
 
     /**
-     * @var string Whether to 'crop' or 'pad' the resulting output
+     * Whether to 'crop' or 'pad' the resulting output
+     *
+     * @var string|null
      */
-
-    public $fit;
+    public ?string $fit = null;
 
     /**
-     * @var integer The rotation to apply to the output
+     * The rotation to apply to the output.
      *
      * Supports values:
      * - `0` => 90CounterCLockwise and Vertical Flip (default)
      * - `1` => 90Clockwise
      * - `2` => 90CounterClockwise
      * - `3` => 90Clockwise and Vertical Flip
+     *
+     * @var int
      */
-
-    public $transpose = 0;
+    public int $transpose = 0;
 
     /**
-     * @var boolean Whether to flip the resulting output vertically
+     * Whether to flip the resulting output vertically
+     *
+     * @var bool
      */
-
-    public $vflip = false;
+    public bool $vflip = false;
 
     /**
-     * @var boolean Whether to flip the resulting output horizontally
+     * Whether to flip the resulting output horizontally
+     *
+     * @var bool
      */
-
-    public $hflip = false;
+    public bool $hflip = false;
 
     /**
-     * @var integer The duration (in seconds) after which the resulting output should start
+     * The duration (in seconds) after which the resulting output should start
+     *
+     * @var int|null
      */
-
-    public $offset;
+    public ?int $offset;
 
     /**
-     * @var integer The duration (in seconds) at which resulting output should be cut
+     * The duration (in seconds) at which resulting output should be cut
+     *
+     * @var int|null
      */
-
-    private $_duration;
+    private ?int $_duration;
 
     /**
-     * @var bool Whether `duration` property has already been normalized
+     * Whether `duration` property has already been normalized
+     *
+     * @var bool
      */
-
-    protected $isNormalizedDuration;
+    protected bool $isNormalizedDuration = false;
 
     /**
-     * @var integer Number of image outputs generated
+     * Number of image outputs generated
+     *
+     * @var int|null
      */
-
-    public $number;
+    public ?int $number = null;
 
     /**
-     * @var integer Interval (in seconds) between each image output to generate
+     * Interval (in seconds) between each image output to generate
+     *
+     * @var int|null
      */
-
-    public $interval;
+    public ?int $interval = null;
 
     /**
-     * @var integer[] Offsets (in seconds) at which to generate an image output
+     * Offsets (in seconds) at which to generate an image output
+     *
+     * @var int[]|null
      */
-
-    private $_offsets;
+    private ?array $_offsets = null;
 
     /**
-     * @var boolean Whether to combine resulting image outputs into a single
-     *  sprite image of 4 columns (useful for network optimisation)
+     * Whether to combine resulting image outputs into a single sprite image
+     * of 4 columns (useful for network optimisation).
+     *
+     * @var bool
      */
-
-    public $sprite = false;
+    public bool $sprite = false;
 
     /**
-     * @var boolean Whether to generate a WebVTT file that includes a list of cues
-     *  with either individual thumbnail or sprite with the right coordinates
+     * Whether to generate a WebVTT file that includes a list of cues with
+     * either individual thumbnail or sprite with the right coordinates
+     *
+     * @var bool
      */
-
-    public $vtt = false;
+    public bool $vtt = false;
 
     /**
-     * @var array Settings to generate an animated GIF image file.
-     *  Format width must be <= 500px. Supported keys are:
+     * Settings to generate an animated GIF image file.
+     *
+     * This must be an array with the following keys:
      * - 'number' => The number of images in the GIF animation (default is `1,` max 10)
      * - 'duration' => The duration (in seconds) of the resulting GIF animation (default is `5`)
      *
+     * ::: warning
+     * For this to work, the Output's format width must be <= 500px
+     * :::
+     *
      * @see https://docs.coconut.co/jobs/outputs-images#gif-animation
+     *
+     * @var array|null
      */
-
-    private $_scene;
+    private ?array $_scene = null;
 
     /**
-     * @var array Url and position of watermark image to add to the resulting output.
-     *  Supported keys are:
+     * Url and position of watermark image to add to the resulting output.
+     *
+     * This must be an array with the following keys:
      * - 'url' => URL to the PNG watermark image file (transparency supported)
      * - `position` => Either 'topleft', 'topright', 'bottomleft' or 'bottomright'
      *
      * @see https://docs.coconut.co/jobs/outputs-videos#watermark
-     */
-
-    private $_watermark;
-
-    /**
-     * @var string Latest output status from Coconut job
-     * @see https://docs.coconut.co/jobs/api#job-status
-     */
-
-    public $status;
-
-    /**
-     * @var string|null Progress (in percentage) for creation of this output
-     */
-
-    private $_progress = '0%';
-
-    /**
-     * @var string Error message associated with this output
-     * @note This is only relevant if output has failed `status`
-     */
-
-    public $error;
-
-    /**
-     * @var string The URL to the generated output file (once stored)
-     */
-
-    public $url;
-
-    /**
-     * @var string[] The list of URL's to the generated output files (once stored)
-     */
-
-    private $_urls;
-
-    /**
+     *
      * @var array|null
      */
-
-    private $_metadata;
-
-    /**
-     * @var integer Width dimension of output
-     */
-
-    private $_width;
+    private ?array $_watermark = null;
 
     /**
-     * @var integer Height dimension of output
+     * Latest Output status, as communicated by the Coconut API
+     * and Notifications.
+     *
+     * @see https://docs.coconut.co/jobs/api#job-status
+     *
+     * @var string|null
      */
-
-    private $_height;
+    public ?string $status = null;
 
     /**
-     * @var float Aspect ratio of output (i.e. `width / height`, rounded up to 4 decimal points)
+     * Transcoding progress (in percentage) of this Output, as communicated by
+     * the Coconut API and Notifications.
+     *
+     * @var string|null
      */
-
-    private $_ratio;
+    private ?string $_progress = '0%';
 
     /**
-     * @var bool Whether dimension properties have been already computed/normalized
+     * Error message associated with this output
+     *
+     * ::: tip
+     * This is only relevant if output has failed `status`
+     * :::
+     *
+     * @var string|null
      */
-
-    protected $isNormalizedDimensions;
+    public ?string $error = null;
 
     /**
-     * @var \Datetime
+     * The URL to the generated output file (once stored)
+     *
+     * @var string|null
      */
-
-    public $dateCreated;
+    public ?string $url = null;
 
     /**
-     * @var \Datetime
+     * The list of URL's to the generated output files (once stored)
+     *
+     * @var string[]|null
      */
+    private ?array $_urls = null;
 
-    public $dateUpdated;
+    /**
+     * The metadata for this Output, as communicated by the Coconut API
+     * and Notifications.
+     *
+     * @var array|null
+     */
+    private ?array $_metadata = null;
+
+    /**
+     * Width dimension of output (in pixels)
+     *
+     * @var int|null
+     */
+    private ?int $_width = null;
+
+    /**
+     * Height dimension of output (in pixels)
+     *
+     * @var int|null
+     */
+    private ?int $_height = null;
+
+    /**
+     * Aspect ratio of output (i.e. `width / height`, rounded up to 4 decimal points)
+     *
+     * @var float|null
+     */
+    private ?float $_ratio = null;
+
+    /**
+     * Whether dimension properties have been already computed/normalized
+     *
+     * @var bool
+     */
+    protected bool $isNormalizedDimensions = false;
+
+    /**
+     * Date at which the job was created in Craft's database
+     *
+     * @var DateTime|null
+     */
+    public ?DateTime $dateCreated = null;
+
+    /**
+     * Date at which the job was last updated in Craft's database
+     * @var DateTime|null
+     */
+    public ?DateTime $dateUpdated = null;
 
     /**
      * @var string
      */
-
-    public $uid;
+    public ?string $uid = null;
 
     // =Public Methods
     // =========================================================================
@@ -427,7 +623,6 @@ class Output extends Model
     /**
      * @inheritdoc
      */
-
     public function init()
     {
         parent::init();
@@ -442,12 +637,15 @@ class Output extends Model
 
     /**
      * @param Job|null $job
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setJob( Job $job = null )
+    public function setJob( Job|null $job ): static
     {
         $this->jobId = $job ? $job->id : null;
         $this->_job = $job;
+
+        return $this;
     }
 
     /**
@@ -455,8 +653,7 @@ class Output extends Model
      *
      * @return Job|null
      */
-
-    public function getJob()
+    public function getJob(): ?Job
     {
         if (!$this->_job && $this->jobId)
         {
@@ -471,20 +668,21 @@ class Output extends Model
      * Setter method for defaulted `progress` property
      *
      * @param string|null $progress
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setProgress( string $progress = null )
+    public function setProgress( string|null $progress ): static
     {
         $this->_progress = $progress;
+        return $this;
     }
 
     /**
      * Getter method for defaulted `progress` property
      *
-     * @return string
+     * @return string|null
      */
-
-    public function getProgress()
+    public function getProgress(): ?string
     {
         if (!isset($this->_progress))
         {
@@ -502,9 +700,10 @@ class Output extends Model
      * Setter method for normalized `format` property
      *
      * @param string|array|null $format
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setFormat( $format )
+    public function setFormat( string|array|null $format ): static
     {
         $isString = is_string($format);
 
@@ -527,6 +726,8 @@ class Output extends Model
         $this->_format = $format;
         $this->_formatString = null;
         $this->_container = null;
+
+        return $this;
     }
 
     /**
@@ -534,7 +735,6 @@ class Output extends Model
      *
      * @return array
      */
-
     public function getFormat(): array
     {
         if (empty($this->_format))
@@ -556,11 +756,13 @@ class Output extends Model
      * Setter method for normalized `key` property
      *
      * @param string|null $key
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setKey( string $key = null )
+    public function setKey( string|null $key ): static
     {
         $this->_key = $key;
+        return $this;
     }
 
     /**
@@ -568,7 +770,6 @@ class Output extends Model
      *
      * @return string
      */
-
     public function getKey(): string
     {
         if (empty($this->_key) && !empty($this->_format)) {
@@ -586,9 +787,10 @@ class Output extends Model
      * Setter method for resolved `path` property
      *
      * @param string|null $path
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setPath( string $path = null )
+    public function setPath( string|null $path ): static
     {
         // support unsetting path
         if (!$path) {
@@ -608,6 +810,8 @@ class Output extends Model
             $this->_explicitPath = $path;
             $this->_pathFormat = null;
         }
+
+        return $this;
     }
 
     /**
@@ -615,8 +819,7 @@ class Output extends Model
      *
      * @return string|null
      */
-
-    public function getPath()
+    public function getPath(): ?string
     {
         $path = null;
 
@@ -677,15 +880,18 @@ class Output extends Model
      * Setter method for normalized `offsets` property
      *
      * @param string|array|null $offsets
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setOffsets( $offsets )
+    public function setOffsets( string|array|null $offsets ): static
     {
         if (is_string($offsets)) {
             $offsets = explode(',', $offsets);
         }
 
         $this->_offsets = $offsets;
+
+        return $this;
     }
 
     /**
@@ -693,8 +899,7 @@ class Output extends Model
      *
      * @return array|null
      */
-
-    public function getOffsets()
+    public function getOffsets(): ?array
     {
         return $this->_offsets;
     }
@@ -703,15 +908,19 @@ class Output extends Model
      * Setter method for normalized `scene` property
      *
      * @param string|array|null  $scene
+     *
+     * @return static Back-reference for method chaining
      */
 
-    public function setScene( $scene )
+    public function setScene( string|array|null $scene ): static
     {
         if (is_string($scene)) {
             $scene = JsonHelper::decode($scene);
         }
 
         $this->_scene = $scene;
+
+        return $this;
     }
 
     /**
@@ -719,8 +928,7 @@ class Output extends Model
      *
      * @return array|null
      */
-
-    public function getScene()
+    public function getScene(): ?array
     {
         return $this->_scene;
     }
@@ -729,15 +937,18 @@ class Output extends Model
      * Setter method for normalized `watermark` property
      *
      * @param string|array|null $watermark
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setWatermark( $watermark )
+    public function setWatermark( string|array|null $watermark ): static
     {
         if (is_string($watermark)) {
             $watermark = JsonHelper::decode($watermark);
         }
 
         $this->_watermark = $watermark;
+
+        return $this;
     }
 
     /**
@@ -745,8 +956,7 @@ class Output extends Model
      *
      * @return array|null
      */
-
-    public function getWatermark()
+    public function getWatermark(): ?array
     {
         return $this->_watermark;
     }
@@ -755,15 +965,18 @@ class Output extends Model
      * Setter method for the normalized `metadata` property
      *
      * @param string|array|null $metadata
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setMetadata( $metadata )
+    public function setMetadata( string|array|null $metadata ): static
     {
         if (is_string($metadata)) {
             $metadata = JsonHelper::decodeIfJson($this->_metadata) ?? [];
         }
 
         $this->_metadata = $metadata;
+
+        return $this;
     }
 
     /**
@@ -771,8 +984,7 @@ class Output extends Model
      *
      * @return array|null
      */
-
-    public function getMetadata()
+    public function getMetadata(): ?array
     {
         return $this->_metadata;
     }
@@ -781,24 +993,26 @@ class Output extends Model
      * Setter method for normalized `urls` property
      *
      * @param string|array|null $urls
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setUrls( $urls )
+    public function setUrls( string|array|null $urls ): static
     {
         if (is_string($urls)) {
             $urls = JsonHelper::decode($urls);
         }
 
         $this->_urls = $urls;
+
+        return $this;
     }
 
     /**
      * Getter method for normalized `urls` property
      *
-     * @return array
+     * @return array|null
      */
-
-    public function getUrls()
+    public function getUrls(): ?array
     {
         return $this->_urls;
     }
@@ -808,8 +1022,7 @@ class Output extends Model
      *
      * @return string|null
      */
-
-    public function getContainer()
+    public function getContainer(): ?string
     {
         if (!isset($this->_container))
         {
@@ -832,8 +1045,7 @@ class Output extends Model
      *
      * @return string|null
      */
-
-    public function getType()
+    public function getType(): ?string
     {
         if (!isset($this->_type)
             && !empty($container = $this->getContainer())
@@ -849,7 +1061,7 @@ class Output extends Model
      *
      * @return string|null
      */
-    public function getExtension()
+    public function getExtension(): ?string
     {
         if (!isset($this->_extension))
         {
@@ -870,7 +1082,7 @@ class Output extends Model
      *
      * @return string|null
      */
-    public function getMimeType()
+    public function getMimeType(): ?string
     {
         if (!isset($this->_mimeType)
             && !empty($extension = $this->getExtension()))
@@ -885,9 +1097,8 @@ class Output extends Model
     /**
      * Getter for read-only `formatString` property
      *
-     * @return string|null
+     * @return string
      */
-
     public function getFormatString(): string
     {
         if (!isset($this->_formatString))
@@ -906,15 +1117,18 @@ class Output extends Model
      * Setter method for defaulted `duration` property
      *
      * @param float|null $duration
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setDuration( float $duration = null )
+    public function setDuration( float|null $duration ): static
     {
         $this->_duration = $duration;
 
         if ($duration === null) {
             $this->isNormalizedDuration = false;
         }
+
+        return $this;
     }
 
     /**
@@ -922,8 +1136,7 @@ class Output extends Model
      *
      * @return float|null
      */
-
-    public function getDuration()
+    public function getDuration(): ?float
     {
         if (!$this->isNormalizedDuration)
         {
@@ -955,8 +1168,7 @@ class Output extends Model
      *
      * @return string|null
      */
-
-    public function getExplicitPath()
+    public function getExplicitPath(): ?string
     {
         return $this->_explicitPath;
     }
@@ -966,8 +1178,7 @@ class Output extends Model
      *
      * @return string|null
      */
-
-    public function getPathFormat()
+    public function getPathFormat(): ?string
     {
         if ($this->_pathFormat) {
             return $this->_pathFormat;
@@ -985,18 +1196,16 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsDefaultPath(): bool
     {
         return (!isset($this->_explicitPath) && !isset($this->_pathFormat));
     }
 
     /**
-     * Getter method for computed `isSkipped` property
+     * Getter method for computed `isPending` property
      *
      * @return bool
      */
-
     public function getIsPending(): bool
     {
         return in_array($this->status, static::PENDING_STATUSES);
@@ -1010,7 +1219,6 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsSkipped(): bool
     {
         return in_array($this->status, static::SKIPPED_STATUSES);
@@ -1024,7 +1232,6 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsAborted(): bool
     {
         return in_array($this->status, static::ABORTED_STATUSES);
@@ -1035,7 +1242,6 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsDiscontinued(): bool
     {
         return $this->getIsSkipped() || $this->getIsAborted();
@@ -1046,7 +1252,6 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsProcessing(): bool
     {
         return in_array($this->status, static::PROCESSING_STATUSES);
@@ -1057,7 +1262,6 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsCompleted(): bool
     {
         return in_array($this->status, static::COMPLETED_STATUSES);
@@ -1071,7 +1275,6 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsSuccessfull(): bool
     {
         return in_array($this->status, static::SUCCESSFUL_STATUSES);
@@ -1085,7 +1288,6 @@ class Output extends Model
      *
      * @return bool
      */
-
     public function getIsFailed(): bool
     {
         return in_array($this->status, static::FAILED_STATUSES);
@@ -1094,10 +1296,9 @@ class Output extends Model
     /**
      * Getter method for computed `width` property
      *
-     * @return integer|null
+     * @return int|null
      */
-
-    public function getWidth()
+    public function getWidth(): ?int
     {
         if (!$this->isNormalizedDimensions) {
             $this->computeDimensions();
@@ -1109,10 +1310,9 @@ class Output extends Model
     /**
      * Getter method for computed `height` property
      *
-     * @return integer|null
+     * @return int|null
      */
-
-    public function getHeight()
+    public function getHeight(): ?int
     {
         if (!$this->isNormalizedDimensions) {
             $this->computeDimensions();
@@ -1126,8 +1326,7 @@ class Output extends Model
      *
      * @return float|null
      */
-
-    public function getRatio()
+    public function getRatio(): ?float
     {
         if (!$this->isNormalizedDimensions) {
             $this->computeDimensions();
@@ -1142,7 +1341,6 @@ class Output extends Model
     /**
      * @inheritdoc
      */
-
     public function attributes()
     {
         $attributes = parent::attributes();
@@ -1167,10 +1365,9 @@ class Output extends Model
     /**
      * @inheritdoc
      */
-
-    public function rules()
+    public function defineRules(): array
     {
-        $rules = parent::rules();
+        $rules = parent::defineRules();
 
         $rules['attrRequired'] = [ [
             'key',
@@ -1192,7 +1389,7 @@ class Output extends Model
             'duration',
         ], 'number' ];
 
-        $rules['attrInteger'] = [ [
+        $rules['attrint'] = [ [
             'id',
             'jobId',
             'formatIndex',
@@ -1201,7 +1398,7 @@ class Output extends Model
             'offset',
             'number',
             'interval',
-        ], 'integer', 'min' => 0 ];
+        ], 'int', 'min' => 0 ];
 
         $rules['attrString'] = [ [
             'key',
@@ -1224,8 +1421,8 @@ class Output extends Model
         $rules['urlsEachString'] = [ 'urls', 'each',
             'rule' => [ 'string' ] ];
 
-        $rules['offsetsEachInteger'] = [ 'offsets', 'each',
-            'rule' => ['integer', 'min' => 0] ];
+        $rules['offsetsEachint'] = [ 'offsets', 'each',
+            'rule' => ['int', 'min' => 0] ];
 
         $rules['fitInRange'] = [ 'fit', 'in', 'range' => [
             self::FIT_PAD,
@@ -1246,6 +1443,7 @@ class Output extends Model
             self::TYPE_VIDEO,
             self::TYPE_AUDIO,
             self::TYPE_IMAGE,
+            self::TYPE_HTTPSTREAM,
         ] ];
 
         $rules['urlUrl'] = [ 'url', 'url' ];
@@ -1260,8 +1458,7 @@ class Output extends Model
     /**
      * @inheritdoc
      */
-
-    public function fields()
+    public function fields(): array
     {
         $fields = parent::fields();
 
@@ -1289,8 +1486,7 @@ class Output extends Model
     /**
      * @inheritdoc
      */
-
-    public function extraFields()
+    public function extraFields(): array
     {
         $fields = parent::extraFields();
 
@@ -1309,7 +1505,6 @@ class Output extends Model
      *
      * @return array
      */
-
     public function toParams(): array
     {
         $paramFields = $this->paramFields();
@@ -1318,7 +1513,7 @@ class Output extends Model
         // 'container' is not a format param supported by Coconut
         ArrayHelper::remove($params['format'], 'container');
 
-        // when sent as parameter, duration must be an integer
+        // when sent as parameter, duration must be an int
         $duration = $params['duration'] ?? null;
         if ($duration) $params['duration'] = round($duration, 0);
 
@@ -1331,7 +1526,6 @@ class Output extends Model
     /**
      * @return array
      */
-
     protected function pathVars(): array
     {
         $key = $this->getKey();
@@ -1391,7 +1585,6 @@ class Output extends Model
      *
      * @return array
      */
-
     protected function paramFields(): array
     {
         $fields = [
@@ -1434,10 +1627,10 @@ class Output extends Model
     }
 
     /**
-     *
+     * Computes Output dimensions, based on Output params submitted to Coconut
+     * and Output metadata pulled from the Coconut API and Notifications.
      */
-
-    protected function computeDimensions()
+    protected function computeDimensions(): void
     {
         $width = null;
         $height = null;
@@ -1490,12 +1683,13 @@ class Output extends Model
     }
 
     /**
+     * Extract (first) video stream from given metadata
+     *
      * @param array $metadata
      *
      * @return array|null
      */
-
-    protected function videoStream( array $metadata )
+    protected function videoStream( array $metadata ): ?array
     {
         if (empty($streams = $metadata['streams'] ?? null)) {
             return null;
@@ -1505,15 +1699,23 @@ class Output extends Model
     }
 
     /**
-     * @param integer|null $width
-     * @param integer|null $height
+     * Calculates rounded ratio for given width and height.
+     * The result will be rounded to 3 decimal places
+     *
+     * @param int|float|null $width
+     * @param int|float|null $height
      *
      * @return float|null
      */
-
-    protected function calcRatio( $width, $height )
+    protected function calcRatio(
+        int|float|null $width,
+        int|float|null $height
+    ): ?float
     {
-        return ($width && $height ?
-            ceil(1000 * ($width / $height)) / 1000 : null);
+        if ($width && $height) {
+            return ceil(1000 * ($width / $height)) / 1000;
+        }
+
+        return null;
     }
 }

@@ -21,6 +21,7 @@ use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\volumes\Local as LocalVolume;
 use craft\helpers\StringHelper;
+use craft\helpers\ArrayHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\App as AppHelper;
 use craft\helpers\Component as ComponentHelper;
@@ -31,16 +32,20 @@ use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
- * Model representing and validation Coconut plugin settings
+ * Model containing and validating Coconut plugin settings
  *
  * @property string $apiKey
+ * @property string $endpoint
+ * @property string $region
+ * @property string $publicBaseUrl
  * @property Storage[] $storages
  * @property Storage|null $defaultStorage
  * @property VolumeInterface|null $defaultUploadVolume
+ * @property Notification $defaultJobNotification
  * @property Job[] $jobs
  * @property Job[] $volumeJobs
+ * @property VolumeInteface[] $watchVolumes
  */
-
 class Settings extends Model
 {
     // =Properties
@@ -52,12 +57,9 @@ class Settings extends Model
      * If this is not set, the plugin will check for an environment variable
      * named `COCONUT_API_KEY` (using `\craft\helper\App::env()`).
      *
-     * @var string
-     *
-     * @default null
+     * @var string|null
      */
-
-    private $_apiKey = null;
+    private ?string $_apiKey = null;
 
     /**
      * The endpoint to use for Coconut API calls.
@@ -68,8 +70,7 @@ class Settings extends Model
      *
      * @var string|null
      */
-
-    private $_endpoint = null;
+    private ?string $_endpoint = null;
 
     /**
      * The region of the Coconut.co cloud infrastructure to use
@@ -81,8 +82,7 @@ class Settings extends Model
      *
      * @var string|null
      */
-
-    private $_region = null;
+    private ?string $_region = null;
 
     /**
      * Public URL to use as *base* for all URLs sent to the Coconut API
@@ -90,8 +90,7 @@ class Settings extends Model
      *
      * @var string
      */
-
-    private $_publicBaseUrl;
+    private ?string $_publicBaseUrl;
 
     /**
      * Named storage settings to use in Coconut transcoding jobs.
@@ -108,7 +107,7 @@ class Settings extends Model
      * - the 'coconut/jobs/upload' action for POST requests (saves file in volume)
      * - the 'coconut/jobs/output' action for GET requests (serves file from volume)
      *
-     * @var array
+     * @var Storage[]
      *
      * @example [
      *      'myS3Bucket' => [
@@ -125,11 +124,8 @@ class Settings extends Model
      *          'url' => 'https://remote.server.com/coconut/upload',
      *      ],
      * ]
-     *
-     * @default []
      */
-
-    private $_storages = [];
+    private array $_storages = [];
 
     /**
      * The storage name or settings used to store Coconut output files when none
@@ -142,36 +138,30 @@ class Settings extends Model
      * based on the input asset's volume, or fallback to use the HTTP upload method
      * to store files in the volume defined by the 'defaultUploadVolume' setting.
      *
-     * @var string|array|\yoannisj\coconut\models\Storage
-     *
-     * @default null
+     * @var string|array|Storage|null
      */
-
-    private $_defaultStorage = null;
+    private mixed $_defaultStorage = null;
 
     /**
      * @var bool
      */
-
-    protected $isNormalizedDefaultStorage;
+    protected bool $isNormalizedDefaultStorage = false;
 
     /**
      * The default volume used to store output files when the `storage` parameter
      * was omitted and the input asset's volume could be determined (.e.g. if the
      * `input` parameter was a URL and not a Craft asset).
      *
-     * @var string|\craft\models\Volume
-     *
-     * @default 'coconut'
+     * @var string|VolumeInterface
      */
-
-    private $_defaultUploadVolume = 'coconut';
+    private mixed $_defaultUploadVolume = 'coconut';
 
     /**
-     * @var boolean
+     * Whether `jobs` property was normalized or not (internal flag)
+     *
+     * @var bool
      */
-
-    protected $isNormalizedDefaultUploadVolume;
+    protected bool $isNormalizedDefaultUploadVolume = false;
 
     /**
      * Format used to generate default path for output files
@@ -191,11 +181,8 @@ class Settings extends Model
      * (if it is not already).
      *
      * @var string
-     *
-     * @default '_coconut/{path}/{key}.{ext}'
      */
-
-    public $defaultOutputPathFormat = '_coconut/{path}/{filename}--{key}.{ext}';
+    public string $defaultOutputPathFormat = '_coconut/{path}/{filename}--{key}.{ext}';
 
     /**
      * Notification param to use if job notifications are enabled but job's own
@@ -207,8 +194,7 @@ class Settings extends Model
      *
      * @default Notification settings for plugin's 'coconut/jobs/notify' controller action
      */
-
-    private $_defaultJobNotification = null;
+    private mixed $_defaultJobNotification = null;
 
     /**
      * Named coconut job settings.
@@ -256,16 +242,14 @@ class Settings extends Model
      *
      * @default []
      */
-
-    private $_jobs = [];
+    private array $_jobs = [];
 
     /**
      * Whether `jobs` property was normalized or not (internal flag)
      *
      * @var bool
      */
-
-    protected $isNormalizedJobs;
+    protected bool $isNormalizedJobs = false;
 
     /**
      * Sets default job parameters for craft assets in given volumes.
@@ -275,31 +259,24 @@ class Settings extends Model
      * same format as the `jobs` setting).
      *
      * @var array
-     *
-     * @default []
      */
-
-    private $_volumeJobs = [];
+    private array $_volumeJobs = [];
 
     /**
      * Whether volumeJobs property was normalized or not (internal flag)
      *
      * @var bool
      */
-
-    protected $isNormalizedVolumeJobs;
+    protected bool $isNormalizedVolumeJobs = false;
 
     /**
      * List of input volumes handles, for which the plugin should
      *  automatically create a Coconut conversion job every time a video asset is
      *  added or updated.
      *
-     * @var array
-     *
-     * @default []
+     * @var string[]|VolumeInterface[]
      */
-
-    public $watchVolumes = [];
+    public array $watchVolumes = [];
 
     // @todo: add `fieldJobs` and `watchFields` settings to automatically
     // transcode video Assets in specific fields when saving a Craft element.
@@ -313,12 +290,9 @@ class Settings extends Model
      * More info:
      *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
      *
-     * @var integer
-     *
-     * @default 900
+     * @var int
      */
-
-    public $transcodeJobTtr = 900;
+    public int $transcodeJobTtr = 900;
 
     // =Public Methods
     // =========================================================================
@@ -327,22 +301,29 @@ class Settings extends Model
     // -------------------------------------------------------------------------
 
     /**
+     * Setter method for dfaulted `apiKey` property
+     *
      * @param string|null $apiKey
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setApiKey( string $apiKey = null )
+    public function setApiKey( string|null $apiKey ): static
     {
         $this->_apiKey = $apiKey;
+        return $this;
     }
 
     /**
+     * Getter method for defaulted `apiKey` property
+     *
      * @return string
+     *
+     * @throws Error if coconut API key could not be determined
      */
-
     public function getApiKey(): string
     {
         if (!isset($this->_apiKey)) {
-            $this->_apiKey = AppHelper::env('COCONUT_API_KEY');
+            $this->_apiKey = AppHelper::env('COCONUT_API_KEY') ?: null;
         }
 
         if (empty($this->_apiKey)) {
@@ -353,19 +334,24 @@ class Settings extends Model
     }
 
     /**
+     * Setter method for defaulted `endpoint` property
+     *
      * @param string|null $endpoint
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setEndpoint( string $endpoint = null )
+    public function setEndpoint( string|null $endpoint ): static
     {
         $this->_endpoint = $endpoint;
+        return $this;
     }
 
     /**
+     * Getter method for defaulted `endpoint` property
+     *
      * @return string|null
      */
-
-    public function getEndpoint()
+    public function getEndpoint(): ?string
     {
         if (!isset($this->_endpoint)) {
             $this->_endpoint = AppHelper::env('COCONUT_ENDPOINT');
@@ -375,19 +361,24 @@ class Settings extends Model
     }
 
     /**
-     * @param string|null $endpoint
+     * Setter method for defaulted `region` property
+     *
+     * @param string|null $region
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setRegion( string $region = null )
+    public function setRegion( string|null $region ): static
     {
         $this->_region = $region;
+        return $this;
     }
 
     /**
+     * Getter method for defaulted `region` property
+     *
      * @return string|null
      */
-
-    public function getRegion()
+    public function getRegion(): ?string
     {
         if (!isset($this->_region)) {
             $this->_region = AppHelper::env('COCONUT_REGION');
@@ -400,11 +391,13 @@ class Settings extends Model
      * Setter method for parsed `publicBaseUrl` property
      *
      * @param string|null $url
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setPublicBaseUrl( string $url = null )
+    public function setPublicBaseUrl( string|null $url ): static
     {
         $this->_publicBaseUrl = $url;
+        return $this;
     }
 
     /**
@@ -412,8 +405,7 @@ class Settings extends Model
      *
      * @return string|null
      */
-
-    public function getPublicBaseUrl()
+    public function getPublicBaseUrl(): ?string
     {
         if ($this->_publicBaseUrl) {
             return Craft::parseEnv($this->_publicBaseUrl);
@@ -426,15 +418,16 @@ class Settings extends Model
      * Setter method for normalized `storages` setting
      *
      * @param array $storages Map of names storages, where each key is a storage name
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setStorages( array $storages )
+    public function setStorages( array $storages ): static
     {
         $this->_storages = [];
 
-        foreach ($storages as $name => $storage)
+        foreach ($storages as $handle => $storage)
         {
-            if (!is_string($name))
+            if (!is_string($handle))
             {
                 throw new InvalidConfigException(
                     "Setting `storages` must be an associative array where keys are storage names");
@@ -450,8 +443,15 @@ class Settings extends Model
                     'Setting `storages` must resolve to a list of'.Storage::class.' models');
             }
 
-            $this->_storages[$name] = $storage;
+            // make sure the storage handle is set
+            if ($storage && !isset($storage->handle)) {
+                $storage->handle = $handle;
+            }
+
+            $this->_storages[$handle] = $storage;
         }
+
+        return $this;
     }
 
     /**
@@ -459,7 +459,6 @@ class Settings extends Model
      *
      * @return Storage[]
      */
-
     public function getStorages(): array
     {
         return $this->_storages;
@@ -469,12 +468,17 @@ class Settings extends Model
      * Setter method for normalized `defaultStorage` setting
      *
      * @param string|array|Storage $storage
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setDefaultStorage( $storage )
+    public function setDefaultStorage(
+        string|array|Storage|null $storage
+    ): static
     {
         $this->_defaultStorage = $storage;
         $this->isNormalizedDefaultStorage = false;
+
+        return $this;
     }
 
     /**
@@ -482,21 +486,18 @@ class Settings extends Model
      *
      * @return Storage|null
      */
-
-    public function getDefaultStorage()
+    public function getDefaultStorage(): ?Storage
     {
         if (!$this->isNormalizedDefaultStorage)
         {
             $storage = $this->_defaultStorage;
-
             if ($storage)
             {
                 if (is_string($storage)) {
                     $storage = Craft::parseEnv($storage);
                 }
 
-                $storage = Coconut::$plugin->getStorages()
-                    ->parseStorage($storage);
+                $storage = JobHelper::resolveStorage($storage);
             }
 
             $this->_defaultStorage = $storage;
@@ -509,22 +510,28 @@ class Settings extends Model
     /**
      * Setter method for normalized `defaultUploadVolume` property
      *
-     * @param string|array|VolumeInterfece
+     * @param string|array|VolumeInterface
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setDefaultUploadVolume( $volume )
+    public function setDefaultUploadVolume(
+        string|array|VolumeInterface|null $volume
+    ): static
     {
         $this->_defaultUploadVolume = $volume;
         $this->isNormalizedDefaultUploadVolume = false;
+
+        return $this;
     }
 
     /**
+     * Getter method for defaulted and normalized `defaultUploadVolume` property
+     *
      * @param bool $createMissing Whether to create the volume if it does not exist
      *
      * @return VolumeInterface|null
      */
-
-    public function getDefaultUploadVolume( $createMissing = false )
+    public function getDefaultUploadVolume( $createMissing = false ): ?VolumeInterface
     {
         if (!$this->isNormalizedDefaultUploadVolume)
         {
@@ -562,20 +569,24 @@ class Settings extends Model
      * Setter method for defaulted 'defaultJobNotification' property
      *
      * @param string|array|Notification|null $notification
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setDefaultJobNotification( $notification )
+    public function setDefaultJobNotification(
+        string|array|Notification|null $notification
+    ): static
     {
         $this->_defaultJobNotification = $notification;
+
+        return $this;
     }
 
     /**
      * Getter method for defaulted 'defaultJobNotification' property
      *
-     * @return string|array|Notification
+     * @return Notification
      */
-
-    public function getDefaultJobNotification()
+    public function getDefaultJobNotification(): Notification
     {
         if (isset($this->_defaultJobNotification)) {
             return $this->_defaultJobNotification;
@@ -607,12 +618,15 @@ class Settings extends Model
      * Setter method for normalized `jobs` setting
      *
      * @param array Map of named jobs where each key is a job name
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setJobs( array $jobs )
+    public function setJobs( array $jobs ): static
     {
         $this->_jobs = $jobs;
         $this->isNormalizedJobs = false;
+
+        return $this;
     }
 
     /**
@@ -620,14 +634,13 @@ class Settings extends Model
      *
      * @return Job[]
      */
-
-    public function getJobs()
+    public function getJobs(): array
     {
         if (!$this->isNormalizedJobs)
         {
-            foreach ($this->_jobs as $name => $job)
+            foreach ($this->_jobs as $handle => $job)
             {
-                if (!is_string($name))
+                if (!is_string($handle))
                 {
                     throw new InvalidConfigException(
                         'Setting `jobs` must be an array where each key is a job name.');
@@ -643,7 +656,11 @@ class Settings extends Model
                         'Setting `jobs` must resolve to a list of `'.Job::class.'` models');
                 }
 
-                $this->_jobs[$name] = $job;
+                if ($job && !isset($job->handle)) {
+                    $job->handle = $handle;
+                }
+
+                $this->_jobs[$handle] = $job;
             }
 
             $this->isNormalizedJobs = true;
@@ -656,13 +673,15 @@ class Settings extends Model
      * Setter method for normalized `volumeJobs` setting
      *
      * @param array Map of volume jobs, where each key is a volume handle
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setVolumeJobs( array $jobs )
+    public function setVolumeJobs( array $jobs ): static
     {
         $this->_volumeJobs = $jobs;
         $this->isNormalizedVolumeJobs = false;
 
+        return $this;
     }
 
     /**
@@ -670,8 +689,7 @@ class Settings extends Model
      *
      * @return Job[]
      */
-
-    public function getVolumeJobs()
+    public function getVolumeJobs(): array
     {
         if (!$this->isNormalizedVolumeJobs)
         {
@@ -745,10 +763,9 @@ class Settings extends Model
     /**
      * @inheritdoc
      */
-
-    public function rules()
+    public function defineRules(): array
     {
-        $rules = parent::rules();
+        $rules = parent::defineRules();
 
         $rules['attrsRequired'] = [ ['apiKey', 'defaultUploadVolume', 'defaultOutputPathFormat'], 'required' ];
         $rules['attrsString'] = [ ['apiKey', 'defaultOutputPathFormat'], 'string' ];
@@ -764,9 +781,18 @@ class Settings extends Model
 
     /**
      * Validation method for maps of storage parameters
+     *
+     * @param string $attribute Attribute to validate
+     * @param array $params Validation params
+     * @param InlindeValidator $validator Yii validator class
+     *
+     * @return void
      */
-
-    public function validateStorageMap( $attribute, array $params, InlineValidator $validator )
+    public function validateStorageMap(
+        string $attribute,
+        array $params,
+        InlineValidator $validator
+    ): void
     {
         $storages = $this->$attribute;
         $registryAttribute = $params['registryAttribute'] ?? null;
@@ -817,10 +843,19 @@ class Settings extends Model
     }
 
     /**
-     * Validation method for maps of job parameters
+     * Validation method for maps of job parameters.
+     *
+     * @param string $attribute Attribute to validate
+     * @param array $params Validation params
+     * @param InlindeValidator $validator Yii validator class
+     *
+     * @return void
      */
-
-    public function validateJobsMap( $attribute, array $params = [], InlineValidator $validator )
+    public function validateJobsMap(
+        string $attribute,
+        array $params = [],
+        InlineValidator $validator
+    ): void
     {
         $jobs = $this->$attribute;
         $registryAttribute = $params['registryAttribute'] ?? null;
@@ -869,24 +904,28 @@ class Settings extends Model
         }
     }
 
-    // =Operations
-    // -------------------------------------------------------------------------
-
     // =Protected Methods
     // =========================================================================
 
     /**
-     * @param
+     * Gets Volume model based on given config settings.
      *
-     * @return \craft\base\VolumeInterface
+     * @param array $config Volume configuration settings
+     * @param bool $createMissing Whether to create volume if it is missing
+     *
+     * @return VolumeInterface|null
      */
-
-    protected function getVolumeModel( array $config = [], bool $createMissing = false )
+    protected function getVolumeModel(
+        array $config = [],
+        bool $createMissing = false
+    ): ?VolumeInterface
     {
         $config = ComponentHelper::mergeSettings($config);
         $handle = $config['handle'] ?? 'coconut';
 
         $craftVolumes = Craft::$app->getVolumes();
+
+        /** @var VolumeInterface|null $volume */
         $volume = $craftVolumes->getVolumeByHandle($handle);
 
         if ($volume || !$createMissing) {
@@ -902,7 +941,7 @@ class Settings extends Model
             'name'=> ($config['name'] ?? $this->humanizeHandle($handle)),
         ];
 
-        if ($type == LocalVolume::class)
+        if (is_a($type, LocalVolume::class))
         {
             $slug = StringHelper::toKebabCase($handle);
 
@@ -922,10 +961,13 @@ class Settings extends Model
     }
 
     /**
+     * Returns human-friendly version of given handle string.
      *
+     * @param sting $handle
+     *
+     * @return sting
      */
-
-    protected function humanizeHandle( string $handle )
+    protected function humanizeHandle( string $handle ): string
     {
         $sep = preg_replace('/([A-Z])/', ' $1', $handle);
         $fix = preg_replace('/\s([A-Z])\s([A-Z])\s/', ' $1$2', $sep);

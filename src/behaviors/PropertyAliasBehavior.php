@@ -19,42 +19,44 @@ use Craft;
 use craft\helpers\StringHelper;
 
 /**
- *
+ * Behavior allowing Models to define alias properties.
  */
-
 class PropertyAliasBehavior extends Behavior
 {
     // =Properties
     // =========================================================================
 
     /**
-     * @var boolean|string[] Whether properties can be aliased by their camelCase counterpart
+     * Whether properties can be aliased by their camelCase counterpart.
+     * This can be set to a list of non-camelcase property names.
      *
-     * This can be set to a list of non-camelcase property names
+     * @var bool|string[]
      */
-
-    public $camelCasePropertyAliases = false;
+    public bool $camelCasePropertyAliases = false;
 
     /**
-     * @var array Resolved list of camel case property aliases to check against
+     * Resolved list of camel case property aliases to check against.
+     *
+     * @var array
      */
-
-    private $_camelPropertyAliasesMap = [];
+    private array $_camelPropertyAliasesMap = [];
 
     /**
-     * @var array Map of property aliases
+     * Map of property aliases
      *
      * Each key is the target property name, and its value can be an alias property name (string),
      * or a list of alias property names (array)
+     *
+     * @var array
      */
-
-    public $propertyAliases = [];
+    public array $propertyAliases = [];
 
     /**
-     * @var array Resolved list of property aliases to check against
+     * Resolved list of property aliases to check against
+     *
+     * @var array
      */
-
-    private $_propertyAliasesMap = [];
+    private array $_propertyAliasesMap = [];
 
     // =Public Methods
     // =========================================================================
@@ -62,7 +64,6 @@ class PropertyAliasBehavior extends Behavior
     /**
      * @inheritdoc
      */
-
     public function init()
     {
         if (is_array($this->camelCasePropertyAliases)) {
@@ -92,7 +93,6 @@ class PropertyAliasBehavior extends Behavior
     /**
      * @inheritdoc
      */
-
     public function canSetProperty( $name, $checkVars = true )
     {
         if (parent::canSetProperty($name, $checkVars)
@@ -107,7 +107,6 @@ class PropertyAliasBehavior extends Behavior
     /**
      * @inheritdoc
      */
-
     public function canGetProperty( $name, $checkVars = true )
     {
         if (parent::canGetProperty($name, $checkVars)
@@ -122,7 +121,6 @@ class PropertyAliasBehavior extends Behavior
     /**
      * @inheritdoc
      */
-
     public function __set( $name, $value )
     {
         $name = $this->getAliasedPropertyName($name) ?? $name;
@@ -132,7 +130,6 @@ class PropertyAliasBehavior extends Behavior
     /**
      * @inheritdoc
      */
-
     public function __get( $name )
     {
         $name = $this->getAliasedPropertyName($name) ?? $name;
@@ -150,8 +147,10 @@ class PropertyAliasBehavior extends Behavior
      *
      * @return string|null
      */
-
-    protected function getAliasedPropertyName( string $name, bool $checkCamelCase = true )
+    protected function getAliasedPropertyName(
+        string $name,
+        bool $checkCamelCase = true
+    ): ?string
     {
         $target = $this->_propertyAliasesMap[$name] ?? null;
         if ($target) return $target;
@@ -181,13 +180,12 @@ class PropertyAliasBehavior extends Behavior
 
     /**
      * Transforms given property name into camel case format if it should be
-     * aliases as such.
+     * aliases as such. Returns it untouched otherwise.
      *
      * @param string $name
      *
      * @return string
      */
-
     protected function camelCasePropertyAlias( string $name ): string
     {
         if ($this->camelCasePropertyAliases === true

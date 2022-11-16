@@ -4,6 +4,7 @@ namespace yoannisj\coconut\queue\jobs;
 
 use yii\base\Exception;
 use yii\base\InvalidConfigException;
+use yii\queue\RetryableJobInterface;
 
 use Craft;
 use craft\queue\BaseJob;
@@ -12,10 +13,9 @@ use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Job;
 
 /**
- *
+ * Job to run a Coconut transcoding Job via the Craft Queue
  */
-
-class RunJob extends BaseJob
+class RunJob extends BaseJob implements RetryableJobInterface
 {
     // =Properties
     // =========================================================================
@@ -23,20 +23,17 @@ class RunJob extends BaseJob
     /**
      * @var int Internal ID of job to run
      */
-
-    public $jobId;
+    public int $jobId;
 
     /**
      * @var Job Model for Coconut job to run
      */
-
-    private $_job;
+    private Job $_job;
 
     /**
      * @var int Time in miliseconds to wait before checking job's status
      */
-
-    public $checkJobInterval = 1000;
+    public int $checkJobInterval = 1000;
 
     // =Public Methods
     // =========================================================================
@@ -53,35 +50,18 @@ class RunJob extends BaseJob
         }
 
         parent::init();
-
-    }
-
-    /**
-     * Getter method for readonly `job` property
-     *
-     * @return Job|null
-     */
-
-    public function getJob()
-    {
-        if (!$this->_job) {
-            $this->fetchJob(); // sets the '_job' property internally
-        }
-
-        return $this->_job;
     }
 
     /**
      * @inheritdoc
      */
-
-    public function getDescription()
+    public function getDescription(): ?string
     {
-        $input = $this->job->input;
+        $input = $this->job->getInput();
 
         return Craft::t('coconut',
             "Transcoding '{inputName}' with Coconut.co", [
-                'inputName' => $this->job->input->getName(),
+                'inputName' => $input->getName(),
             ]
         );
     }
@@ -92,7 +72,6 @@ class RunJob extends BaseJob
      * Set high Time to Reserve for this job to support longer Coconut jobs
      * @link https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452#25452
      */
-
     public function getTtr()
     {
         return Coconut::$plugin->getSettings()->transcodeJobTtr;
@@ -100,9 +79,22 @@ class RunJob extends BaseJob
 
     /**
      * @inheritdoc
+     *
+     * @param mixed $attempt
+     * @param mixed $error
+     *
+     * @return bool
      */
+    public function canRetry( $attempt, $error )
+    {
+        // @todo Determine retry conditions for RunJob queue jobs
+        return false;
+    }
 
-    public function execute( $queue )
+    /**
+     * @inheritdoc
+     */
+    public function execute( $queue ): void
     {
         $job = $this->getJob();
         $coconutJobs = Coconut::$plugin->getJobs();
@@ -132,13 +124,29 @@ class RunJob extends BaseJob
     }
 
     /**
+     * Getter method for readonly `job` property
+     *
+     * @return Job|null
+     */
+    public function getJob(): ?Job
+    {
+        if (!$this->_job) {
+            $this->fetchJob(); // sets the '_job' property internally
+        }
+
+        return $this->_job;
+    }
+
+    // =Protected Methods
+    // =========================================================================
+
+    /**
      * Fetches job from database
      *
      * @return Job
      *
      * @throws InvalidConfigException If job could not be found
      */
-
     protected function fetchJob(): Job
     {
         $job = Coconut::$plugin->getJobs()->getJobById($this->jobId);

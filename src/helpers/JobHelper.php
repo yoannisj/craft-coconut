@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Coconut plugin for Craft
  *
@@ -7,7 +6,6 @@
  * @copyright Copyright (c) 2020 Yoannis Jamar
  * @link https://github.com/yoannisj/
  * @package craft-coconut
- *
  */
 
 namespace yoannisj\coconut\helpers;
@@ -45,25 +43,29 @@ class JobHelper
     /**
      * List of format specs that are relevant for video encoding
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string[]
      */
-
     const VIDEO_SPECS = [
         'video_codec', 'resolution', 'video_bitrate', 'fps',
     ];
 
     /**
-     * Default video specification values
+     * Default video spec values
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array[]
      */
-
     const DEFAULT_VIDEO_SPECS = [
         'resolution' => '0x0', 'video_bitrate' => '1000k', 'fps' => '0fps',
     ];
 
     /**
-     * Equivalent of unsetting all video specifications (i.e. no video)
+     * Format specs equivalent of unsetting all video specs
+     * (i.e. no video track in output).
+     *
+     * @var array
      */
-
     const DISABLED_VIDEO_SPECS = [
         'video_codec' => false, 'resolution' => false, 'video_bitrate' => false, 'fps' => false,
     ];
@@ -71,8 +73,9 @@ class JobHelper
     /**
      * List of video codec spec values supported by the Coconut service
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string[]
      */
-
     const VIDEO_CODECS = [
         'mpeg4', 'xvid', 'flv', 'h263', 'mjpeg', 'mpeg1video', 'mpeg2video',
         'qtrle', 'svq3', 'wmv1', 'wmv2', 'huffyuv', 'rv20', 'h264', 'hevc',
@@ -82,8 +85,9 @@ class JobHelper
     /**
      * List of format specs that are relevant for audio encoding
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string[]
      */
-
     const AUDIO_SPECS = [
         'audio_codec',
         'audio_bitrate',
@@ -92,10 +96,11 @@ class JobHelper
     ];
 
     /**
-     * Default audio specification values
+     * Default audio spec values
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array
      */
-
     const DEFAULT_AUDIO_SPECS = [
         'audio_bitrate' => '128k',
         'sample_rate' => '44100hz',
@@ -103,9 +108,10 @@ class JobHelper
     ];
 
     /**
-     * Equivalent of unsetting all audio specifications (i.e. no audio)
+     * Equivalent of unsetting all audio specs (i.e. no audio)
+     *
+     * @var array
      */
-
     const DISABLED_AUDIO_SPECS = [
         'audio_codec' => false,
         'audio_bitrate' => false,
@@ -116,8 +122,9 @@ class JobHelper
     /**
      * List of audio codec spec values supported by the Coconut service
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string[]
      */
-
     const AUDIO_CODECS = [
         'mp3', 'mp2', 'aac', 'amr_nb', 'ac3', 'vorbis', 'flac',
         'pcm_u8', 'pcm_s16le', 'pcm_alaw', 'wmav2',
@@ -127,42 +134,45 @@ class JobHelper
      * List of format specs that are relevant for image creation
      * @see https://docs.coconut.co/references/formats#basics
      *
+     * @var string[]
      */
-
     const IMAGE_SPECS = [
         'resolution', 'pix_fmt', // '2pass',
     ];
 
     /**
-     * Default image specification values
+     * Default image spec values
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array
      */
-
     const DEFAULT_IMAGE_SPECS = [
         'resolution' => '0x0',
     ];
 
     /**
      * List of format options
+     *
+     * @var string[]
      */
-
     const FORMAT_OPTIONS = [
         'pix_fmt', '2pass', 'quality', 'vprofile', 'level', 'frag',
     ];
 
     /**
-     * Regex patterns used to identify specification values
+     * Regex pattern used to identify spec values
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string
      */
-
-    // =common
     const RESOLUTION_PATTERN = '/^(\d+)x(\d+)$/';
 
     /**
      * Maps formatting video resolution definitions to video specs
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array[]
      */
-
     const RESOLUTION_DEFINITION_SPECS = [
         '240p' => [ 'resolution' => '0x240', 'video_bitrate' => '500k' ],
         '360p' => [ 'resolution' => '0x360', 'video_bitrate' => '800k' ],
@@ -174,27 +184,102 @@ class JobHelper
         '2160p' => [ 'resolution' => '3840x2160', 'video_bitrate' => '8000k' ],
     ];
 
-    // =video
+    /**
+     * Regex pattern used to identify video bitrate spec values
+     * @see https://docs.coconut.co/references/formats#video-specs
+     *
+     * @var string
+     */
     const VIDEO_BITRATE_PATTERN = '/^(\d{2,6})k$/';
+
+    /**
+     * Regex pattern used to identify video FPS spec values
+     * @see https://docs.coconut.co/references/formats#video-specs
+     *
+     * @var string
+     */
     const FPS_PATTERN = '/^(0|15|23\.98|25|29\.97|30)fps$/';
 
-    // =audio
+    /**
+     * Regex pattern used to identify segments of audio format specs
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const AUDIO_SEGMENTS_SPLIT_PATTERN = '/(?<!amr|pcm)_/';
+
+    /**
+     * Regex pattern used to identify audio bitrate spec values
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const AUDIO_BITRATE_PATTERN = '/^(32|64|96|128|160|192|224|256|288|320|352|384|416|448|480|512)k$/';
+
+    /**
+     * Regex pattern used to identify sample rate spec values
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const SAMPLE_RATE_PATTERN = '/^(8000|11025|16000|22000|22050|24000|32000|44000|44100|48000)hz$/';
+
+    /**
+     * Regex pattern used to identify audio channel spec values
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const AUDIO_CHANNEL_PATTERN = '/^(mono|stereo)$/';
 
-    // =options
+    /**
+     * Regex pattern used to identify the pixel format option in format specs
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const PIX_FMT_OPTION_PATTERN = '/^(yuv420p|yuv422p|yuva444p10le)$/';
+
+    /**
+     * Regex pattern used to identify the quality option in format specs
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const QUALITY_OPTION_PATTERN = '/^[1-5]{1}$/';
+
+    /**
+     * Regex pattern used to identify the vprofile option in format specs
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const VPROFILE_OPTION_PATTERN = '/^(baseline|main|high|high10|high422|high444|444)$/';
+
+    /**
+     * Regex pattern used to identify the vprofile's prores option in format specs
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const VPROFILE_OPTION_PATTERN_PRORES = '/^[0-3]{1}$/';
+
+    /**
+     * Regex pattern used to identify the level option in format specs
+     * @see https://docs.coconut.co/references/formats#audio-specs
+     *
+     * @var string
+     */
     const LEVEL_OPTION_PATTERN = '/^(10|11|12|13|20|21|22|30|31|32|40|41|42|50|51)$/';
 
     /**
-     * Map of patterns to validate supported container options
+     * Map of patterns to validate supported options for each container.
+     *
+     * Each option can be set to a pattern to identify values supported by the
+     * container, or to the boolean `true` for on/off options.
+     *
+     * @var array[]
      */
-
     const CONTAINER_OPTION_PATTERNS = [
         'mp4' => [
             'frag' => true, // boolean value
@@ -202,9 +287,13 @@ class JobHelper
     ];
 
     /**
-     * MAp of patterns to validate supported codec options
+     * Map of patterns to validate supported options for each codec.
+     *
+     * Each option can be set to a pattern to identify values supported by the
+     * container, or to the boolean `true` for on/off options.
+     *
+     * @var array[]
      */
-
     const CODEC_OPTION_PATTERNS = [
         'prores' => [
             'vprofile' => self::VPROFILE_OPTION_PATTERN_PRORES,
@@ -232,10 +321,11 @@ class JobHelper
     ];
 
     /**
-     * Map of container aliases and their target container
+     * Map of container aliases and their target container.
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array
      */
-
     const CONTAINER_ALIASES = [
         'divx' => 'avi',
         'xvid' => 'avi',
@@ -246,9 +336,11 @@ class JobHelper
     ];
 
     /**
-     * List of input file containers (i.e. extensions) supported by the Coconut service
+     * List of input file containers (i.e. extensions) supported by
+     * the Coconut service.
+     *
+     * @var string[]
      */
-
     const INPUT_CONTAINERS = [
         'mp4', 'm4p', 'm4v',
         'webm',
@@ -262,10 +354,12 @@ class JobHelper
     ];
 
     /**
-     * List of video output file containers supported by the Coconut service
+     * List of video output file containers (i.e. extensions) supported by
+     * the Coconut service.
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string[]
      */
-
     const VIDEO_OUTPUT_CONTAINERS = [
         'mp4',
         'webm',
@@ -278,28 +372,33 @@ class JobHelper
     ];
 
     /**
-     * List of audio output file containers supported by the Coconut service
+     * List of audio output file containers (i.e. extensions) supported by
+     * the Coconut service.
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string[]
      */
-
     const AUDIO_OUTPUT_CONTAINERS = [
         'mp3', 'ogg',
     ];
 
     /**
-     * List of image output file containers supported by the Coconut service
+     * List of image output file containers (i.e. extensions) supported by
+     * the Coconut service.
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var string[]
      */
-
     const IMAGE_OUTPUT_CONTAINERS = [
         'jpg', 'jpeg', 'png', 'gif',
     ];
 
     /**
-     * Default format specification values for given container
+     * Default format spec values for each video file container
      * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array[]
      */
-
     const CONTAINER_VIDEO_SPECS = [
         // =video containers
         'mp4' => [ 'video_codec' => 'h264', ],
@@ -314,6 +413,12 @@ class JobHelper
         'ogv' => [ 'video_codec' => 'theora', ],
     ];
 
+    /**
+     * Default format spec values for each audio file container
+     * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array[]
+     */
     const CONTAINER_AUDIO_SPECS = [
         // =video containers
         'mp4' => [ 'audio_codec' => 'aac' ],
@@ -332,65 +437,76 @@ class JobHelper
         'mp3' => [ 'audio_codec' => 'mp3' ],
     ];
 
+    /**
+     * Default format spec values for each image file container
+     * @see https://docs.coconut.co/references/formats#basics
+     *
+     * @var array[]
+     */
     const CONTAINER_IMAGE_SPECS = [];
 
     /**
      * Regex patterns to parse file paths and urls
+     *
+     * @var string
      */
-
     const FILE_EXTENSION_PATTERN = '/\.([a-zA-Z0-9]{2,5}$)/';
 
     /**
      * Regex patterns to parse sequence options
+     *
+     * @var string
      */
-
     const SEQUENTIAL_PLACEHOLDER_PATTERN = "/%(\d+\$)?(-|\+| {1}|0|')?(\d+)?(\.\d+)?(%|[b-h]|[F-H]|o|s|u|x|X){1}/";
 
     /**
      * Pattern used to recognize and resolve path formats expressions
+     *
+     * @var string
      */
-
     const PATH_EXPRESSION_PATTERN = '/(?<!\{)\{([a-zA-Z0-9_]+)\}(?!\})/';
 
     /**
      * Pattern used to make paths private
+     *
+     * @var string
      */
-
     const PATH_PRIVATISATION_PATTERN = '/^(\.{0,2}\/)?([^_])/';
 
     /**
      * Pattern used to find extra separators in a path
+     *
+     * @var string
      */
-
     const PATH_EXTRA_SEPARATORS_PATTERN = '/\/+/';
 
     // =Public Methods
     // =========================================================================
 
     /**
-     * Resolved given value into an Input model
+     * Resolved given input params into an Input model.
      *
-     * @param mixed $input Input value to resolve
+     * This method can resolve a URL string, an Asset ID, an Asset model,
+     * an Input model or an array of Input model properties. Any other value
+     * will return `null`
      *
-     * @return Input|null
+     * @param mixed $input Input params to resolve
+     *
+     * @return Input The Input model resolved from $input
+     * @return null If $input could not be resolved to an Input model
      */
-
-    public static function resolveInput( $input )
+    public static function resolveInput( mixed $input ): ?Input
     {
-        if (empty($input)) {
-            return null;
-        }
-
         if ($input instanceof Input) {
             return $input;
         }
 
-        if (is_array($input)) {
-            return new Input($input);
-        }
-
         if ($input instanceof Asset) {
             return new Input([ 'asset' => $input ]);
+        }
+
+        if (empty($input)) {
+            return null;
         }
 
         if (is_numeric($input)) {
@@ -401,14 +517,29 @@ class JobHelper
             return new Input([ 'url' => $input ]);
         }
 
+        if (is_array($input)) {
+            return new Input($input);
+        }
+
         return null;
     }
 
     /**
-     * @return Output[]|null()
+     * Resolves list of output params to Output models.
+     *
+     * This method can resolve a list containing format strings, arrays of
+     * format specs, Output properties or Output models.
+     * It can also resolve an associative array with format string keys mapped
+     * to additional Output properties.
+     *
+     * @param array $outputs Output params to resolve
+     *
+     * @return Output[] Output models resolved from $outputs
      */
 
-    public static function resolveOutputs( $outputs, Input $input = null )
+    public static function resolveOutputs(
+        array $outputs
+    ): array
     {
         if (empty($outputs)) return [];
 
@@ -451,12 +582,18 @@ class JobHelper
     }
 
     /**
-     * @param mixed $storage
+     * Resolves given storage param into a Storage model.
      *
-     * @return Storage|null
+     * This method can resolve a named storage handle, an Asset Volume
+     * an Asset Volume handle, an Asset Volume ID, or an array of Storage
+     * model properties.
+     *
+     * @param mixed $storage Storage params to resolve
+     *
+     * @return Storage Storage model resolved from $storage
+     * @return null If $storage could not be resolved to a Storage model
      */
-
-    public static function resolveStorage( $storage )
+    public static function resolveStorage( mixed $storage ): ?Storage
     {
         if ($storage instanceof Storage) {
             return $storage;
@@ -497,11 +634,21 @@ class JobHelper
     }
 
     /**
+     * Resolves given Output params into an Output model
      *
+     * @param $params Output params to resolve
+     * @param string $formatKey The Output's format key
+     *
+     * @return Output The Output model resolved from $params and $formatKey
+     * @return null If the Output model could not be resolved
+     *
+     * @throws InvalidArgumentException If given multiple outputs and one of them is not a format string, array of params or output model
      */
-
     public static function resolveOutputParams(
-        $params, string $formatKey = null, int $formatIndex = null )
+        mixed $params,
+        string $formatKey = null,
+        int $formatIndex = null
+    ): Output
     {
         if (!$formatKey)
         {
@@ -555,34 +702,47 @@ class JobHelper
             $output->format = $formatSpecs;
         }
 
+        if ($output && $formatIndex) {
+            $output->formatIndex = $formatIndex;
+        }
+
         return $output;
     }
 
     /**
-     * Parses given format string or array of format specs, by
-     * analyzing and validating spec values against the format container,
-     * and discarding invalid and irrelevant values.
+     * Parses given format string or array of format specs, by analyzing and
+     * validating spec values against the format container, and discarding
+     * invalid and irrelevant values.
      *
-     * @note: If format is given as an array of specs, make sure you
-     *  include the 'container' key.
+     * ::: warning
+     * If `$format` is given as an array of specs, make sure you include the
+     * 'container' key.
+     * :::
      *
-     * @param string|array $format Format to parse
+     * @param string|array $format Format specs to parse
      *
      * @return array Parsed specs for given $format
+     *
+     * @throws InvalidArgumentException If given array of $format specs is missing the 'container' key
      */
-
-    public static function parseFormat( $format ): array
+    public static function parseFormat( string|array $format ): array
     {
         if (is_string($format)) {
             $format = static::decodeFormat($format);
         }
 
-        else if (!is_array($format))
+        else if (!array_key_exists('container', $format))
         {
             throw new InvalidArgumentException(
-                'Argument #1 `$format` must be a format string or an array of format specs');
-
+                "Array of format specs must include the 'container' key");
         }
+
+        // else if (!is_array($format))
+        // {
+        //     throw new InvalidArgumentException(
+        //         'Argument #1 `$format` must be a format string or an array of format specs');
+
+        // }
 
         return static::_normalizeFormatSpecs($format);
     }
@@ -591,11 +751,10 @@ class JobHelper
      * Parses given format string, and returns the corresponding map of
      * (explicit and implicit) spec values
      *
-     * @param string $format
+     * @param string $format Format string to parse
      *
-     * @return array
+     * @return array Parsed specs for given $format
      */
-
     public static function decodeFormat( string $format ): array
     {
         // don't throw errors if this is an empty format string
@@ -633,15 +792,24 @@ class JobHelper
     }
 
     /**
-     * Returns formatted string for given format specs
+     * Returns format string for given format specs.
+     *
+     * ::: tip
+     * If the format $specs don't specify the container, you must pass it in
+     * separately as 2nd argument.
+     * :::
      *
      * @param array $specs Formatting specs to encode
      * @param string|null $container Format container
      *
-     * @return string
+     * @return string Format string for given $specs
+     *
+     * @throws InvalidArgumentException If the format container could not be determined
      */
-
-    public static function encodeFormat( array $specs, string $container = null ): string
+    public static function encodeFormat(
+        array $specs,
+        string $container = null
+    ): string
     {
         if (!$container) {
             $container = $specs['container'] ?? null;
@@ -740,12 +908,16 @@ class JobHelper
     }
 
     /**
-     * @param string|array $format
+     * Returns file extension for given format specs.
      *
-     * @return string|null
+     * @param string|array $format Format specs for which to get the extension
+     *
+     * @return string The file extension for $format
+     * @return null If the format's file extension is unknown
+     *
+     * @throws InvalidArgumentException If the format container could not be determined
      */
-
-    public static function formatExtension( $format )
+    public static function formatExtension( string|array $format )
     {
         $container = null;
 
@@ -766,11 +938,13 @@ class JobHelper
     }
 
     /**
-     * @param string $container
+     * Returns file extension for given container.
      *
-     * @return string|null
+     * @param string $container Container for which to get the file extension
+     *
+     * @return string The file extension for $container
+     * @return null If container's file extension is unknown
      */
-
     public static function containerExtension( string $container )
     {
         $extension = null;
@@ -798,11 +972,11 @@ class JobHelper
     /**
      * Returns the media type of given output file container
      *
-     * @param string $container
+     * @param string $container Container for which to get the media type
      *
-     * @return string|null
+     * @return string Either 'video', 'audio' or 'image'
+     * @return null If the container is of another or unknown file type
      */
-
     public static function containerType( string $container )
     {
         if (in_array($container, self::VIDEO_OUTPUT_CONTAINERS)) {
@@ -821,9 +995,8 @@ class JobHelper
      *
      * @param string $container Output container
      *
-     * @return array
+     * @return array Array of default format specs for $container
      */
-
     public static function containerFormatDefaults( string $container ): array
     {
         $base = self::CONTAINER_ALIASES[$container] ?? $container;
@@ -839,7 +1012,6 @@ class JobHelper
      *
      * @return string A key-friendly version of given format
      */
-
     public static function formatAsKey( string $format )
     {
         return str_replace(
@@ -855,49 +1027,47 @@ class JobHelper
      *
      * @return string The corresponding format key
      */
-
-    public static function keyFromPath( string $path )
-    {
-        return str_replace(
-            ['-', '_'],
-            [':', '='],
-        str_replace('__', ',', $path)); // don't replace '__' with '=='
-    }
+    // public static function keyFromPath( string $path )
+    // {
+    //     return str_replace(
+    //         ['-', '_'],
+    //         [':', '='],
+    //     str_replace('__', ',', $path)); // don't replace '__' with '=='
+    // }
 
     /**
-     * Turns given volume path private, so Craft-CMS does not index it as an asset
+     * Turns given file path private, so Craft-CMS does not index it the file
+     * an Asset if it is found on a Volume.
      *
-     * @param string $path
+     * @param string $path File path to privatise
      *
-     * @return string
+     * @return string Private version of $path
      */
-
     public static function privatisePath( string $path ): string
     {
         return preg_replace(self::PATH_PRIVATISATION_PATTERN, '$1_$2', $path);
     }
 
     /**
-     * Normalizes given file path
+     * Normalizes given file path.
      *
-     * @param string $path
+     * @param string $path File path to normalize
      *
-     * @return string
+     * @return string Normalized version of $path
      */
-
     public static function normalizePath( string $path ): string
     {
         return trim(preg_replace(static::PATH_EXTRA_SEPARATORS_PATTERN, '/', $path), '/');
     }
 
     /**
-     * Adds a sequential placeholder to given path
+     * Adds a sequential placeholder to given path, so Coconut knows where to
+     * insert the output file's format index.
      *
-     * @param string $path
+     * @param string $path File path to transform
      *
-     * @return string
+     * @return string Version of $path with sequential placeholder suffix
      */
-
     public static function sequencePath( string $path ): string
     {
         if (!preg_match(static::SEQUENTIAL_PLACEHOLDER_PATTERN, $path))
@@ -937,9 +1107,10 @@ class JobHelper
      * 'publicBaseUrl' setting
      *
      * @param string $url
+     *
+     * @return string
      */
-
-    public static function publicUrl( string $url )
+    public static function publicUrl( string $url ): string
     {
         $publicBaseUrl = Coconut::$plugin->getSettings()->publicBaseUrl;
 
@@ -980,14 +1151,13 @@ class JobHelper
     }
 
     /**
-     * Poplates job model with given data (e.g. returned by API)
+     * Populates job model with given data (e.g. returned by API)
      *
      * @param Job $job
      * @param array $data
      *
      * @return Job
      */
-
     public static function populateJobFromData( Job $job, array $data ): Job
     {
         $dataType = ArrayHelper::remove($data, 'type');
@@ -1028,13 +1198,13 @@ class JobHelper
             foreach ($outputsData as $outputData)
             {
                 $outputKey = ArrayHelper::getValue($outputData, 'key');
-
-                if (!$outputKey) {
-                    throw new InvalidArgmentException('Given data is missing the output key');
+                if (!$outputKey)
+                {
+                    throw new InvalidArgumentException(
+                        'Given data is missing the output key');
                 }
 
                 $output = $job->getOutputByKey($outputKey);
-
                 if (!$output)
                 {
                     // @todo throw error for invalid key?
@@ -1062,38 +1232,40 @@ class JobHelper
     }
 
     /**
+     * Populates Output model with given output data
      *
+     * @param Output $output Output to populate
+     * @param array $data Date to populate output with
+     *
+     * @return InvalidArgumentException If given $data's 'type' is not a valid Output type
      */
-
     public static function populateJobOutput( Output $output, array $data ): Output
     {
         $dataType = ArrayHelper::remove($data, 'type');
 
         if ($dataType && $dataType != Output::TYPE_VIDEO
+            && $dataType != Output::TYPE_AUDIO
             && $dataType != Output::TYPE_IMAGE
             && $dataType != Output::TYPE_HTTPSTREAM)
         {
             throw new InvalidArgumentException(
-                "Can not populate job with data of type '$dataType'");
+                "Can not populate job output with data of type '$dataType'");
         }
 
         return static::populateObject($output, $data);
     }
 
     /**
-     * Transfers data from given job record to job model
+     * Transfers data from given Job Record to Job Model.
      *
-     * @param Job $job
-     * @param JobRecord $record
+     * @param Job $job Job model to populate
+     * @param JobRecord $record Job record from which to get populated data
      *
      * @return Job
      */
-
     public static function populateJobFromRecord( Job $job, JobRecord $record ): Job
     {
         $attrs = $record->getAttributes();
-
-
         $inputAssetId = ArrayHelper::remove($attrs, 'inputAssetId');
         $inputUrl = ArrayHelper::remove($attrs, 'inputUrl');
 
@@ -1144,14 +1316,13 @@ class JobHelper
     }
 
     /**
-     * Transfers data from given job model to job record
+     * Transfers data from given Job Model to Job Record.
      *
-     * @param JobRecord $record
-     * @param Job $job
+     * @param JobRecord $record Job record to populate
+     * @param Job $job Job model from which to get populated data
      *
      * @return JobRecord
      */
-
     public static function populateRecordFromJob( JobRecord $record, Job $job): JobRecord
     {
         $attrs = $job->getAttributes();
@@ -1182,11 +1353,13 @@ class JobHelper
     }
 
     /**
-     * @param Job $job
+     * Creates a transcoding Job config from given Job Model.
+     * The resutl can be used to run a new transcoding Job.
+     *
+     * @param Job $job Job from which to get config.
      *
      * @return Job
      */
-
     public static function jobAsConfig( Job $job ): Job
     {
         $attrs = $job->getAttributes([
@@ -1201,8 +1374,8 @@ class JobHelper
 
         $configOutputs = [];
 
-        foreach ($outputs as $output) {
-            $configOutputs[] = static::outputAsConfig§($output);
+        foreach ($job->getOutputs() as $output) {
+            $configOutputs[] = static::outputAsConfig($output);
         }
 
         $config->outputs = $configOutputs;
@@ -1211,14 +1384,17 @@ class JobHelper
     }
 
     /**
-     * @param Output $output
-     * @param OutputRecord $record
+     * Populates Output Model with data from Output Record.
+     *
+     * @param Output $output Output Model to populate
+     * @param OutputRecord $record Output Record from which to get populated data
      *
      * @return Output
      */
-
     public static function populateOutputFromRecord(
-        Output $output, OutputRecord $record ): Output
+        Output $output,
+        OutputRecord $record
+    ): Output
     {
         $attrs = $record->getAttributes();
 
@@ -1231,14 +1407,17 @@ class JobHelper
     }
 
     /**
-     * @param OutputRecord $record
-     * @param Output $output
+     * Populates Output Record with data from given Output Model.
+     *
+     * @param OutputRecord $record Output Record to populate
+     * @param Output $output Output Model from which to get populated data
      *
      * @return OutputRecord
      */
-
     public static function populateRecordFromOutput(
-        OutputRecord $record, Output $output ): OutputRecord
+        OutputRecord $record,
+        Output $output
+    ): OutputRecord
     {
         $attrs = $output->getAttributes();
         $record->setAttributes($attrs, false);
@@ -1247,13 +1426,14 @@ class JobHelper
     }
 
     /**
-     * Returns an Output config based on given output
+     * Returns an Output config based on given Output.
      *
-     * @param Output $output
+     * The result can be used to transcode a new Output (via a new Job Model).
+     *
+     * @param Output $output Output to get config from
      *
      * @return Output
      */
-
     public static function outputAsConfig( Output $output ): Output
     {
         $attrs = $output->getAttributes([
@@ -1287,27 +1467,30 @@ class JobHelper
     }
 
     /**
-     * Populates object with given data
+     * Populates object with given data.
      *
-     * @param array|object $object
-     * @param array|object $data Data to
+     * @param array|object $object Object to populate
+     * @param array $data Data to populate $object with
      * @param bool $recursive Whether values should be merged recursively
      *
      * @return array|object
      */
-
-    public static function populateObject( $object, $data, bool $recursive = true )
+    public static function populateObject(
+        array|object $object,
+        array $data,
+        bool $recursive = true
+    ): array|object
     {
-        if (!is_object($object) && !is_array($object)) {
-            throw new InvalidArgumentException(
-                "Argument #2 `object` must be an object or array to populate");
-        }
+        // if (!is_object($object) && !is_array($object)) {
+        //     throw new InvalidArgumentException(
+        //         "Argument #2 `object` must be an object or array to populate");
+        // }
 
-        if (!is_object($data) && !is_array($data))
-        {
-            throw new InvalidArgumentException(
-                'Argument #2 `data` must be an array or object to traverse');
-        }
+        // if (!is_object($data) && !is_array($data))
+        // {
+        //     throw new InvalidArgumentException(
+        //         'Argument #2 `data` must be an array or object to traverse');
+        // }
 
         foreach ($data as $prop => $value)
         {
@@ -1330,14 +1513,13 @@ class JobHelper
 
     /**
      * Removes empty values from given params. Similar to php's `array_filter`
-     *  but recursive.
+     * function but recursive.
      *
-     * @param array $params
+     * @param array $params Params to clean
      *
-     * @return array
+     * @return array $params without keys that had empty values.
      */
-
-    public static function cleanParams( array $params )
+    public static function cleanParams( array $params ): array
     {
         $res = [];
 
@@ -1364,9 +1546,10 @@ class JobHelper
      *
      * @return array
      */
-
     private static function _containerFormatDefaults(
-        string $container, string $type ): array
+        string $container,
+        string $type
+    ): array
     {
         $defaults = [];
 
@@ -1396,17 +1579,19 @@ class JobHelper
     }
 
     /**
-     * Parses video specification segment from format string
+     * Parses video spec segment from format string
      *
      * @param string $container The format's output file container
-     * @param string $segment The video specification segment to parse
+     * @param string $segment The video spec segment to parse
      * @param string|null $options The format options segment to parse
      *
-     * @return array All corresponding video specification values (implicit and explicit)
+     * @return array All corresponding video spec values (implicit and explicit)
      */
-
     private static function _decodeFormatVideoSpecs(
-        string $container, string $segment, string $options = null )
+        string $container,
+        string $segment,
+        string $options = null
+    ): array
     {
         // support disabling video by using 'x'
         if ($segment == 'x') return [ 'video_disabled' => true ];
@@ -1481,16 +1666,17 @@ class JobHelper
     }
 
     /**
-     * Parses audio specification segment from format string
+     * Parses audio spec segment from format string.
      *
      * @param string $container The format's output file container
-     * @param string $segment The audio specification segment to parse
+     * @param string $segment The audio spec segment to parse
      *
-     * @return array All corresponding audio specification values (implicit and explicit)
+     * @return array All corresponding audio spec values (implicit and explicit)
      */
-
     private static function _decodeFormatAudioSpecs(
-        string $container, string $segment = null )
+        string $container,
+        string $segment = null
+    ): array
     {
         // support disabling audio by using 'x'
         if ($segment == 'x') return [ 'audio_disabled' => true ];
@@ -1538,15 +1724,17 @@ class JobHelper
     }
 
     /**
-     * Parses image specification segment from format string
+     * Parses image spec segment from format string
      *
      * @param string $container The format's output file container
-     * @param string $segment The image specification segment to parse
+     * @param string $segment The image spec segment to parse
      *
-     * @return array All corresponding image specification values (implicit and explicit)
+     * @return array All corresponding image spec values (implicit and explicit)
      */
-
-    private static function _decodeFormatImageSpecs( string $container, string $segment )
+    private static function _decodeFormatImageSpecs(
+        string $container,
+        string $segment
+    ): array
     {
         // include default image specs
         $specs = array_merge([], self::DEFAULT_IMAGE_SPECS);
@@ -1575,7 +1763,7 @@ class JobHelper
             }
         }
 
-        // @todo: do image containers support the `pix_fmt` or '2pass' options?
+        // @todo Check if image containers support the `pix_fmt` or '2pass' options?
 
         return $specs;
     }
@@ -1584,10 +1772,16 @@ class JobHelper
      * Parses options segment from format string
      *
      * @param string $container
+     * @param string $codec
+     * @param string $segment
+     *
+     * @return array
      */
-
     private static function _decodeFormatOptions(
-        string $container, string $codec, string $segment )
+        string $container,
+        string $codec,
+        string $segment
+    ): array
     {
         $options = [];
 
@@ -1655,9 +1849,11 @@ class JobHelper
      *
      * @return array
      */
-
     private static function _normalizeFormatSpecs(
-        array $specs, string $container = null, string $type = null )
+        array $specs,
+        string $container = null,
+        string $type = null
+    ): array
     {
         // make sure we know which output container we are working with
         if (!$container) {
@@ -1862,9 +2058,10 @@ class JobHelper
      *
      * @return array
      */
-
     private static function _resolveDefinitionInFormatSpecs(
-        array $specs, string $type = null ): array
+        array $specs,
+        string $type = null
+    ): array
     {
         if (array_key_exists('resolution', $specs))
         {

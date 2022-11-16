@@ -22,20 +22,20 @@ use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Notification;
 
 /**
- * Active record for Job rows in database
+ * Active record for transcoding Jobs in database
  *
- * @property integer id
+ * @property int id
  * @property string coconutId
  * @property string status
  * @property string progress
- * @property integer inputAssetId
+ * @property int inputAssetId
  * @property string inputUrl
  * @property string inputUrlHash
  * @property string inputStatus
  * @property string inputMetadata
  * @property Datetime inputExpires
  * @property string storageHandle
- * @property integer storageVolumeId
+ * @property int storageVolumeId
  * @property array storageParams
  * @property array notification
  * @property Datetime createdAt
@@ -43,7 +43,6 @@ use yoannisj\coconut\models\Notification;
  * @property Datetime dateCreated
  * @property Datetime dateUpdated
  */
-
 class JobRecord extends ActiveRecord
 {
     // =Static
@@ -52,7 +51,6 @@ class JobRecord extends ActiveRecord
     /**
      * @inheritdoc
      */
-
     public static function tableName(): string
     {
         return Coconut::TABLE_JOBS;

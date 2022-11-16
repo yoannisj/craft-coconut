@@ -18,11 +18,14 @@ use Craft;
 use craft\db\ActiveRecord;
 use craft\records\Volume as VolumeRecord;
 use craft\errors\VolumeException;
+use craft\helpers\Json as JsonHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\records\JobRecord;
 
 /**
+ * Active record for transcoding Outputs in database
+ *
  * @property $id
  * @property $inputId
  * @property $coconutJobId
@@ -35,7 +38,6 @@ use yoannisj\coconut\records\JobRecord;
  * @property $dateUpdated
  * @property $uid
  */
-
 class OutputRecord extends ActiveRecord
 {
     // =Static
@@ -44,7 +46,6 @@ class OutputRecord extends ActiveRecord
     /**
      * @inheritdoc
      */
-
     public static function tableName(): string
     {
         return Coconut::TABLE_OUTPUTS;
@@ -60,46 +61,54 @@ class OutputRecord extends ActiveRecord
     // -------------------------------------------------------------------------
 
     /**
-     * @param string|array
+     * @param string|array|null $offsets
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setOffsets( $offsets )
+    public function setOffsets( string|array|null $offsets ): static
     {
         if (is_array($offsets)) {
             $offsets = implode(',', $offsets);
         }
 
         $this->offsets = $offsets;
+
+        return $this;
     }
 
     /**
-     * @param string|array
+     * @param string|array|null $urls
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setUrls( $urls )
+    public function setUrls( string|array|null $urls ): static
     {
         if (is_array($urls)) {
             $this->urls = JsonHelper::encode($urls);
         }
+
+        return $this;
     }
 
     /**
-     * @param string|array $metadata
+     * @param string|array|null $metadata
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setMetadata( $metadata )
+    public function setMetadata( string|array|null $metadata ): static
     {
-        if ($metadata && !is_string($metadata)) {
+        if ($metadata && is_array($metadata)) {
             $metadata = JsonHelper::encode($metadata);
         }
 
         $this->metadata = $metadata;
+
+        return $this;
     }
 
     /**
      * @return array
      */
-
     public function getMetadata(): array
     {
         $metadata = $this->metadata ?? [];
@@ -108,7 +117,7 @@ class OutputRecord extends ActiveRecord
             $metadata = JsonHelper::decode($metadata);
         }
 
-        return $metadata;
+        return $metadata ;
     }
 
     // =Relations
@@ -119,7 +128,6 @@ class OutputRecord extends ActiveRecord
      *
      * @return ActiveQueryInterface The relational query object
      */
-
     public function getJob(): ActiveQueryInterface
     {
         return $this->hasOne(JobRecord::class, ['id' => 'jobId']);
@@ -131,7 +139,6 @@ class OutputRecord extends ActiveRecord
     /**
      * @inheritdoc
      */
-
     public function afterDelete()
     {
         if (isset($this->volumeId))

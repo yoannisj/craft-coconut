@@ -12,11 +12,8 @@
 
 namespace yoannisj\coconut\models;
 
-use yii\validators\InlineValidator;
-
 use Craft;
 use craft\base\Model;
-use craft\helpers\StringHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
@@ -29,7 +26,6 @@ use yoannisj\coconut\behaviors\PropertyAliasBehavior;
  * @property string $container Alias for 'bucket' property
  *
  */
-
 class ServiceCredentials extends Model
 {
     // =Static
@@ -39,28 +35,33 @@ class ServiceCredentials extends Model
     // =========================================================================
 
     /**
-     * @var string Name of the service these credentials are for
+     * Name of the service these credentials are for.
+     *
+     * @var string|null
      */
 
-    public $service;
+    public ?string $service = null;
 
     /**
-     * @var string Id or name of service account (required by some services)
+     * Id or name of service account (required by some services).
+     *
+     * @var string|null
      */
-
-    public $accountId;
+    public ?string $accountId = null;
 
     /**
-     * @var string Key Id or API key used to connect to the service
+     * Key ID or API key used to connect to the service.
+     *
+     * @var string
      */
-
-    public $keyId;
+    public ?string $keyId = null;
 
     /**
-     * @var string Secret key used to connect ot the service
+     * Secret key used to connect ot the service
+     *
+     * @var string|null
      */
-
-    public $secretKey;
+    public ?string $secretKey = null;
 
     // =Public Methods
     // =========================================================================
@@ -68,8 +69,7 @@ class ServiceCredentials extends Model
     /**
      * @inheritdoc
      */
-
-    public function behaviors()
+    public function defineBehaviors(): array
     {
         $behaviors = parent::behaviors();
 
@@ -93,13 +93,13 @@ class ServiceCredentials extends Model
     /**
      * @inheritdoc
      */
-
-    public function rules()
+    public function defineRules(): array
     {
-        $rules = parent::rules();
+        $rules = parent::defineRules();
 
         // =service supported
-        $rules['serviceSupported'] = [ 'service', 'in', 'range' => Coconut::SUPPORTED_SERVICES ];
+        $rules['serviceSupported'] = [
+            'service', 'in', 'range' => Coconut::SUPPORTED_SERVICES ];
 
         // =required attributes
         // get list of required attributes based on service
@@ -148,8 +148,7 @@ class ServiceCredentials extends Model
     /**
      * @return array
      */
-
-    public function toParams()
+    public function toParams(): array
     {
         $params = [];
 
@@ -170,7 +169,6 @@ class ServiceCredentials extends Model
      *
      * @return array
      */
-
     protected function paramFields(): array
     {
         $fields = [];

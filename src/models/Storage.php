@@ -16,7 +16,7 @@ use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;
-use craft\helpers\StringHelper;
+use craft\base\VolumeInterface;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
@@ -31,120 +31,143 @@ use yoannisj\coconut\helpers\JobHelper;
  * @property string $container Alias for 'bucket' property
  *
  */
-
 class Storage extends Model
 {
     // =Static
     // =========================================================================
 
+    /**
+     * @var string
+     */
     const SCENARIO_DEFAULT = 'default';
+
+    /**
+     * @var string
+     */
     const SCENARIO_CONFIG = 'config';
 
     // =Properties
     // =========================================================================
 
     /**
-     * @var string Base URL on which to store output URLs (via HTTP(S) or (S)FTP)
+     * Base URL on which to store output URLs (via HTTP(S) or (S)FTP)
+     *
+     * @var string|null
      */
-
-    public $url;
+    public ?string $url = null;
 
     /**
-     * @var string Handle of storage service
+     * Handle of storage service
+     *
+     * @var ?string
      */
-
-    public $service;
+    public ?string $service = null;
 
     /**
-     * @var array Credentials used to connect to storage service
+     * Credentials used to connect to storage service
+     *
+     * @var array|null
      */
-
-    private $_credentials;
+    private ?array $_credentials = null;
 
     /**
-     * @var string Name of storage service bucket/volume
+     * Name of storage service bucket/volume
+     *
+     * @var string|null
      */
-
-    public $bucket;
+    public ?string $bucket = null;
 
     /**
-     * @var string Name of storage container (for Rackspace service only)
+     * Name of storage container (for Rackspace service only)
+     *
+     * @var string|null
      */
-
-    public $container;
+    public ?string $container = null;
 
     /**
-     * @var string Region of storage service bucket/volume
+     * Region of storage service bucket/volume
+     *
+     * @var string|null
      */
-
-    public $region;
+    public ?string $region = null;
 
     /**
-     * @var string The absolute path where you want the output files to be uploaded.
+     * The absolute path where you want the output files to be uploaded.
+     *
+     * @var string
      */
-
-    public $path;
+    public string $path = '';
 
     /**
-     * @var bool Whether stored output URLs should use the `https://` scheme
+     * Whether stored output URLs should use the `https://` scheme
+     *
+     * @var bool
      */
-
-    public $secure;
+    public bool $secure = true;
 
     /**
-     * @var string Access Control List policy to use for stored output files
+     * Access Control List policy to use for stored output files
+     *
+     * @var string|null
      */
-
-    public $acl;
+    public ?string $acl = null;
 
     /**
-     * @var string Storage class for stored output files
+     * Storage class for stored output files
+     *
+     * @var string|null
      */
-
-    public $storageClass;
+    public ?string $storageClass = null;
 
     /**
-     * @var string Expires header value for stored output files
+     * Expires header value for stored output files
+     *
+     * @var string|null
      */
-
-    public $expires;
+    public ?string $expires = null;
 
     /**
-     * @var string CacheControl header value for stored output files
+     * CacheControl header value for stored output files
+     *
+     * @var ?string
      */
-
-    public $cacheControl;
+    public ?string $cacheControl = null;
 
     /**
-     * @var string Endpoint URL for AWS S3-compatible storage service
+     * Endpoint URL for AWS S3-compatible storage service
+     *
+     * @var string|null
      */
-
-    public $endpoint;
+    public ?string $endpoint = null;
 
     /**
-     * @var bool Whether to always use path style stored output file URLs
+     * Whether to always use path style stored output file URLs
      *  (required by some services).
+     *
+     * @var bool
      */
-
-    public $forcePathStyle;
+    public bool $forcePathStyle = false;
 
     /**
-     * @param string|null Handle for named storage or Craft volume storage
+     * Handle for named storage or Craft volume storage
+     *
+     * @param string|null
      */
-
-    private $_handle;
+    private ?string $_handle = null;
 
     /**
-     * @param int Id of Craft volume for storage
+     * ID of Craft volume for storage
+     *
+     * @param int|null
      */
-
-    private $_volumeId;
+    private ?int $_volumeId = null;
 
     /**
-     * @param VolumeInterface|null Craft volume for storage
+     * Craft volume for storage
+     *
+     * @var VolumeInterface|null
      */
-
-    private $_volume;
+    private ?VolumeInterface $_volume = null;
 
     // =Public Methods
     // =========================================================================
@@ -152,10 +175,9 @@ class Storage extends Model
     /**
      * @inheritdoc
      */
-
-    public function behaviors()
+    public function defineBehaviors(): array
     {
-        $behaviors = parent::behaviors();
+        $behaviors = parent::defineBehaviors();
 
         $behaviors[] = [
             'class' => PropertyAliasBehavior::class,
@@ -176,11 +198,15 @@ class Storage extends Model
      * Setter method for normalized `credentials` property
      *
      * @param array|ServiceCredentials|null $credentials
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setCredentials( $credentials = null )
+    public function setCredentials(
+        array|ServiceCredentials|null $credentials
+    ): static
     {
         $this->_credentials = $credentials;
+        return $this;
     }
 
     /**
@@ -188,7 +214,6 @@ class Storage extends Model
      *
      * @return ServiceCredentials|null
      */
-
     public function getCredentials()
     {
         if (empty($this->service)) {
@@ -208,9 +233,10 @@ class Storage extends Model
 
     /**
      * @param string|null $handle
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setHandle( string $handle = null )
+    public function setHandle( string|null $handle ): static
     {
         $this->_handle = $handle;
         $this->_volumeId = null;
@@ -218,13 +244,14 @@ class Storage extends Model
         if ($this->_volume && $this->_volume->handle != $handle) {
             $this->_volume = null;
         }
+
+        return $this;
     }
 
     /**
      * @return string|null
      */
-
-    public function getHandle()
+    public function getHandle(): ?string
     {
         if (!isset($this->_handle)
             && ($volume = $this->getVolume()))
@@ -236,10 +263,11 @@ class Storage extends Model
     }
 
     /**
-     * @param integer|null $volumeId
+     * @param int|null $volumeId
+     * @return static Back-reference for method chaining
      */
 
-    public function setVolumeId( int $volumeId = null )
+    public function setVolumeId( int|null $volumeId ): static
     {
         $this->_volumeId = $volumeId;
 
@@ -250,13 +278,14 @@ class Storage extends Model
         if ($volumeId) {
             $this->_handle = null;
         }
+
+        return $this;
     }
 
     /**
-     * @return integer|null
+     * @return int|null
      */
-
-    public function getVolumeId()
+    public function getVolumeId(): ?int
     {
         if (!isset($this->_volumeId) && $this->_volume)
         {
@@ -268,9 +297,10 @@ class Storage extends Model
 
     /**
      * @param VolumeInterface|null $volume
+     *
+     * @return static Back-reference for method chaining
      */
-
-    public function setVolume( VolumeInterface $volume = null )
+    public function setVolume( VolumeInterface|null $volume ): static
     {
         $this->_volume = $volume;
 
@@ -280,13 +310,14 @@ class Storage extends Model
         } else {
             $this->_volumeId = null;
         }
+
+        return $this;
     }
 
     /**
      * @return VolumeInterface|null
      */
-
-    public function getVolume()
+    public function getVolume(): ?VolumeInterface
     {
         if (!isset($this->_volume) && $this->_volumeId)
         {
@@ -303,7 +334,6 @@ class Storage extends Model
     /**
      * @inheritdoc
      */
-
     public function attributes()
     {
         $attributes = parent::attributes();
@@ -314,17 +344,15 @@ class Storage extends Model
         return $attributes;
     }
 
-
     // =Validation
     // -------------------------------------------------------------------------
 
     /**
      * @inheritdoc
      */
-
-    public function rules()
+    public function defineRules(): array
     {
-        $rules = parent::rules();
+        $rules = parent::defineRules();
 
         // =service supported
         $rules['serviceSupported'] = [ 'service', 'in', 'range' => Coconut::SUPPORTED_SERVICES ];
@@ -383,9 +411,14 @@ class Storage extends Model
      * @param string $attribute
      * @param array $params
      * @param InlineValidator $validator
+     *
+     * @return void
      */
-
-    public function validateCredentials( string $attribute, array $params, InlineValidator $validator )
+    public function validateCredentials(
+        string $attribute,
+        array $params,
+        InlineValidator $validator
+    ): void
     {
         $credentials = $this->$attribute;
 
@@ -402,8 +435,7 @@ class Storage extends Model
     /**
      * @inheritdoc
      */
-
-    public function extraFields()
+    public function extraFields(): array
     {
         $fields = parent::extraFields();
 
@@ -417,7 +449,6 @@ class Storage extends Model
      *
      * @return array
      */
-
     public function toParams(): array
     {
         $params = [];
@@ -448,7 +479,6 @@ class Storage extends Model
      *
      * @return array
      */
-
     protected function paramFields(): array
     {
         // no service? use HTTP, (S)FTP protocol with `url` only

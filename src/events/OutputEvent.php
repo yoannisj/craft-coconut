@@ -13,22 +13,20 @@
 namespace yoannisj\coconut\events;
 
 use yii\base\Event;
+use yoannisj\models\Output;
 
 /**
- *
+ * Model for transcoding Output events
  */
-
 class OutputEvent extends Event
 {
     /**
-     * @var Output|null
+     * @var Output|null Output associated with the event
      */
-
-    public $output;
+    public Output $output;
 
     /**
-     * @var bool|null
+     * @var bool Whether the associated Output is new (i.e. it was never saved yet)
      */
-
-    public $isNew;
+    public bool $isNew = false;
 }

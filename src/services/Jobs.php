@@ -21,6 +21,7 @@ use yii\base\InvalidArgumentException;
 use Craft;
 use craft\base\Component;
 use craft\base\VolumeInterface;
+use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
 
@@ -35,80 +36,104 @@ use yoannisj\coconut\events\CancellableJobEvent;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
- * Singleton service class to work with Coconut Jobs
+ * Service component class to work with Coconut Jobs
  */
-
 class Jobs extends Component
 {
     // =Static
     // =========================================================================
 
+    /**
+     * Name of event triggered before a Coconut job is saved
+     *
+     * @var string
+     */
     const EVENT_BEFORE_SAVE_JOB = 'beforeSaveJob';
+
+    /**
+     * Name of event triggered after a Coconut job is saved
+     *
+     * @var string
+     */
     const EVENT_AFTER_SAVE_JOB = 'afterSaveJob';
 
     // =Properties
     // =========================================================================
 
     /**
-     * @var Job[] List of memoized Coconut jobs indexed by their ID
+     * Map of memoized Coconut jobs indexed by their ID
+     *
+     * @var Job[]
      */
-
-    private $_jobsPerId = [];
+    private array $_jobsPerId = [];
 
     /**
-     * @var Job[] List of memoized Coconut jobs indexed by their coconut ID
+     * Map of memoized Coconut jobs indexed by their coconut ID
+     *
+     * @var Job[]
      */
-
-    private $_jobsPerCoconutId = [];
+    private array $_jobsPerCoconutId = [];
 
     /**
-     * @var Job[] List of memoized Coconut jobs indexed by their input asset ID
+     * Map of memoized Coconut jobs indexed by their input asset ID
+     *
+     * @var Job[]
      */
-
-    private $_jobsPerInputAssetId = [];
+    private array $_jobsPerInputAssetId = [];
 
     /**
-     * @var Job[] List of memoized Coconut jobs indexed by their input asset ID
+     * Map of memoized Coconut jobs indexed by their input asset ID
+     *
+     * @var Job[]
      */
-
-    private $_jobsPerInputUrlHash = [];
+    private array $_jobsPerInputUrlHash = [];
 
     /**
+     * Map of memoized job info per Coconut job ID.
+     *
      * @var array[]
      */
-
     private $_jobInfoByCoconutId = [];
 
     /**
+     * Map of memoized job metadata per Coconut job ID.
+     *
      * @var array[]
      */
-
-    private $_jobMetadataByCoconutId = [];
+    private array $_jobMetadataByCoconutId = [];
 
     // =Public Methods
     // =========================================================================
 
     /**
-     * @param string $handle
+     * Returns the Job model for given job name. Jobs are named by their key
+     * in the `jobs` config setting.
+     *
+     * @see yoannisj\coconut\models\Settings::jobs To learn about named jobs
+     *
+     * @param string $handle Name of the job to get
      *
      * @return Job|null
      */
-
-    public function getNamedJobs( string $handle )
+    public function getNamedJob( string $handle ): ?Job
     {
-        $namedJobs = Coconut::$plugin->getSettings()->getNamedJobs();
+        $namedJobs = Coconut::$plugin->getSettings()->getJobs();
         return $namedJobs[$handle] ?? null;
     }
 
     /**
+     * Returns the default Job model configured for given Asset Volume.
+     *
+     * @see yoannisj\coconut\models\Settings::volumeJobs To learn about
+     * configuring default transcoding jobs for asset volumes.
+     *
      * @param string|VolumeInterface $volume
      *
      * @return Job|null
      *
      * @throws InvalidArgumentException If given $volume argument is not a volume instance of handle
      */
-
-    public function getVolumeJob( $volume )
+    public function getVolumeJob( string|VolumeInterface $volume ): ?Job
     {
         $handle = null;
 
@@ -129,17 +154,16 @@ class Jobs extends Component
     }
 
     /**
-     * Runs given job via Coconut's API
+     * Runs given transcoding job via the Coconut API.
      *
-     * @param Job $job Th job model to run
-     * @param boolean $runValidation Whether to validate given job before submitting it to Coconut
+     * @param Job $job The transcoding Job to run
+     * @param bool $runValidation Whether to validate given job before submitting it to Coconut
      *
-     * @return boolean Whether job was successfully ran or not
+     * @return bool Whether job was successfully ran or not
      *
-     * @throws \Coconut\Error if Coconut API could not be reached or returned an error
+     * @throws CoconutError if Coconut API could not be reached or returned an error
      */
-
-    public function runJob( Job $job, bool $runValidation = true )
+    public function runJob( Job $job, bool $runValidation = true ): bool
     {
         if (isset($job->coconutId))
         {
@@ -149,10 +173,10 @@ class Jobs extends Component
 
         if ($runValidation && !$job->validate())
         {
-            Craft::info('Could not run Job due to validation error(s): '.
-                print_r($job->errors, true), __METHOD__);
+            $message = 'Could not run Job due to validation error(s)';
+            Craft::info($message.':'.print_r($job->errors, true), 'coconut');
 
-                return false;
+            return false;
         }
 
         // use Coconut API to run the job
@@ -167,14 +191,13 @@ class Jobs extends Component
     }
 
     /**
-     * Saves given job model to the database
+     * Saves given transcoding Job model in the database.
      *
-     * @param Job $job
-     * @param boolean $runValidation
+     * @param Job $job The transcoding job to save
+     * @param bool $runValidation Whether to validate the Job model before saving it
      *
-     * @return boolean
+     * @return bool Whether the Job model was saved successfully
      */
-
     public function saveJob( Job $job, bool $runValidation = true ): bool
     {
         $isNewJob = !isset($job->id);
@@ -261,13 +284,13 @@ class Jobs extends Component
     }
 
     /**
-     * Pulls info for given job from Coconut API
+     * Updates given transcoding Job model with the information returned by
+     * the Coconut API.
      *
-     * @param Job $job
+     * @param Job $job The transcoding job to pull information for
      *
-     * @return bool Whether job info could be retrieved
+     * @return bool Whether job info could be retrieved successfully
      */
-
     public function pullJobInfo( Job $job ): bool
     {
         if (!isset($job->coconutId)) {
@@ -299,13 +322,13 @@ class Jobs extends Component
     }
 
     /**
-     * Pulls metadata for given job from Coconut API
+     * Updates given transcoding Job model with the metadata returned by
+     * the Coconut API.
      *
-     * @param Job $job
+     * @param Job $job Job to pull the metadata for
      *
-     * @return bool Whether metadata could be retrieved
+     * @return bool Whether the metadata could be retrieved successfully
      */
-
     public function pullJobMetadata( Job $job ): bool
     {
         if (!isset($job->coconutId)) {
@@ -338,16 +361,20 @@ class Jobs extends Component
     }
 
     /**
-     * Updates a coconut job with given data
+     * Updates transcoding Job model with given data, and saves it in
+     * the database.
      *
-     * @param Job $job Coconut job to update
+     * @param Job $job Transcoding job to update
      * @param array $data Data to update the job with (may include outputs data)
      * @param bool $runValidation Whether to validate the updated job
      *
-     * @return bool
+     * @return bool Whether the job was be updated and saved successfully
      */
-
-    public function updateJob( Job $job, array $data, bool $runValidation = true )
+    public function updateJob(
+        Job $job,
+        array $data,
+        bool $runValidation = true
+    ): bool
     {
         if (!isset($job->id)) {
             throw new InvalidArgumentException('Can not update a new job');
@@ -361,16 +388,20 @@ class Jobs extends Component
     }
 
     /**
-     * Updates job input metadata based on given data
+     * Updates transcoding Job with given input data, and saves it back
+     * in the database.
      *
-     * @param Job $job Coconut job the input belongs to
-     * @param array $inputData Data to update the job input with
+     * @param Job $job Transcoding job the input belongs to
+     * @param array $inputData Input data to update the job input with
      * @param bool $runValidation Whether to validate the updated job when saving
      *
-     * @return bool Whether the job was succesfully updated and saved
+     * @return bool Whether the job was succesfully updated and saved successfully
      */
-
-    public function updateJobInput( Job $job, array $inputData, bool $runValidation = true )
+    public function updateJobInput(
+        Job $job,
+        array $inputData,
+        bool $runValidation = true
+    ): bool
     {
         if (!$job->id) {
             throw new InvalidArgumentException("Can not update new Job model");
@@ -384,16 +415,20 @@ class Jobs extends Component
     }
 
     /**
-     * Updates job output based on given data
+     * Updates transcofing Job with given output data, and saves it back
+     * in the database.
      *
-     * @param Job $job Coconut job the output belongs to
+     * @param Job $job Transcofing job the output data belongs to
      * @param array $outputData Output data to update the job with
      * @param bool $runValidation Whether to validate the updated job when saving
      *
-     * @return bool Whether the job output was succesfully updated and saved
+     * @return bool Whether the job output was succesfully updated and saved successfully
      */
-
-    public function updateJobOutput( Job $job, array $outputData, bool $runValidation = true )
+    public function updateJobOutput(
+        Job $job,
+        array $outputData,
+        bool $runValidation = true
+    ): bool
     {
         if (!$job->id) {
             throw new InvalidArgumentException("Can not update new Job model");
@@ -427,12 +462,13 @@ class Jobs extends Component
     }
 
     /**
-     * @param integer $id
+     * Fetches transcoding Job from the database by its ID.
+     *
+     * @param int $id ID of job to retreive.
      *
      * @return Job|null
      */
-
-    public function getJobById( int $id )
+    public function getJobById( int $id ): ?Job
     {
         if (!array_key_exists($id, $this->_jobsPerId))
         {
@@ -449,12 +485,13 @@ class Jobs extends Component
     }
 
     /**
-     * Retrieves job with given coconut ID
+     * Retrieves transcoding Job from the database by its coconut ID.
+     *
+     * @param string $coconutId Cococnut ID of the Job
      *
      * @return Job|null
      */
-
-    public function getJobByCoconutId( string $coconutId )
+    public function getJobByCoconutId( string $coconutId ): ?Job
     {
         if (!array_key_exists($coconutId, $this->_jobsPerCoconutId))
         {
@@ -473,26 +510,24 @@ class Jobs extends Component
     }
 
     /**
-     * Retrieves list of all jobs for given Asset
+     * Retrieves list of all transcoding jobs for given Asset
      *
      * @param Asset $asset
      *
      * @return Job[]
      */
-
     public function getJobsForInputAsset( Asset $asset ): array
     {
         return $this->getJobsForInputAssetId($asset->id);
     }
 
     /**
-     * Retrieves list of all jobs for given asset URL
+     * Retrieves list of all transcoding jobs for given Asset ID.
      *
      * @param int $assetId
      *
      * @return Job[]
      */
-
     public function getJobsForInputAssetId( int $assetId ): array
     {
         if (!array_key_exists($assetId, $this->_jobsPerInputAssetId))
@@ -513,13 +548,12 @@ class Jobs extends Component
     }
 
     /**
-     * Retrieves list of all jobs for given input url
+     * Retrieves list of all transcoding jobs for given input url.
      *
-     * @param string $url
+     * @param string $url URL of input to get jobs for
      *
      * @return Job[]
      */
-
     public function getJobsForInputUrl( string $url ): array
     {
         $urlHash = md5($url);
@@ -544,10 +578,13 @@ class Jobs extends Component
     }
 
     /**
+     * Retrieves list of all transcoding jobs for given input video.
      *
+     * @param string|int|Asset|Input $input Input for which to get all jobs
+     *
+     * @return Job[]
      */
-
-    public function getJobsForInput( $input ): array
+    public function getJobsForInput( string|int|Asset|Input $input ): array
     {
         $input = JobHelper::resolveInput($input);
 
@@ -663,13 +700,13 @@ class Jobs extends Component
      * @return object Information retrieved about the job
      */
 
-    public function checkJob( int $jobId, $updateOutputs = true )
-    {
-        $jobInfo = CoconutJob::get($jobId);
-        $this->updateJob($jobInfo, $updateOutputs);
+    // public function checkJob( int $jobId, $updateOutputs = true )
+    // {
+    //     $jobInfo = CoconutJob::get($jobId);
+    //     $this->updateJob($jobInfo, $updateOutputs);
 
-        return $jobInfo;
-    }
+    //     return $jobInfo;
+    // }
 
     /**
      * Helper method to handle status update status for given Coconut job.
@@ -705,10 +742,15 @@ class Jobs extends Component
     // =========================================================================
 
     /**
+     * Stores reference to given job record in internal memoization properties,
+     * in order to optimize the multiple methods for fetching jobs from the
+     * database.
      *
+     * @param JobRecord $record Job record to store/memoize
+     *
+     * @return void
      */
-
-    protected function memoizeJobRecord( JobRecord $record = null )
+    protected function memoizeJobRecord( JobRecord $record = null ): void
     {
         $job = JobHelper::populateJobFromRecord(new Job(), $record);
         $input = $job->getInput();
@@ -756,33 +798,32 @@ class Jobs extends Component
      *
      * @throws Job error exception
      */
+    // protected function onJobError( $jobInfo, bool $updateOutputs = true )
+    // {
+    //     $jobId = $jobInfo->id ?? null;
+    //     $jobOutputs = null;
 
-    protected function onJobError( $jobInfo, bool $updateOutputs = true )
-    {
-        $jobId = $jobInfo->id ?? null;
-        $jobOutputs = null;
+    //     if ($updateOutputs && $jobId)
+    //     {
+    //         $service = Coconut::$plugin->getOutputs();
+    //         $jobOutputs = $service->getJobOutputs($jobId);
 
-        if ($updateOutputs && $jobId)
-        {
-            $service = Coconut::$plugin->getOutputs();
-            $jobOutputs = $service->getJobOutputs($jobId);
+    //         foreach ($jobOutputs as $output) {
+    //             $service->deleteOutput($output);
+    //         }
+    //     }
 
-            foreach ($jobOutputs as $output) {
-                $service->deleteOutput($output);
-            }
-        }
+    //     // trigger EVENT_JOB_ERROR
+    //     $errorEvent = new JobEvent([
+    //         'updateOutputs' => $updateOutputs,
+    //         'jobInfo' => $jobInfo,
+    //         'jobOutputs' => $jobOutputs,
+    //     ]);
 
-        // trigger EVENT_JOB_ERROR
-        $errorEvent = new JobEvent([
-            'updateOutputs' => $updateOutputs,
-            'jobInfo' => $jobInfo,
-            'jobOutputs' => $jobOutputs,
-        ]);
+    //     $this->trigger(self::EVENT_JOB_ERROR, $errorEvent);
 
-        $this->trigger(self::EVENT_JOB_ERROR, $errorEvent);
-
-        throw new Exception($jobInfo->message);
-    }
+    //     throw new Exception($jobInfo->message);
+    // }
 
     /**
      * Handles completion for given Coconut job.
@@ -792,80 +833,79 @@ class Jobs extends Component
      *
      * @return null|array Updated list of outputs if `$updateOutputs` argument is `true`
      */
+    // protected function onJobComplete( $jobInfo, bool $updateOutputs = true )
+    // {
+    //     if (!$updateOutputs) {
+    //         return null;
+    //     }
 
-    protected function onJobComplete( $jobInfo, bool $updateOutputs = true )
-    {
-        if (!$updateOutputs) {
-            return null;
-        }
+    //     $service = Coconut::$plugin->getOutputs();
 
-        $service = Coconut::$plugin->getOutputs();
+    //     $jobOutputs = $service->getJobOutputs($jobInfo->id);
+    //     $outputUrls = (array)$jobInfo->output_urls;
 
-        $jobOutputs = $service->getJobOutputs($jobInfo->id);
-        $outputUrls = (array)$jobInfo->output_urls;
+    //     $metadata = [];
+    //     $result = CoconutJob::getAllMetadata($jobInfo->id);
+    //     if ($result && property_exists($result, 'metadata')) {
+    //         $metadata = JsonHelper::decode(JsonHelper::encode($result->metadata));
+    //     }
 
-        $metadata = [];
-        $result = CoconutJob::getAllMetadata($jobInfo->id);
-        if ($result && property_exists($result, 'metadata')) {
-            $metadata = JsonHelper::decode(JsonHelper::encode($result->metadata));
-        }
+    //     // @todo: compare at db output urls with jobInfo->outputUrls to discover
+    //     // errors in anticipative urls saved in the DB
+    //     // -> problem: if we don't add the ?host arg in output urls to the coconut job,
+    //     //  resulting jobInfo->outputUrls use "http://"
+    //     // -> problem: when passing "https://s3.amazonaws.com/<bucket-name>" in the ?host arg,
+    //     //  resulting jobInfo->outputUrls still use "https://<bucket-name>.s3.amazonaws.com/"
+    //     // ->problem: when passing "https://<bucket-name>.s3.amazonaws.com/" in the ?host arg,
+    //     //  the coconut job does not throw an error, but transcoding still fails for every file
 
-        // @todo: compare at db output urls with jobInfo->outputUrls to discover
-        // errors in anticipative urls saved in the DB
-        // -> problem: if we don't add the ?host arg in output urls to the coconut job,
-        //  resulting jobInfo->outputUrls use "http://"
-        // -> problem: when passing "https://s3.amazonaws.com/<bucket-name>" in the ?host arg,
-        //  resulting jobInfo->outputUrls still use "https://<bucket-name>.s3.amazonaws.com/"
-        // ->problem: when passing "https://<bucket-name>.s3.amazonaws.com/" in the ?host arg,
-        //  the coconut job does not throw an error, but transcoding still fails for every file
+    //     foreach ($jobOutputs as $output)
+    //     {
+    //         $output->inProgress = false;
+    //         $output->metadata = $metadata[$output->format] ?? null;
 
-        foreach ($jobOutputs as $output)
-        {
-            $output->inProgress = false;
-            $output->metadata = $metadata[$output->format] ?? null;
+    //         $service->saveOutput($output);
+    //     }
 
-            $service->saveOutput($output);
-        }
+    //     // $completedOutputs = [];
+    //     // $invalidOutputs = [];
 
-        // $completedOutputs = [];
-        // $invalidOutputs = [];
+    //     // foreach ($jobOutputs as $output)
+    //     // {
+    //     //     $formatUrls = $outputUrls[$output->format] ?? [];
+    //     //     if (!is_array($formatUrls)) $formatUrls = [ $formatUrls ];
 
-        // foreach ($jobOutputs as $output)
-        // {
-        //     $formatUrls = $outputUrls[$output->format] ?? [];
-        //     if (!is_array($formatUrls)) $formatUrls = [ $formatUrls ];
+    //     //     if (in_array($output->url, $formatUrls)) {
+    //     //         $completedOutputs[] = $output;
+    //     //     }
 
-        //     if (in_array($output->url, $formatUrls)) {
-        //         $completedOutputs[] = $output;
-        //     }
+    //     //     else {
+    //     //         $invalidOutputs[] = $output;
+    //     //     }
+    //     // }
 
-        //     else {
-        //         $invalidOutputs[] = $output;
-        //     }
-        // }
+    //     // foreach ($completedOutputs as $output)
+    //     // {
+    //     //     $output->inProgress = false;
+    //     //     $service->saveOutput($output);
+    //     // }
 
-        // foreach ($completedOutputs as $output)
-        // {
-        //     $output->inProgress = false;
-        //     $service->saveOutput($output);
-        // }
+    //     // foreach ($invalidOutputs as $output) {
+    //     //     $service->deleteOutput($output); // removes output file
+    //     // }
 
-        // foreach ($invalidOutputs as $output) {
-        //     $service->deleteOutput($output); // removes output file
-        // }
+    //     // return $completedOutputs;
 
-        // return $completedOutputs;
+    //     // trigger EVENT_JOB_COMPLETE
+    //     $completeEvent = new JobEvent([
+    //         'updateOutputs' => $updateOutputs,
+    //         'jobInfo' => $jobInfo,
+    //         'jobOutputs' => $jobOutputs,
+    //     ]);
 
-        // trigger EVENT_JOB_COMPLETE
-        $completeEvent = new JobEvent([
-            'updateOutputs' => $updateOutputs,
-            'jobInfo' => $jobInfo,
-            'jobOutputs' => $jobOutputs,
-        ]);
+    //     $this->trigger(self::EVENT_JOB_COMPLETE, $completeEvent);
 
-        $this->trigger(self::EVENT_JOB_COMPLETE, $completeEvent);
-
-        return $jobOutputs;
-    }
+    //     return $jobOutputs;
+    // }
 
 }

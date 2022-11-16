@@ -13,22 +13,20 @@
 namespace yoannisj\coconut\events;
 
 use yii\base\Event;
+use yoannisj\coconut\models\Job;
 
 /**
- *
+ * Model for transcoding Job events
  */
-
 class JobEvent extends Event
 {
     /**
-     * @var |yoannisj\coconut\models\Job | null
+     * @var Job Job associated with the event
      */
-
-    public $job;
+    public Job $job;
 
     /**
-     * @var bool|null
+     * @var bool Whether the associated job is new (i.e. it was never saved yet)
      */
-
-    public $isNew;
+    public bool $isNew = false;
 }

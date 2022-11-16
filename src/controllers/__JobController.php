@@ -15,44 +15,41 @@ namespace yoannisj\coconut\controllers;
 use yii\web\BadRequestHttpException;
 
 use Craft;
-use craft\base\Controller;
-use craft\elements\Asset;
+use craft\web\Controller;
 use craft\web\Request;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\queue\jobs\TranscodeJob;
 
 /**
- * 
+ * Web Controller to work with transcoding Jobs
  */
-
 class JobController extends Controller
 {
     // =Properties
     // =========================================================================
 
     /**
-     * @inheritdocs
+     * @inheritdoc
      */
-
     public $allowAnonymous = true;
 
     // =Public Methods
     // =========================================================================
 
     /**
-     * Pushes a new coconut job to the queue
+     * Action to complete a transcofing job
      */
-
     public function actionComplete()
     {
         $request = Craft::$app->getRequest();
-
-
         $jobInfo = $this->getJobInfoFromWebhook($request);
 
-        Craft::error('WEBHOOK');
-        Craft::error($jobInfo);
+        Craft::info([
+            'method' => __METHOD__,
+            'jobInfo' => $jobInfo,
+        ], 'coconut-debug');
+
+        // @todo Explicitly return OK code
 
         Coconut::$plugin->getJobs()->updateJob($jobInfo, true);
     }
@@ -77,8 +74,6 @@ class JobController extends Controller
         $outputPath = $request->getRequiredParam('outputPath');
         $outputFile = $request->getRequiredParam('encoded_video');
 
-        Craft::error('OUTPUT IS RESOURCE:: ' . is_resource($outputFile) ? 'YES' : 'NO');
-
         // replace / create file on volume
         if ($volume->fileExists($outputPath)) {
             $volume->updateFileByStream($outputPath, $outputFile);
@@ -91,9 +86,8 @@ class JobController extends Controller
     // =========================================================================
 
     /**
-     *
+     * Returns Job info from Coconut.co Notification webhook paybload
      */
-
     protected function getJobInfoFromWebhook( Request $request )
     {
         $params = $request->getBodyParams();
@@ -115,7 +109,7 @@ class JobController extends Controller
     }
 
     /**
-     * 
+     *
      */
 
     protected function handleComplete( array $data )
@@ -124,7 +118,7 @@ class JobController extends Controller
     }
 
     /**
-     * 
+     *
      */
 
 
@@ -134,7 +128,7 @@ class JobController extends Controller
     }
 
     /**
-     * 
+     *
      */
 
     protected function handleOutputs()
@@ -143,7 +137,7 @@ class JobController extends Controller
     }
 
     /**
-     * 
+     *
      */
 
     protected function handleErrors()

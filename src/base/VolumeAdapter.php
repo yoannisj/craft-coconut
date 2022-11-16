@@ -20,16 +20,17 @@ use yoannisj\coconut\base\VolumeAdapterInterface;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
- * Base volume adapter used to transfer coconut output files
+ * Base volume adapter used to store coconut output files
  */
-
 class VolumeAdapter implements VolumeAdapterInterface
 {
     /**
      * @inheritdoc
      */
-
-    public static function outputUploadUrl( VolumeInterface $volume, string $outputPath ): string
+    public static function outputUploadUrl(
+        VolumeInterface $volume,
+        string $outputPath
+    ): string
     {
         return JobHelper::publicActionUrl('coconut/jobs/upload', [
             'volume' => $volume->handle,
@@ -40,8 +41,10 @@ class VolumeAdapter implements VolumeAdapterInterface
     /**
      * @inheritdoc
      */
-
-    public static function outputPublicUrl( VolumeInterface $volume, string $outputPath ): string
+    public static function outputPublicUrl(
+        VolumeInterface $volume,
+        string $outputPath
+    ): string
     {
         $url = $volume->getRootUrl().$outputPath;
         return rtrim(JobHelper::publicUrl($url), '/');

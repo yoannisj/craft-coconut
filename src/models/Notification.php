@@ -18,80 +18,103 @@ use craft\helpers\ArrayHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
-use yoannisj\coconut\models\Credentials;
+use yoannisj\coconut\models\ServiceCredentials;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
  * Class representing notification params for the Coconut API
  */
-
 class Notification extends Model
 {
     // =Static
     // =========================================================================
 
+    /**
+     * @var string
+     */
     const EVENT_INPUT_TRANSFERRED = 'input.transferred';
+
+    /**
+     * @var string
+     */
     const EVENT_OUTPUT_COMPLETED = 'output.completed';
+
+    /**
+     * @var string
+     */
     const EVENT_OUTPUT_FAILED = 'output.failed';
+
+    /**
+     * @var string
+     */
     const EVENT_JOB_COMPLETED = 'job.completed';
+
+    /**
+     * @var string
+     */
     const EVENT_JOB_FAILED = 'job.failed';
 
     // =Properties
     // =========================================================================
 
     /**
-     * @var string The notification type (either 'http' or 'sns')
+     * The notification type (either 'http' or 'sns')
+     *
+     * @var string|null
      */
-
-    public $type;
+    public ?string $type = null;
 
     /**
-     * @var string The URL Coconut should send notifications to
+     * The URL Coconut should send notifications to.
+     *
+     * @var string|null
      */
-
-    public $url;
+    public ?string $url = null;
 
     /**
-     * @var array Additional query parameters that Coconut should send along
-     *  with notification requests
+     * Additional query parameters that Coconut should send along with
+     * notification requests.
+     *
+     * @var array
      */
-
-    public $params = [];
+    public array $params = [];
 
     /**
-     * @var Credentials|null Credentials for SNS service notifications
+     * @var ServiceCredentials|null Credentials for SNS service notifications
      *  Applies only if `type` is set to 'sns'
      */
-
-    private $_credentials;
-
-    /**
-     * @var string Region used by SNS service notifications
-     *  Applies only if `type` is set to 'sns'
-     */
-
-    public $region;
+    private ?ServiceCredentials $_credentials;
 
     /**
-     * @var string Topci ARN for SNS service notifications
-     *  Applies only if `type` is set to 'sns'
+     * Region used by SNS service notifications.
+     * Applies only if `type` is set to 'sns'.
+     *
+     * @var string|null
      */
-
-    public $topicArn;
+    public ?string $region = null;
 
     /**
-     * @var boolean Whether the payload of Coconut notifications should include
-     *  metadata information
+     * Topic ARN for SNS service notifications.
+     * Applies only if `type` is set to 'sns'
+     *
+     * @var string|null
      */
-
-    public $metadata = false;
+    public ?string $topicArn = null;
 
     /**
-     * @var boolean Whether Coconut should send a notification for each and
-     *  every event
+     * Whether the payload of Coconut notifications should include
+     * metadata information.
+     *
+     * @var bool
      */
+    public bool $metadata = false;
 
-    public $events = false;
+    /**
+     * Whether Coconut should send a notification for each and every event.
+     *
+     * @var bool
+     */
+    public bool $events = false;
 
     // =Public Methods
     // =========================================================================
@@ -105,10 +128,9 @@ class Notification extends Model
     /**
      * @inheritdoc
      */
-
-    public function behaviors()
+    public function defineBehaviors(): array
     {
-        $behaviors = parent::behaviors();
+        $behaviors = parent::defineBehaviors();
 
         $behaviors[] =  [
             'class' => PropertyAliasBehavior::class,
@@ -129,7 +151,6 @@ class Notification extends Model
      *
      * @return array
      */
-
     public function toParams(): array
     {
         $params = [

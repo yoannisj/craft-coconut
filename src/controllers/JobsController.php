@@ -9,7 +9,6 @@
  * @package craft-coconut
  *
  */
-
 namespace yoannisj\coconut\controllers;
 
 use yii\base\ErrorException;
@@ -21,6 +20,7 @@ use Craft;
 use craft\web\Controller;
 use craft\elements\Asset;
 use craft\web\Request;
+use craft\web\Response;
 use craft\web\UploadedFile;
 use craft\errors\UploadFailedException;
 use craft\helpers\ArrayHelper;
@@ -31,14 +31,18 @@ use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Notification;
 
 /**
- *
+ * Web Controller to work with Coconut.co transcoding Jobs
  */
-
 class JobsController extends Controller
 {
     // =Static
     // =========================================================================
 
+    /**
+     * Regex pattern to validate output file paths
+     *
+     * @var string
+     */
     const FORBIDDEN_PATH_PATTERN = '/^\.{2}\/[\s\S]+/';
 
     // =Properties
@@ -47,26 +51,25 @@ class JobsController extends Controller
     /**
      * @inheritdoc
      */
-
-    public $allowAnonymous = true;
+    public bool $allowAnonymous = true;
 
     /**
      * @inheritdoc
      */
-
-    public $enableCsrfValidation = false;
+    public bool $enableCsrfValidation = false;
 
     // =Public Methods
     // =========================================================================
 
     /**
      * Webhook to update coconut job information in local DB
+     *
+     * @return Response
      */
-
-    public function actionNotify()
+    public function actionNotify(): Response
     {
-        // @todo: inject valid token in notification URL
-        // @todo: secure notification webhook:
+        // @todo Inject valid token in notification URL
+        // @todo Secure notification webhook:
 
         // $this->requireToken();
         $this->requirePostRequest();
@@ -78,7 +81,13 @@ class JobsController extends Controller
         $hasMetadata = $params['metadata'] ?? false;
         $data = $params['data'] ?? [];
 
-        Craft::error("NOTIFY [#$jobId] $event", 'coconut-debug');
+        Craft::debug([
+            'method' => __METHOD__,
+            'jobId' => $jobId,
+            'event' => $event,
+            'hasMetadata' => $hasMetadata,
+            'data' => $data,
+        ], 'coconut-debug');
 
         $coconutJobs = Coconut::$plugin->getJobs();
         $job = $coconutJobs->getJobByCoconutId($jobId);
@@ -117,15 +126,19 @@ class JobsController extends Controller
 
         if (!$success)
         {
-            Craft::error('JOB ERRORS', 'coconut-debug');
-            Craft::error($job->getErrorSummary(true));
+            Craft::info('Could not update job with ID '.$job->id, 'coconut');
 
-            Craft::error('OUTPUT ERRORS', 'coconut-debug');
-            foreach ($job->getOutputs() as $output)
-            {
-                Craft::error('> '.$output->key, 'coconut-debug');
-                Craft::error($output->getErrorSummary(true), 'coconut-debug');
-            }
+            Craft::debug([
+                'method' => __METHOD__,
+                'jobErrors' => $job->getErrorSummary(true),
+                'inputErrors' => $job->getInput()->getErrorSummary(true),
+                'outputErrors' => array_map(function($output) {
+                    return [
+                        'key' => $output->key,
+                        'errors' => $output->getErrorSummary(true),
+                    ];
+                }, $job->getOutputs()),
+            ], 'coconut-debug');
 
             throw new ServerErrorHttpException("Could not handle job notification");
         }
@@ -137,11 +150,20 @@ class JobsController extends Controller
     /**
      * Saves Coconut http(s) output files
      * @todo: use a setting to configure the `encoded_video` parameter name?
+     *
+     * @return Response
      */
-
-    public function actionUpload( string $volumeHandle, string $outputPath )
+    public function actionUpload(
+        string $volumeHandle,
+        string $outputPath
+    ): Response
     {
-        Craft::error('UPLOAD:: '. $volumeHandle . ' > '.$outputPath, 'coconut-debug');
+        Craft::debug([
+            'method' => __METHOD__,
+            'volumeHandle' => $volumeHandle,
+            'outputPath' => $outputPath,
+        ], 'coconut-debug');
+
         $this->requirePostRequest();
 
         // get volume model based on given handle
@@ -200,9 +222,13 @@ class JobsController extends Controller
 
     /**
      * Serves given output file if it exists
+     *
+     * @return Response
      */
-
-    public function actionOutput( string $volumeHandle, string $outputPath )
+    public function actionOutput(
+        string $volumeHandle,
+        string $outputPath
+    ): Response
     {
         $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
 
@@ -240,10 +266,10 @@ class JobsController extends Controller
      *
      * @return string Path to temporarily saved uploaded file
      *
+     * @throws UploadFailedException if $uploadedFile has errors
      * @throws UploadFailedException if $uploadedFile could not be saved
      */
-
-    protected function getUploadedFileTempPath( UploadedFile $uploadedFile )
+    protected function getUploadedFileTempPath( UploadedFile $uploadedFile ): string
     {
         if ($uploadedFile->getHasError()) {
             throw new UploadFailedException($uploadedFile->error);

@@ -15,10 +15,9 @@ namespace yoannisj\coconut\base;
 use craft\base\VolumeInterface;
 
 /**
- * Interface for volume adapters
+ * Interface for Asset Volume adapters
  */
-
-interface VolumeAdapterInterface 
+interface VolumeAdapterInterface
 {
     // =Static
     // =========================================================================
@@ -28,23 +27,27 @@ interface VolumeAdapterInterface
      * file into the volume.
      * **Note**: the `$filename` parameter may contain special segments such as "#num#".
      *
-     * @param \craft\base\VolumeInterface $volume The coconut format key 
+     * @param \craft\base\VolumeInterface $volume The coconut format key
      * @param string $outputPath Path to the folder where output will be saved
      *
      * @return string The url used to upload the output file into the volume
      */
-
-    public static function outputUploadUrl( VolumeInterface $volume, string $outputPath ): string;
+    public static function outputUploadUrl(
+        VolumeInterface $volume,
+        string $outputPath
+    ): string;
 
     /**
-     * Returns the url for the output
+     * Returns the public url to see and/or download the output file
      *
-     * @param \craft\base\VolumeInterface $volmume The coconut format key 
+     * @param \craft\base\VolumeInterface $volmume The coconut format key
      * @param string $outputPath The path to the folder where the will be uploaded
      *
      * @return string The public url for the output file
      */
-
-    public static function outputPublicUrl( VolumeInterface $volume, string $outputPath ): string;
+    public static function outputPublicUrl(
+        VolumeInterface $volume,
+        string $outputPath
+    ): string;
 
 }

@@ -21,15 +21,22 @@ use yoannisj\coconut\Coconut;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
- *
+ * Element action to transcode video Asset via Coconut.co
  */
-
 class TranscodeVideo extends ElementAction
 {
+    // =Static
+    // =========================================================================
+
+    // =Properties
+    // =========================================================================
+
+    // =Public Methods
+    // =========================================================================
+
     /**
      * @inheritdoc
      */
-
     public function getTriggerLabel(): string
     {
         return Craft::t('coconut', 'Transcode with Coconut');
@@ -38,8 +45,7 @@ class TranscodeVideo extends ElementAction
     /**
      * @inheritdoc
      */
-
-    public function getTriggerHtml()
+    public function getTriggerHtml(): ?string
     {
         $type = Json::encode(static::class);
         $fileExtensions = implode('|', JobHelper::INPUT_CONTAINERS);
@@ -67,12 +73,13 @@ class TranscodeVideo extends ElementAction
 EOD;
 
         Craft::$app->getView()->registerJs($js);
+
+        return null;
     }
 
     /**
      * @inheritdoc
      */
-
     public function performAction( ElementQueryInterface $query ): bool
     {
         // fetch video elements only

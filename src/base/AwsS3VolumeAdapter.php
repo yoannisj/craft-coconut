@@ -21,14 +21,15 @@ use yoannisj\coconut\base\VolumeAdapterInterface;
 /**
  * Adapter for AWS S3 Volumes, used to transfer coconut output files
  */
-
 class AwsS3VolumeAdapter implements VolumeAdapterInterface
 {
     /**
      * @inheritdoc
      */
-
-    public static function outputUploadUrl( VolumeInterface $volume, string $outputPath ): string
+    public static function outputUploadUrl(
+        VolumeInterface $volume,
+        string $outputPath
+    ): string
     {
         $secretKey = Craft::parseEnv($volume->secret);
         $accessKey = Craft::parseEnv($volume->keyId);
@@ -53,7 +54,7 @@ class AwsS3VolumeAdapter implements VolumeAdapterInterface
         // providers (e.g. digitalocean, etc.)
         // @todo: If the volume uses "http://<bucket-name>.s3.amazonaws.com/" as base url,
         //  passing the ?host argument results in empty jobInfo->outputUrls (the coconut dashboard
-        //  shows there was en error when transcoding outputs, but doesn't tell us which one) 
+        //  shows there was en error when transcoding outputs, but doesn't tell us which one)
         // $volumeHost = UrlHelper::hostInfo($volume->getRootUrl());
         // $hostArg = strpos($uploadUrl, '?') === false ? '?host=' : '&host=';
         // $uploadUrl .= $hostArg . $volumeHost;
@@ -64,8 +65,10 @@ class AwsS3VolumeAdapter implements VolumeAdapterInterface
     /**
      * @inheritdoc
      */
-
-    public static function outputPublicUrl( VolumeInterface $volume, string $outputPath ): string
+    public static function outputPublicUrl(
+        VolumeInterface $volume,
+        string $outputPath
+    ): string
     {
         $url = $volume->getRootUrl().$outputPath;
         return rtrim($url, '/');

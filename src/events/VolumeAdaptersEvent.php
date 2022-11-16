@@ -13,20 +13,19 @@
 namespace yoannisj\coconut\events;
 
 use yii\base\Event;
+use yoannisj\coconut\base\VolumeAdapterInterface;
 
 /**
- * RegisterVoluemAdaptersEvent class.
+ * Model for Volume Adapter events
  */
-
 class VolumeAdaptersEvent extends Event
 {
     // =Properties
     // =========================================================================
 
     /**
-     * @var array Associates volume types with a volume adapter class
+     * @var VolumeAdapterInterface[] Map associating volume types with a volume adapter class
      */
-
     public $adapters = [];
 
 }

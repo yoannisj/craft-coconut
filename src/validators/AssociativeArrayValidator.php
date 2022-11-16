@@ -13,12 +13,8 @@ use Craft;
 use craft\helpers\ArrayHelper;
 
 /**
- * Class ArrayValidator.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.0.0
+ * Validator class to validate associative array values.
  */
-
 class AssociativeArrayValidator extends Validator
 {
     // =Properties
@@ -27,38 +23,32 @@ class AssociativeArrayValidator extends Validator
     /**
      * @var array The keys that must exist in the associative array value
      */
-
-    public $requiredKeys = [];
+    public array $requiredKeys = [];
 
     /**
      * @var array The keys that can not exist in the associative array value
      */
-
-    public $forbiddenKeys = [];
+    public array $forbiddenKeys = [];
 
     /**
      * @var array The keys that can exist in the associative array value
      */
-
-    public $allowedKeys = [];
-
-    /**
-     * @var string|null
-     */
-
-    public $keyNotFound;
+    public array $allowedKeys = [];
 
     /**
      * @var string|null
      */
-
-    public $keyNotAllowed;
+    public ?string $keyNotFound = null;
 
     /**
-     * @var boolean Wether all required/forbidden keys should be checked by validation
+     * @var string|null
      */
+    public ?string $keyNotAllowed = null;
 
-    public $checkAllKeys = false;
+    /**
+     * @var bool Wether all required/forbidden keys should be checked by validation
+     */
+    public bool $checkAllKeys = false;
 
     // =Public Methods
     // =========================================================================
@@ -66,7 +56,6 @@ class AssociativeArrayValidator extends Validator
     /**
      * @inheritdoc
      */
-
     public function init()
     {
         parent::init();
@@ -90,7 +79,6 @@ class AssociativeArrayValidator extends Validator
     /**
      * @inheritdoc
      */
-
     protected function validateValue( $value )
     {
         if (!ArrayHelper::isAssociative($value)) {

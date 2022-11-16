@@ -17,72 +17,80 @@ use yii\base\InvalidValueException;
 use Craft;
 use craft\base\Component;
 use craft\base\VolumeInterface;
-use craft\helpers\UrlHelper;
-
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\events\VolumeStorageEvent;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
- * Singleton class to work with Coconut storages
+ * Service component to work with Coconut Storages
  */
-
 class Storages extends Component
 {
     // =Static
     // =========================================================================
 
-    // =Events
-    // -------------------------------------------------------------------------
-
+    /**
+     * Name of event triggered before a volume storage is resoled.
+     *
+     * This allows modules and plugins to override the storage model for
+     * specific volumes (before the Coconut plugin tries to resolve it).
+     *
+     * @var string
+     */
     const EVENT_BEFORE_RESOLVE_VOLUME_STORAGE = 'beforeResolveVolumeStorage';
+
+    /**
+     * Name of event triggered before saving an output in the database
+     *
+     * This allows modules and plugins to override or customise the storage model
+     * that was resolved by the Coconut plugin for a specific volumes.
+     *
+     * @var string
+     */
     const EVENT_AFTER_RESOLVE_VOLUME_STORAGE = 'afterResolveVolumeStorage';
 
     // =Properties
     // =========================================================================
 
     /**
-     * @var array Registry of resolved volume storages by volume ID
+     * Map of resolved and memoized volume storages indexed by volume ID
+     *
+     * @var Storage[]
      */
-
-    private $_volumeStoragesById = [];
+    private array $_volumeStoragesById = [];
 
     // =Public Methods
     // =========================================================================
 
     /**
-     * Returns storage model for given storage handle
+     * Returns storage model for given storage handle.
      *
-     * @param string $handle
+     * @see \yoannisj\models\Settings::storages To learn about named jobs
      *
-     * @return Storage|null
+     * @param string $handle Handle of named storage
+     *
+     * @return Storage|null The storage model named after given $handle
      */
-
-    public function getNamedStorage( string $handle )
+    public function getNamedStorage( string $handle ): ?Storage
     {
         $storages = Coconut::$plugin->getSettings()->getStorages();
-        $storage = $storages[$handle] ?? null;
-
-        if ($storage) {
-            $storage->handle = $handle;
-            return $storage;
-        }
-
-        return null;
+        return $storages[$handle] ?? null;
     }
 
     /**
-     * Resolves storage model for given Craft-CMS Volume
+     * Resolves storage model for given Craft-CMS Volume.
      *
-     * @param VolumeInterface $volume
+     * If no storage settings where registered for given Volume, this method
+     * returns a default HTTP upload storage model.
      *
-     * @return Storage
+     * @param VolumeInterface $volume Volume for which to get a storage model
      *
-     * @throws InvalidValueException If another module/plugin resolves to storage settings
-     *  that are not an instance of \yoannisj\coconut\models\Storage
+     * @return Storage The storage model for given $volume
+     *
+     * @throws InvalidValueException If registered storage is not an instance of [[Storage:class]]
+     * @throws InvalidValueException If registered storage is not valid
      */
-
     public function getVolumeStorage( VolumeInterface $volume ): Storage
     {
         if (!array_key_exists($volume->id, $this->_volumeStoragesById))
@@ -104,12 +112,10 @@ class Storages extends Component
             // no need to resolve volume storage if module/plugin already did
             if (!$storage)
             {
-                // @todo: resolve storage settings for commonly used Volume types,
-                // corresponding to service supported by Coconut (e.g. AWS S3)
+                // @todo Resolve storage settings for commonly used Filesystems which correspond to a service supported by Coconut (e.g. AWS S3)
 
-                // @see Note about HTTP uploads in `Settings::storages` comment
+                // See note about HTTP uploads in `Settings::storages` comment
                 $uploadUrl = JobHelper::publicUrl('/coconut/uploads/'.$volume->handle.'/');
-
                 $storage = new Storage([ 'url' => $uploadUrl ]);
             }
 
@@ -127,10 +133,18 @@ class Storages extends Component
             }
 
             // validate storage before continuing
-            if (!$storage instanceof Storage)
+            if (!($storage instanceof Storage))
             {
-                throw new InvalidValueException(
-                    'Resolved volume storage must be an instance of '.Storage::class);
+                $message = 'Registered volume storage must be an instance of '.Storage::class;
+                throw new InvalidValueException(Craft::t('coconut', $message));
+            }
+
+            else if (!$storage->validate())
+            {
+                $message = "Resolved volume storage is not valid";
+
+                Craft::info($message.':'.print_r($storage->errors, true), 'coconut');
+                throw new InvalidValueException(Craft::t('coconut', $message));
             }
 
             // set volume-related storage attributes

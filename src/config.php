@@ -60,7 +60,7 @@ return [
      * More info:
      *  https://craftcms.stackexchange.com/questions/25437/queue-exec-time/25452
      *
-     * @var integer
+     * @var int
      *
      * @default 900
      */

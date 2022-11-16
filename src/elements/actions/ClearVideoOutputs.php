@@ -22,25 +22,39 @@ use craft\helpers\Json as JsonHelper;
 use yoannisj\coconut\Coconut;
 
 /**
- *
+ * Element action to clear Outputs of a video Assets
  */
-
 class ClearVideoOutputs extends ElementAction
 {
+    // =Static
+    // =========================================================================
+
     /**
      * @inheritdoc
      */
+    public static function isDestructive(): bool
+    {
+        return true;
+    }
 
+    // =Properties
+    // =========================================================================
+
+    // =Public Methods
+    // =========================================================================
+
+    /**
+     * @inheritdoc
+     */
     public function getTriggerLabel(): string
     {
-        return Craft::t('coconut', 'Clear Coconut ouputs');
+        return Craft::t('coconut', 'Clear Coconut Ouputs');
     }
 
     /**
      * @inheritdoc
      */
-
-    public function getTriggerHtml()
+    public function getTriggerHtml(): ?string
     {
         $type = JsonHelper::encode(static::class);
         $assetIds = implode(',', $this->getOutputAssetIds());
@@ -67,12 +81,13 @@ class ClearVideoOutputs extends ElementAction
 EOD;
 
         Craft::$app->getView()->registerJs($js);
+
+        return null;
     }
 
     /**
      * @inheritdoc
      */
-
     public function performAction( ElementQueryInterface $query ): bool
     {
         // fetch video elements only
@@ -95,11 +110,15 @@ EOD;
         return $anySuccess;
     }
 
-    /**
-     *
-     */
+    // =Protected Methods
+    // =========================================================================
 
-    protected function getOutputAssetIds()
+    /**
+     * Return Output IDS for selected Asset elements.
+     *
+     * @return array
+     */
+    protected function getOutputAssetIds(): array
     {
         $results = (new Query())
             ->select('inputAssetId')

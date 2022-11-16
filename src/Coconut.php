@@ -18,10 +18,9 @@ use yii\base\InvalidArgumentException;
 use yii\base\InvalidConfigException;
 
 use Craft;
-use craft\base\VolumeInterface;
+use craft\base\Model;
 use craft\base\Plugin;
 use craft\base\Element;
-use craft\models\Volume;
 use craft\elements\Asset;
 use craft\web\UrlManager;
 use craft\services\Elements;
@@ -32,7 +31,6 @@ use craft\events\RegisterUrlRulesEvent;
 use craft\events\ElementEvent;
 use craft\events\AssetEvent;
 use craft\helpers\ArrayHelper;
-use craft\helpers\UrlHelper;
 use craft\helpers\ElementHelper;
 
 use Coconut\Client as CoconutClient;
@@ -42,44 +40,40 @@ use yoannisj\coconut\services\Jobs;
 use yoannisj\coconut\services\Outputs;
 use yoannisj\coconut\models\Settings;
 use yoannisj\coconut\models\Job;
-use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\elements\actions\TranscodeVideo;
 use yoannisj\coconut\elements\actions\ClearVideoOutputs;
-use yoannisj\coconut\queue\jobs\RunJob;
 use yoannisj\coconut\variables\CoconutVariable;
-use yoannisj\coconut\events\VolumeStorageEvent;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
- * Coconut plugin class for Craft
+ * Coconut plugin class for Craft-CMS
  */
-
 class Coconut extends Plugin
 {
     // =Static
     // =========================================================================
 
     /**
-     * reference to the plugin's instance
+     * Static reference to the plugin's instance
      * @var Plugin
      */
-
     public static $plugin;
-
 
     // =Tables (DB)
     // -------------------------------------------------------------------------
 
     /**
      * Name of database table used to store references to coconut inputs
+     *
+     * @var string
      */
-
     const TABLE_JOBS = '{{%coconut_jobs}}';
 
     /**
      * Name of database table used to store coconut outputs
+     *
+     * @var string
      */
-
     const TABLE_OUTPUTS = '{{%coconut_outputs}}';
 
     // =Services
@@ -96,6 +90,9 @@ class Coconut extends Plugin
     const SERVICE_RACKSPACE = 'rackspace';
     const SERVICE_AZURE = 'azure';
 
+    /**
+     * List of storage services supporte dby Coconut.co
+     */
     const SUPPORTED_SERVICES = [
         self::SERVICE_COCONUT,
         self::SERVICE_S3,
@@ -109,6 +106,9 @@ class Coconut extends Plugin
         self::SERVICE_AZURE,
     ];
 
+    /**
+     * List of S3-compatible services supported by Coconut.co
+     */
     const S3_COMPATIBLE_SERVICES = [
         self::SERVICE_S3,
         self::SERVICE_GCS,
@@ -124,24 +124,18 @@ class Coconut extends Plugin
     /**
      * @inheritdoc
      */
-
     public $schemaVersion = '2.0.0';
-
-    /**
-     * @var array List of resolved volume storages
-     */
-
-    private $_volumeStorages = [];
 
     // =Public Methods
     // =========================================================================
 
     /**
-     * Method running when the plugin gets initialized
+     * @inheritDoc
      * This is where all of the plugin's functionality gets loaded into the system
+     *
+     * @return void
      */
-
-    public function init()
+    public function init(): void
     {
         parent::init();
 
@@ -240,38 +234,40 @@ class Coconut extends Plugin
     // -------------------------------------------------------------------------
 
     /**
-     * @return \yoannisj\coconut\services\Storages
+     * @return Storages
      */
 
-    public function getStorages()
+    public function getStorages(): Storages
     {
         return $this->get('storages');
     }
 
     /**
-     * @return \yoannisj\coconut\services\Jobs
+     * @return Jobs
      */
 
-    public function getJobs()
+    public function getJobs(): Jobs
     {
         return $this->get('jobs');
     }
 
     /**
-     * @return \yoannisj\coconut\services\Outputs
+     * @return Outputs
      */
 
-    public function getOutputs()
+    public function getOutputs(): Outputs
     {
         return $this->get('outputs');
     }
 
-    // =Helpers
+    // =Operations
     // -------------------------------------------------------------------------
 
     /**
-     * Returns Coconut outputs for given video, or transcodes them if they
-     * have not been transcoded before
+     * Returns Coconut outputs for given video input, or creates a transcoding
+     * job for those that have not been transcoded before. This method looks at
+     * the output's `key` property to determine if it has already been
+     * transcoded or not.
      *
      * The first `$input` argument would typically be a video Asset or an
      * external video URL.
@@ -286,11 +282,10 @@ class Coconut extends Plugin
      * @param mixed $input Video to transcode
      * @param mixed $outputs Outputs to transcode video into
      *
-     * @return Output[]
+     * @return Output[] The transcoding outputs
      *
      * @throws InvalidArgumentException If no input could be resolved from given arguments
      */
-
     public function transcodeVideo( $input, $outputs = null ): array
     {
         $job = null;
@@ -384,11 +379,6 @@ class Coconut extends Plugin
 
             $coconutJobs = $this->getJobs();
 
-            Craft::error('RUN JOB...');
-            Craft::error($job->toParams());
-
-            // return [];
-
             // Run job via Coconut.co API (updates the job properties)
             // @todo: implement UI for job's feedback progress (based on notifications)
             if (!$coconutJobs->runJob($job))
@@ -438,10 +428,9 @@ class Coconut extends Plugin
     /**
      * Creates a new coconut client to connect to the coconut API
      *
-     * @return \Coconut\Client
+     * @return CoconutClient
      */
-
-    public function createClient()
+    public function createClient(): CoconutClient
     {
         $apiKey = $this->getSettings()->apiKey;
         $endpoint = $this->getSettings()->endpoint;
@@ -462,31 +451,35 @@ class Coconut extends Plugin
      * @throws JobException if job errored
      * @return array
      */
+    // public function transcodeSource(
+    //     $source,
+    //     $job = null,
+    //     bool $useQueue = null,
+    //     int $checkInterval = 0
+    // ): array
+    // {
+    //     // default to global useQueue value
+    //     if ($useQueue === null) $useQueue = $this->getSettings()->preferQueue;
+    //     // normalize and fill in config attributes based on source
+    //     $job = $this->normalizeSourceConfig($source, $job);
 
-    public function transcodeSource( $source, $job = null, bool $useQueue = null, int $checkInterval = 0 )
-    {
-        // default to global useQueue value
-        if ($useQueue === null) $useQueue = $this->getSettings()->preferQueue;
-        // normalize and fill in config attributes based on source
-        $job = $this->normalizeSourceConfig($source, $job);
+    //     if ($useQueue)
+    //     {
+    //         // add job to the queue
+    //         $queueJob = new TranscodeSourceJob([ 'config' => $job ]);
+    //         Craft::$app->getQueue()->push($queueJob);
 
-        if ($useQueue)
-        {
-            // add job to the queue
-            $queueJob = new transcodeSourceJob([ 'config' => $job ]);
-            Craft::$app->getQueue()->push($queueJob);
+    //         // return initialized outputs for job config
+    //         $outputs = $this->getOutputs()->initJobOutputs($job);
+    //     }
 
-            // return initialized outputs for job config
-            $outputs = $this->getOutputs()->initJobOutputs($job);
-        }
+    //     else {
+    //         // synchronous use of the coconut job api
+    //         $outputs = $this->getJobs()->runJob($job);
+    //     }
 
-        else {
-            // synchronous use of the coconut job api
-            $outputs = $this->getJobs()->runJob($job);
-        }
-
-        return ArrayHelper::index($outputs, 'format');
-    }
+    //     return ArrayHelper::index($outputs, 'format');
+    // }
 
     /**
      * @param string|int|Asset $source
@@ -495,33 +488,32 @@ class Coconut extends Plugin
      *
      * @return Job
      */
+    // public function normalizeSourceConfig( $source, $job = null, bool $strict = true )
+    // {
+    //     if (is_array($job)) {
+    //         $job = new Job($job);
+    //     }
 
-    public function normalizeSourceConfig( $source, $job = null, bool $strict = true )
-    {
-        if (is_array($job)) {
-            $job = new Job($job);
-        }
+    //     else if (is_string($job)) {
+    //         $job = $this->getJobs()->getNamedJob($job);
+    //     }
 
-        else if (is_string($job)) {
-            $job = $this->getJobs()->getNamedJob($job);
-        }
+    //     else if (!$job && $source instanceof Asset)
+    //     {
+    //         $volume = $source->getVolume();
+    //         $job = $this->getJobs()->getVolumeJob($volume->handle);
+    //     }
 
-        else if (!$job && $source instanceof Asset)
-        {
-            $volume = $source->getVolume();
-            $job = $this->getJobs()->getVolumeJob($volume->handle);
-        }
+    //     if ($strict && !($job instanceof Job))
+    //     {
+    //         throw new InvalidArgumentException(
+    //             'Could not resolve given job into a `'.Job::class.'` instance');
+    //     }
 
-        if ($strict && !($job instanceof Job))
-        {
-            throw new InvalidArgumentException(
-                'Could not resolve given job into a `'.Job::class.'` instance');
-        }
+    //     $job->setSource($source);
 
-        $job->setSource($source);
-
-        return $job;
-    }
+    //     return $job;
+    // }
 
     // =Protected Methods
     // =========================================================================
@@ -529,17 +521,23 @@ class Coconut extends Plugin
     /**
      * @inheritdoc
      */
-
-    protected function createSettingsModel()
+    protected function createSettingsModel(): ?Model
     {
         return new Settings();
     }
 
-    /**
-     * @param RegisterUrlRulesEvent $event
-     */
+    // =Events
+    // -------------------------------------------------------------------------
 
-    protected function onRegisterUrlRules( RegisterUrlRulesEvent $event )
+    /**
+     * Handler method for the `UrlManager::EVENT_REGISTER_CP_URL_RULES` and
+     * `UrlManager::EVENT_REGISTER_SITE_URL_RULES` events.
+     *
+     * @param RegisterUrlRulesEvent $event
+     *
+     * @return void
+     */
+    protected function onRegisterUrlRules( RegisterUrlRulesEvent $event ): void
     {
         $uploadUrlPattern = '/coconut/uploads/<volumeHandle:{handle}>/<outputPath:(?:\S+)>';
 
@@ -547,12 +545,14 @@ class Coconut extends Plugin
         $event->rules["GET $uploadUrlPattern"] = '/coconut/jobs/output';
     }
 
-
     /**
-     * @param \craft\events\ElementEvent
+     * Handler method for the `Elements::EVENT_AFTER_SAVE_ELEMENT` event.
+     *
+     * @param ElementEvent $event
+     *
+     * @return void
      */
-
-    protected function onAfterSaveElement( ElementEvent $event )
+    protected function onAfterSaveElement( ElementEvent $event ): void
     {
         if ($event->isNew && $event->element instanceof Asset
             && !ElementHelper::isDraftOrRevision($event->element)
@@ -562,25 +562,30 @@ class Coconut extends Plugin
     }
 
     /**
-     * @param \craft\events\ElementEvent
+     * * Handler method for the `Elements::EVENT_AFTER_SAVE_ELEMENT` event.
+     *
+     * @param ElementEvent $event
+     *
+     * @return void
      */
-
-    protected function onAfterDeleteElement( ElementEvent $event )
+    protected function onAfterDeleteElement( ElementEvent $event ): void
     {
         if ($event->element instanceof Asset
             && $element->kind == 'video' // only videos can be inputs
             && !ElementHelper::isDraftOrRevision($event->element)
         ) {
-            Craft::error('CLEAR OUTPUTS FOR DELETED ASSET');
             $this->getOutputs()->clearOutputsForInput($event->element);
         }
     }
 
     /**
-     * @param \craft\events\ElementEvent
+     * Handler method for the `Elements::EVENT_AFTER_RESTORE_ELEMENT` event.
+     *
+     * @param ElementEvent $event
+     *
+     * @return void
      */
-
-    protected function onAfterRestoreElement( ElementEvent $event )
+    protected function onAfterRestoreElement( ElementEvent $event ): void
     {
         if ($event->isNew && $event->element instanceof Asset
             && !ElementHelper::isDraftOrRevision($event->element)
@@ -590,23 +595,25 @@ class Coconut extends Plugin
     }
 
     /**
-     * @param \craft\events\AssetEvent
+     * Handler method for the `Assets::EVENT_AFTER_REPLACE_ASSET` event.
+     *
+     * @param AssetEvent $event
+     *
+     * @return void
      */
-
-    protected function onAfterReplaceAsset( AssetEvent $event )
+    protected function onAfterReplaceAsset( AssetEvent $event ): void
     {
         $this->checkWatchAsset($event->asset);
     }
 
     /**
-     * Checks if given asset element should be converted, and creates a
-     * coconut conversion job if it does.
+     * Checks if given asset element should be automatically transcoded,
+     * and creates a coconut transcoding job if it does.
      *
-     * @param \craft\elements\Asset
+     * @param Asset $asset
      *
-     * @return bool
+     * @return bool Whether an automatic transcoding job was successfully created
      */
-
     protected function checkWatchAsset( Asset $asset ): bool
     {
         // to avoid creating 2x coconut jobs in case there is a conflicting
@@ -617,8 +624,6 @@ class Coconut extends Plugin
         {
             return false;
         }
-
-        Craft::error('CHECK WATCH ASSET:: '.$asset->volume->handle.' > '.$asset->filename);
 
         $settings = $this->getSettings();
         $volume = $asset->getVolume();
