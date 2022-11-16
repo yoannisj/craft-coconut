@@ -342,8 +342,10 @@ class Outputs extends Component
 
         if ($storageVolume)
         {
+            $storageFs = $storageVolume->getFs();
+
             if ($output->url) {
-                $storageVolume->deleteFile($output->path);
+                $storageFs->deleteFile($output->path);
             }
 
             if ($output->urls)
@@ -351,7 +353,7 @@ class Outputs extends Component
                 for ($i = 1; $i <= count($output->urls); $i++)
                 {
                     $urlPath = sprintf($output->path, $i);
-                    $storageVolume->deleteFile($urlPath);
+                    $storageFs->deleteFile($urlPath);
                 }
             }
         }

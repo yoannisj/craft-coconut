@@ -20,10 +20,10 @@ use yii\base\InvalidArgumentException;
 use yii\validators\InlineValidator;
 
 use Craft;
-use craft\base\VolumeInterface;
 use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\validators\DateTimeValidator;
+use craft\models\Volume;
 use craft\elements\Asset;
 use craft\helpers\UrlHelper;
 use craft\helpers\ArrayHelper;
@@ -429,7 +429,7 @@ class Job extends Model
      * If given $storage is a string, it will first be checked against named storage
      * settings, or it will be considered a volume handle.
      *
-     * @param string|array|Storage|VolumeInterface|null $storage
+     * @param string|array|Storage|Volume|null $storage
      *
      * @return static Back-reference for method chaining
      */
@@ -773,19 +773,6 @@ class Job extends Model
         $attributes[] = 'outputPathFormat';
         $attributes[] = 'notification';
         $attributes[] = 'progress';
-        $attributes[] = 'createdAt';
-        $attributes[] = 'completedAt';
-
-        return $attributes;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function datetimeAttributes(): array
-    {
-        $attributes = parent::datetimeAttributes();
-
         $attributes[] = 'createdAt';
         $attributes[] = 'completedAt';
 

@@ -20,7 +20,7 @@ use yii\base\InvalidArgumentException;
 
 use Craft;
 use craft\base\Component;
-use craft\base\VolumeInterface;
+use craft\models\Volume;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
@@ -127,17 +127,17 @@ class Jobs extends Component
      * @see yoannisj\coconut\models\Settings::volumeJobs To learn about
      * configuring default transcoding jobs for asset volumes.
      *
-     * @param string|VolumeInterface $volume
+     * @param string|Volume $volume
      *
      * @return Job|null
      *
      * @throws InvalidArgumentException If given $volume argument is not a volume instance of handle
      */
-    public function getVolumeJob( string|VolumeInterface $volume ): ?Job
+    public function getVolumeJob( string|Volume $volume ): ?Job
     {
         $handle = null;
 
-        if ($volume instanceof VolumeInterface) {
+        if ($volume instanceof Volume) {
             $handle = $volume->handle;
         } else if (is_string($volume)) {
             $handle = $volume;

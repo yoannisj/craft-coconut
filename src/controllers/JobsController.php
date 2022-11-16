@@ -17,8 +17,9 @@ use yii\web\BadRequestHttpException;
 use yii\web\ServerErrorHttpException;
 
 use Craft;
-use craft\web\Controller;
+use craft\base\Fs;
 use craft\elements\Asset;
+use craft\web\Controller;
 use craft\web\Request;
 use craft\web\Response;
 use craft\web\UploadedFile;
@@ -143,8 +144,8 @@ class JobsController extends Controller
             throw new ServerErrorHttpException("Could not handle job notification");
         }
 
-        $this->response->setStatusCode(200);
-        return $this->response;
+        $message = Craft::t('coconut', "Coconut Job updated");
+        return $this->asModelSuccess($job, $message, 'job');
     }
 
     /**
@@ -190,25 +191,16 @@ class JobsController extends Controller
         {
             FileHelper::unlink($tempPath); // delete temporarily saved file
 
-            throw new FileException(Craft::t('app',
-                'Could not open file for streaming at {path}', [
-                    'path' => $tempPath
-                ])
-            );
+            $error = 'Could not open file for streaming at {path}';
+            throw new FileException(Craft::t('app', $error, [
+                'path' => $tempPath
+            ]));
         }
 
-        // // upload file to the volume
-        if ($volume->fileExists($outputPath)) {
-            // replace output file
-            $volume->updateFileByStream($outputPath, $stream, [
-                'mimetype' => FileHelper::getMimeType($tempPath),
-            ]);
-        } else {
-            // create output file
-            $volume->createFileByStream($outputPath, $stream, [
-                'mimetype' => FileHelper::getMimeType($tempPath),
-            ]);
-        }
+        // write uploaded file contents to target file on the volume
+        $volume->getFs()->writeFileFromStream($outputPath, $stream, [
+            Fs::CONFIG_MIMETYPE => FileHelper::getMimeType($tempPath),
+        ]);
 
         // Rackspace will disconnect the stream automatically
         if (is_resource($stream)) {
@@ -216,8 +208,8 @@ class JobsController extends Controller
         }
 
         // Tell coconut we managed to upload the file successfully
-        $this->response->setStatusCode(200);
-        return $this->response;
+        $message = Craft::t('coconut', 'Uploaded Output file');
+        return $this->asSuccess($message);
     }
 
     /**
@@ -232,7 +224,8 @@ class JobsController extends Controller
     {
         $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
 
-        if (!$volume) {
+        if (!$volume)
+        {
             throw new NotFoundHttpException(
                 "Could not find storage volume '$volumeHandle'.");
         }

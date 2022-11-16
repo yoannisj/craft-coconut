@@ -12,7 +12,7 @@
 namespace yoannisj\coconut\base;
 
 use Craft;
-use craft\base\VolumeInterface;
+use craft\models\Volume;
 use craft\helpers\UrlHelper;
 
 use yoannisj\coconut\Coconut;
@@ -27,7 +27,7 @@ class AwsS3VolumeAdapter implements VolumeAdapterInterface
      * @inheritdoc
      */
     public static function outputUploadUrl(
-        VolumeInterface $volume,
+        Volume $volume,
         string $outputPath
     ): string
     {
@@ -66,7 +66,7 @@ class AwsS3VolumeAdapter implements VolumeAdapterInterface
      * @inheritdoc
      */
     public static function outputPublicUrl(
-        VolumeInterface $volume,
+        Volume $volume,
         string $outputPath
     ): string
     {

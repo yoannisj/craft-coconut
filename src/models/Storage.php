@@ -16,7 +16,7 @@ use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;
-use craft\base\VolumeInterface;
+use craft\models\Volume;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
@@ -165,9 +165,9 @@ class Storage extends Model
     /**
      * Craft volume for storage
      *
-     * @var VolumeInterface|null
+     * @var Volume|null
      */
-    private ?VolumeInterface $_volume = null;
+    private ?Volume $_volume = null;
 
     // =Public Methods
     // =========================================================================
@@ -296,11 +296,11 @@ class Storage extends Model
     }
 
     /**
-     * @param VolumeInterface|null $volume
+     * @param Volume|null $volume
      *
      * @return static Back-reference for method chaining
      */
-    public function setVolume( VolumeInterface|null $volume ): static
+    public function setVolume( Volume|null $volume ): static
     {
         $this->_volume = $volume;
 
@@ -315,9 +315,9 @@ class Storage extends Model
     }
 
     /**
-     * @return VolumeInterface|null
+     * @return Volume|null
      */
-    public function getVolume(): ?VolumeInterface
+    public function getVolume(): ?Volume
     {
         if (!isset($this->_volume) && $this->_volumeId)
         {

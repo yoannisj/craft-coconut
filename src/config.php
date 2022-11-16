@@ -77,7 +77,7 @@ return [
      * URL needs to function for both uploading the asset file (POST) and serving
      * the outptut file (GET).
      * To achieve this , the Coconut plugin for Craft registers a custom route
-     * `/coconut/uploads/<volume-handle>/<output-path>` which maps to:
+     * `/coconut/outputs/<volume-handle>/<output-path>` which maps to:
      * - the 'coconut/jobs/upload' action for POST requests (saves file in volume)
      * - the 'coconut/jobs/output' action for GET requests (serves file from volume)
      *

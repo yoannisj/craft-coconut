@@ -16,10 +16,11 @@ use yii\base\InvalidConfigException;
 use yii\validators\InlineValidator;
 
 use Craft;
-use craft\base\VolumeInterface;
+use craft\base\FsInterface;
 use craft\base\Model;
+use craft\models\Volume;
 use craft\validators\HandleValidator;
-use craft\volumes\Local as LocalVolume;
+use craft\fs\Local as LocalFs;
 use craft\helpers\StringHelper;
 use craft\helpers\ArrayHelper;
 use craft\helpers\UrlHelper;
@@ -40,11 +41,11 @@ use yoannisj\coconut\helpers\JobHelper;
  * @property string $publicBaseUrl
  * @property Storage[] $storages
  * @property Storage|null $defaultStorage
- * @property VolumeInterface|null $defaultUploadVolume
+ * @property Volume|null $defaultUploadVolume
  * @property Notification $defaultJobNotification
  * @property Job[] $jobs
  * @property Job[] $volumeJobs
- * @property VolumeInteface[] $watchVolumes
+ * @property Volume[] $watchVolumes
  */
 class Settings extends Model
 {
@@ -152,9 +153,9 @@ class Settings extends Model
      * was omitted and the input asset's volume could be determined (.e.g. if the
      * `input` parameter was a URL and not a Craft asset).
      *
-     * @var string|VolumeInterface
+     * @var string|Volume
      */
-    private mixed $_defaultUploadVolume = 'coconut';
+    private string|Volume $_defaultUploadVolume = 'coconut';
 
     /**
      * Whether `jobs` property was normalized or not (internal flag)
@@ -274,7 +275,7 @@ class Settings extends Model
      *  automatically create a Coconut conversion job every time a video asset is
      *  added or updated.
      *
-     * @var string[]|VolumeInterface[]
+     * @var string[]|Volume[]
      */
     public array $watchVolumes = [];
 
@@ -510,12 +511,12 @@ class Settings extends Model
     /**
      * Setter method for normalized `defaultUploadVolume` property
      *
-     * @param string|array|VolumeInterface
+     * @param string|array|Volume|unll $volume
      *
      * @return static Back-reference for method chaining
      */
     public function setDefaultUploadVolume(
-        string|array|VolumeInterface|null $volume
+        string|array|Volume|null $volume
     ): static
     {
         $this->_defaultUploadVolume = $volume;
@@ -529,9 +530,9 @@ class Settings extends Model
      *
      * @param bool $createMissing Whether to create the volume if it does not exist
      *
-     * @return VolumeInterface|null
+     * @return Volume|null
      */
-    public function getDefaultUploadVolume( $createMissing = false ): ?VolumeInterface
+    public function getDefaultUploadVolume( $createMissing = false ): ?Volume
     {
         if (!$this->isNormalizedDefaultUploadVolume)
         {
@@ -552,10 +553,10 @@ class Settings extends Model
                 ], true);
             }
 
-            else if (!$volume instanceof VolumeInterface)
+            else if (!($volume instanceof Volume))
             {
                 throw new InvalidConfigException(
-                    "Setting `defaultUploadVolume` must resolve to a model that implements ".VolumeInterface::class);
+                    "Setting `defaultUploadVolume` must resolve to an instance of ".Volume::class);
             }
 
             $this->_defaultUploadVolume = $volume;
@@ -913,46 +914,62 @@ class Settings extends Model
      * @param array $config Volume configuration settings
      * @param bool $createMissing Whether to create volume if it is missing
      *
-     * @return VolumeInterface|null
+     * @return Volume|null
+     *
+     * @throws InvalidConfigArgument If volume's 'handle' is not a string
      */
     protected function getVolumeModel(
         array $config = [],
         bool $createMissing = false
-    ): ?VolumeInterface
+    ): ?Volume
     {
         $config = ComponentHelper::mergeSettings($config);
         $handle = $config['handle'] ?? 'coconut';
 
-        $craftVolumes = Craft::$app->getVolumes();
+        if (!is_string($handle)) {
+            throw new InvalidConfigException(
+                "Volume's 'handle' setting must be a string");
+        }
 
-        /** @var VolumeInterface|null $volume */
+        $craftVolumes = Craft::$app->getVolumes();
         $volume = $craftVolumes->getVolumeByHandle($handle);
 
         if ($volume || !$createMissing) {
             return $volume;
         }
 
-        // create missing volume
-        $type = $config['type'] ?? $config['class'] ?? LocalVolume::class;
+        // create missing volume, and its file-system(s) if they are missing too
+        $fsConfig = $config['fs'] ?? [];
+        if (is_string($fsConfig)) $fsConfig = [ 'handle' => $fsConfig ];
+        $fsHandle = $config['fsHandle'] ?? $fsConfig['handle'] ?? 'coconutFiles';
 
-        $defaults = [
-            'type' => $type,
-            'handle' => $handle,
-            'name'=> ($config['name'] ?? $this->humanizeHandle($handle)),
-        ];
+        $fs = $this->getFsModel($fsConfig, $fsHandle, true);
 
-        if (is_a($type, LocalVolume::class))
-        {
-            $slug = StringHelper::toKebabCase($handle);
-
-            $defaults['hasUrls'] = true;
-            $defaults['path'] = '@webroot/'.$slug;
-            $defaults['url'] = '@web/'.$slug;
+        if (!$fs) {
+            throw new InvalidConfigException(
+                "Could not find or create Volume's file-system model");
         }
 
-        $config = array_merge($defaults, $config);
-        $volume = $craftVolumes->createVolume($config);
+        $config['fs'] = $fs->handle;
+        ArrayHelper::remove($config, 'fsHandle');
 
+        $transformFsConfig = $config['transformFs'] ?? [];
+        if (is_string($transformFsConfig)) $transformFsConfig = [ 'handle' => $transformFsConfig ];
+        $transformFsHandle = $config['transformFsHandle'] ?? $transformFsConfig['handle'] ?? null;
+
+        if ($transformFsHandle)
+        {
+            $transformFs = $this->getFsModel($transformFsConfig, $transformFsHandle, true);
+
+            $config['transformFs'] = $transformFs->handle;
+            ArrayHelper::remove($config, 'transformFsHandle');
+        }
+
+        $config['handle'] = $handle;
+        $name = $config['name'] ?? implode(' ', StringHelper::toWords($handle));
+        $config['name'] = $name;
+
+        $volume = $craftVolumes->createVolume($config);
         if ($craftVolumes->saveVolume($volume)) {
             return $volume;
         }
@@ -961,17 +978,70 @@ class Settings extends Model
     }
 
     /**
-     * Returns human-friendly version of given handle string.
+     * Gets Fs model based on given config settings.
      *
-     * @param sting $handle
+     * @param array $config Fs configuration settings
+     * @param string|null $handle Handle of Fs to get or create
+     * @param bool $createMissing Whether to create volume if it is missing
      *
-     * @return sting
+     * @return FsInterface|null
+     *
+     * @throws InvalidConfigArgument If Fs's handle is not a string
+     * @throws InvalidConfigArgument If Fs's handle could not be determined
      */
-    protected function humanizeHandle( string $handle ): string
+    protected function getFsModel(
+        array $config,
+        string|null $handle = null,
+        bool $createMissing = true
+    ): ?FsInterface
     {
-        $sep = preg_replace('/([A-Z])/', ' $1', $handle);
-        $fix = preg_replace('/\s([A-Z])\s([A-Z])\s/', ' $1$2', $sep);
-        return ucfirst(ltrim($fix));
+        if (!$handle) {
+            $handle = $config['handle'] ?? 'coconutFiles';
+        }
+
+        if (!$handle) {
+            throw new InvalidConfigException(
+                "Could not determine Volume's file-system handle");
+        } else if (!is_string($handle)) {
+            throw new InvalidConfigException(
+                "Volume file-system's 'handle' setting must be a string");
+        }
+
+        if (!is_string($handle))
+
+        $craftFilesystems = Craft::$app->getFs();
+        $fs = $craftFilesystems->getFilesystemByHandle($handle);
+
+        // filesystem with handle exists? use that!
+        if ($fs) return $fs;
+
+        $config['handle'] = $handle;
+
+        $type = $config['type'] ?? $config['class'] ?? LocalFs::class;
+        $name = $config['name'] ?? implode(' ', StringHelper::toWords($handle));
+
+        $defaults = [
+            'class' => $type,
+            'name' => $name,
+        ];
+
+        if (is_a($type, LocalFs::class))
+        {
+            $slug = StringHelper::slugify(implode(' ', StringHelper::toWords($handle)));
+
+            $defaults['hasUrls'] = true;
+            $defaults['url'] = '@web/'.$slug;
+            $defaults['path'] = '@webroot/'.$slug;
+        }
+
+        $config = array_merge($defaults, $config);
+
+        $fs = $craftFilesystems->createFilesystem($config);
+        if (!$craftFilesystems->saveFilesystem($fs)) {
+            return null;
+        }
+
+        return $fs;
     }
 
     // =Private Methods

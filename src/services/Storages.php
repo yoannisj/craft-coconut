@@ -16,7 +16,7 @@ use yii\base\InvalidValueException;
 
 use Craft;
 use craft\base\Component;
-use craft\base\VolumeInterface;
+use craft\models\Volume;
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\events\VolumeStorageEvent;
@@ -84,14 +84,14 @@ class Storages extends Component
      * If no storage settings where registered for given Volume, this method
      * returns a default HTTP upload storage model.
      *
-     * @param VolumeInterface $volume Volume for which to get a storage model
+     * @param Volume $volume Volume for which to get a storage model
      *
      * @return Storage The storage model for given $volume
      *
      * @throws InvalidValueException If registered storage is not an instance of [[Storage:class]]
      * @throws InvalidValueException If registered storage is not valid
      */
-    public function getVolumeStorage( VolumeInterface $volume ): Storage
+    public function getVolumeStorage( Volume $volume ): Storage
     {
         if (!array_key_exists($volume->id, $this->_volumeStoragesById))
         {

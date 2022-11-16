@@ -13,7 +13,7 @@ namespace yoannisj\coconut\helpers;
 use yii\base\InvalidArgumentException;
 
 use Craft;
-use craft\base\VolumeInterface;
+use craft\models\Volume;
 use craft\elements\Asset;
 use craft\helpers\StringHelper;
 use craft\helpers\UrlHelper;
@@ -624,7 +624,7 @@ class JobHelper
                 ->getVolumeByHandle($handle);
         }
 
-        if ($storage instanceof VolumeInterface)
+        if ($storage instanceof Volume)
         {
             return Coconut::$plugin->getStorages()
                 ->getVolumeStorage($storage);

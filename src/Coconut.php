@@ -118,6 +118,20 @@ class Coconut extends Plugin
         self::SERVICE_S3OTHER,
     ];
 
+    /**
+     * @inheritdoc
+     */
+    public static function config(): array
+    {
+        return [
+            'components' => [
+                'storages' => Storages::class,
+                'jobs' => Jobs::class,
+                'outputs' => Outputs::class,
+            ],
+        ];
+    }
+
     // =Properties
     // =========================================================================
 
@@ -141,13 +155,6 @@ class Coconut extends Plugin
 
         // store reference to plugin instance
         self::$plugin = $this;
-
-        // register plugin services as components
-        $this->setComponents([
-            'storages' => Storages::class,
-            'jobs' => Jobs::class,
-            'outputs' => Outputs::class,
-        ]);
 
         // register plugin (template) variables
         Event::on(
@@ -188,7 +195,7 @@ class Coconut extends Plugin
         // register action types
         Event::on(
             Asset::class,
-            Element::EVENT_REGISTER_ACTIONS,
+            Asset::EVENT_REGISTER_ACTIONS,
             function( RegisterElementActionsEvent $event ) {
                 $event->actions[] = TranscodeVideo::class;
                 $event->actions[] = ClearVideoOutputs::class;

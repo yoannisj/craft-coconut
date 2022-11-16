@@ -13,7 +13,7 @@
 namespace yoannisj\coconut\events;
 
 use yii\base\Event;
-use craft\base\VolumeInterface;
+use craft\models\Volume;
 use yoannisj\coconut\models\Storage;
 
 /**
@@ -22,9 +22,9 @@ use yoannisj\coconut\models\Storage;
 class VolumeStorageEvent extends Event
 {
     /**
-     * @var VolumeInterface The Craft Volume associated with the event
+     * @var Volume The Craft Volume associated with the event
      */
-    public VollumeInterface $volume;
+    public Volume $volume;
 
     /**
      * @var Storage|null The Coconut Storage model associated with the event
