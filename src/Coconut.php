@@ -579,7 +579,7 @@ class Coconut extends Plugin
     protected function onAfterDeleteElement( ElementEvent $event ): void
     {
         if ($event->element instanceof Asset
-            && $element->kind == 'video' // only videos can be inputs
+            && $event->element->kind == 'video' // only videos can be inputs
             && !ElementHelper::isDraftOrRevision($event->element)
         ) {
             $this->getOutputs()->clearOutputsForInput($event->element);
