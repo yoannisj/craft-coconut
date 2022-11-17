@@ -14,6 +14,7 @@ namespace yoannisj\coconut\models;
 
 use Craft;
 use craft\base\Model;
+use craft\helpers\App as AppHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
@@ -155,7 +156,7 @@ class ServiceCredentials extends Model
         foreach ($this->paramFields() as $field)
         {
             $value = $this->$field;
-            $params[$field] = Craft::parseEnv($value);
+            $params[$field] = AppHelper::parseEnv($value);
         }
 
         return $params;

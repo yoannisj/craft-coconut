@@ -13,9 +13,8 @@ namespace yoannisj\coconut\base;
 
 use Craft;
 use craft\models\Volume;
-use craft\helpers\UrlHelper;
+use craft\helpers\App as AppHelper;
 
-use yoannisj\coconut\Coconut;
 use yoannisj\coconut\base\VolumeAdapterInterface;
 
 /**
@@ -31,12 +30,12 @@ class AwsS3VolumeAdapter implements VolumeAdapterInterface
         string $outputPath
     ): string
     {
-        $secretKey = Craft::parseEnv($volume->secret);
-        $accessKey = Craft::parseEnv($volume->keyId);
-        $bucket = Craft::parseEnv($volume->bucket);
+        $secretKey = AppHelper::parseEnv($volume->secret);
+        $accessKey = AppHelper::parseEnv($volume->keyId);
+        $bucket = AppHelper::parseEnv($volume->bucket);
 
         // include volume's root folder in output path
-        $subfolder = Craft::parseEnv($volume->subfolder);
+        $subfolder = AppHelper::parseEnv($volume->subfolder);
 
         if (!empty($subfolder)) {
             $outputPath = rtrim($subfolder, '/').'/'.$outputPath;

@@ -16,11 +16,9 @@ use yii\base\InvalidArgumentException;
 
 use Craft;
 use craft\base\Component;
-use craft\base\FsInterface;
-use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 use craft\helpers\DateTimeHelper;
-use craft\helpers\UrlHelper;
+
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Job;
@@ -95,27 +93,6 @@ class Outputs extends Component
 
         return $output;
     }
-
-    /**
-     * Returns Output for given input and format(s)
-     *
-     * @param mixed $input Input for wich to return the outputs
-     * @param string|array $format
-     * @param bool $transcode Whether to transcode missing output with Coconut.co
-     *
-     * @return Output[]
-     */
-    // public function getOutputs(
-    //     string|int|Asset|Input|null $input,
-    //     array $outputs,
-    //     bool $transcode = false
-    // ): array
-    // {
-    //     $input = JobHelper::resolveInput($input);
-    //     $outputs = JobHelper::resolveOutputs($outputs);
-
-    //     $savedOutputs = $this->getOutputsForInput($input);
-    // }
 
     /**
      * Returns all saved outputs for given transcoding job ID.
@@ -238,11 +215,6 @@ class Outputs extends Component
         // @todo Conditionally rewrite output URLs in `Output::getUrl()` and `Output::getUrls()` getters
         $isCompleted = $output->getIsCompleted();
         if ($isCompleted && ($volume = $output->getJob()?->getStorage()?->getVolume())) {
-            Craft::info([
-                'message' => 'REWRITE OUTPUT URLS',
-                'outputKey' => $output->key,
-                'volumeHandle' => $volume->handle,
-            ], 'coconut-debug');
             JobHelper::rewriteOutputUrls($output, $volume);
         }
 
@@ -444,214 +416,7 @@ class Outputs extends Component
         return $this->deleteOutputs($outputs);
     }
 
-
-
-
-
-
-
-
-
-
-
-
-    /**
-     * Initializes outputs for given job
-     */
-    // public function initJobOutputs( Job $job )
-    // {
-    //     // delete existing job outputs (deletes output files)
-    //     $this->clearJobOutputs($job);
-
-    //     // initialize common attributes for new outputs
-    //     $outputVolume = $job->getOutputVolumeModel();
-    //     $newAttrs = [
-    //         'sourceAssetId' => $job->getSourceAssetId(),
-    //         'source' => $job->getSource(),
-    //         'volumeId' => (int)$outputVolume->id,
-    //         'inProgress' => !!($job->coconutId),
-    //         'coconutJobId' => $job->coconutId,
-    //     ];
-
-    //     // create new output for all output urls defined by job
-    //     $outputUrls = $job->getOutputUrls();
-    //     $newOutputs = [];
-
-    //     foreach ($outputUrls as $format => $url)
-    //     {
-    //         // normalize for formats which create multiple outputs
-    //         if (!is_array($url)) $url = [ $url ];
-
-    //         foreach ($url as $outputUrl)
-    //         {
-    //             $attrs = array_merge($newAttrs, [
-    //                 'format' => $format,
-    //                 'url' => $outputUrl,
-    //             ]);
-
-    //             $output = new Output();
-    //             $output->setAttributes($attrs);
-
-    //             $this->saveOutput($output); // gives the output an id
-    //             $newOutputs[] = $output; // collect newly created outputs
-    //         }
-    //     }
-
-    //     return $newOutputs;
-    // }
-
-    /**
-     * Returns output model for given source video, and optionally for
-     * matching criteria.
-     *
-     * @param Asset | string $source Source for which to get outputs
-     * @param array $criteria Criteria against which returned outputs should match
-     *
-     * @return Output | null
-     */
-
-    public function getSourceOutputs( $source, array $criteria = [] )
-    {
-        $outputs = $this->getAllSourceOutputs($source);
-
-        if (!empty($criteria)) {
-            $outputs = ArrayHelper::whereMultiple($outputs, $criteria);
-        }
-
-        return $outputs;
-    }
-
-    /**
-     * Returns all output models for given source video
-     *
-     * @param string | int | \craft\elements\Asset $source
-     *
-     * @return array
-     */
-    // public function getAllSourceOutputs( $source ): array
-    // {
-    //     $key = $source->id ?? (is_numeric($source) ? (int)$source : $source);
-
-    //     if (!array_key_exists($key, $this->sourceOutputs))
-    //     {
-    //         $outputs = [];
-
-    //         $criteria = $this->getSourceCriteria($source);
-    //         $records = OutputRecord::find()
-    //             ->where($criteria)
-    //             ->all();
-
-    //         foreach ($records as $record)
-    //         {
-    //             $output = new Output();
-    //             JobHelper::populateOutputFromRecord($output, $record);
-
-    //             $outputs[] = $output;
-    //         }
-
-    //         $this->sourceOutputs[$key] = $outputs;
-    //     }
-
-    //     return $this->sourceOutputs[$key];
-    // }
-
-    /**
-     * @param string | int | \craft\elements\Asset $source
-     * @param array $criteria
-     *
-     * @return bool
-     */
-    // public function clearSourceOutputs( $source, array $criteria = [] )
-    // {
-    //     $sourceCriteria = $this->getSourceCriteria($source);
-    //     $criteria = array_merge($criteria, $sourceCriteria);
-
-    //     return $this->deleteOutputs($criteria);
-    // }
-
-    /**
-     * Returns outputs for given source and formats
-     *
-     * @param string | \craft\elements\Asset $source
-     * @param array $formats
-     * @param bool $transcodeMissing
-     */
-
-    // public function getFormatOutputs( $source, array $formats = null, bool $transcodeMissing = false, bool $useQueue = null )
-    // {
-    //     // get source job and outputs
-    //     $sourceJob = Coconut::$plugin->normalizeSourceJob($source, null, false);
-    //     $sourceOutputs = $this->getSourceOutputs($source);
-
-    //     // if no formats were specified, use configured formats
-    //     if (empty($formats) && $sourceJob) {
-    //         $formats = array_keys($sourceJob->getOutputs());
-    //     }
-
-    //     // select and index source outputs for formats
-    //     $formatOutputs = ArrayHelper::whereMultiple($sourceOutputs, [ 'format' => $formats ]);
-    //     $outputs = [];
-
-    //     foreach ($formatOutputs as $output)
-    //     {
-    //         if (!array_key_exists($output->format, $outputs)) {
-    //             $outputs[$output->format] = [];
-    //         }
-
-    //         $outputs[$output->format][] = $output;
-    //     }
-
-    //     if ($transcodeMissing)
-    //     {
-    //         // look for missing output formats
-    //         $missingFormats = array_diff($formats, array_keys($outputs));
-
-    //         if (!empty($missingFormats))
-    //         {
-    //             // limit job to missing formats only
-    //             $job = $sourceJob->forFormats($missingFormats);
-
-    //             // transcode missing output formats, and merge in resulting outputs
-    //             $newOutputs = Coconut::$plugin->transcodeSource($source, $job, $useQueue);
-    //             $newOutputs = ArrayHelper::index($newOutputs, null, 'format');
-
-    //             $outputs = array_merge_recursive($outputs, $newOutputs);
-    //         }
-    //     }
-
-    //     return $outputs;
-    // }
-
     // =Protected Methods
     // =========================================================================
 
-    /**
-     * Returns criteria to query for outputs in the database
-     *
-     * @param \craft\elements\Asset | string $source
-     * @param string $key
-     *
-     * @return array4
-     * @throws \yii\base\InvalidArgumentException
-     */
-    // protected function getSourceCriteria( $source, $key = null ): array
-    // {
-    //     $criteria = [];
-
-    //     if (is_numeric($source)) {
-    //         $criteria['sourceAssetId'] = $source;
-    //     } else if (is_string($source)) {
-    //         $criteria['source'] = $source;
-    //     } else if ($source instanceof Asset) {
-    //         $criteria['sourceAssetId'] = $source->id;
-    //     } else {
-    //         throw new InvalidArgumentException('Argument `source` must be an Asset element, an asset id, or a video url.');
-    //     }
-
-    //     if ($key) {
-    //         $criteria['key'] = $key;
-    //     }
-
-    //     return $criteria;
-    // }
 }

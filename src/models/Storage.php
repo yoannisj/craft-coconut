@@ -17,6 +17,7 @@ use yii\validators\InlineValidator;
 use Craft;
 use craft\base\Model;
 use craft\models\Volume;
+use craft\helpers\App as AppHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
@@ -467,7 +468,7 @@ class Storage extends Model
             } else if ($field == 'credentials') {
                 $params['credentials'] = $value->toParams();
             } else if (is_string($value)) {
-                $params[$field] = Craft::parseEnv($value);
+                $params[$field] = AppHelper::parseEnv($value);
             } else {
                 $params[$field] = $value;
             }

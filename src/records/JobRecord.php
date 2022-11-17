@@ -12,14 +12,10 @@
 
 namespace yoannisj\coconut\records;
 
-use yii\base\InvalidConfigException;
-
 use Craft;
 use craft\db\ActiveRecord;
-use craft\helpers\Json as JsonHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\models\Notification;
 
 /**
  * Active record for transcoding Jobs in database

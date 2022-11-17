@@ -12,10 +12,8 @@
 
 namespace yoannisj\coconut\services;
 
-use Coconut\Client as CoconutClient;
 use Coconut\Error as CoconutError;
 
-use yii\base\Exception;
 use yii\base\InvalidArgumentException;
 
 use Craft;
@@ -23,7 +21,6 @@ use craft\base\Component;
 use craft\models\Volume;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
-use craft\helpers\Json as JsonHelper;
 use craft\helpers\DateTimeHelper;
 
 use yoannisj\coconut\Coconut;
@@ -31,9 +28,7 @@ use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\records\JobRecord;
-use yoannisj\coconut\exceptions\CoconutApiExeption;
 use yoannisj\coconut\events\JobEvent;
-use yoannisj\coconut\events\CancellableJobEvent;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
@@ -172,10 +167,26 @@ class Jobs extends Component
                 'Can not re-run a job that has been ran by Coconut.co before');
         }
 
+        $message = "Run coconut transcoding job for input ".$job->getInput()->getName();
+        Craft::info($message, 'coconut');
+        Craft::debug([
+            'message' => $message,
+            'method' => __METHOD__,
+            'params' => $job->toParams(),
+        ], 'coconut');
+
         if ($runValidation && !$job->validate())
         {
-            $message = 'Could not run Job due to validation error(s)';
-            Craft::info($message.':'.print_r($job->errors, true), 'coconut');
+            $message = 'Could not run transcofing job due to validation error(s)';
+            $errors = $job->getErrorSummary(true);
+            $info = $errors ? $message."\n  ".implode("\n  -", $errors) : $message;
+
+            Craft::info($info, 'coconut');
+            Craft::debug([
+                'message' => $message,
+                'method' => __METHOD__,
+                'errors' => $errors,
+            ], 'coconut');
 
             return false;
         }
@@ -213,12 +224,21 @@ class Jobs extends Component
 
         if ($runValidation && !$job->validate())
         {
-            Craft::info([
-                'message' => 'Job not saved due to validation errors',
+            if ($isNewJob) {
+                $message = 'Could not save new job due to validation errors';
+            } else {
+                $message = 'Could not save job with ID '.$job->id.' due to validation errors';
+            }
+
+            $errors = $job->getErrorSummary(true);
+            $info = $message."\n  ".implode("\n  -", $errors);
+
+            Craft::info($info, 'coconut');
+            Craft::debug([
+                'message' => $message,
                 'method' => __METHOD__,
-                'jobId' => $job->id,
-                'jobErrors' => $job->getErrorSummary(true),
-            ], 'coconut-debug');
+                'errors' => $errors,
+            ], 'coconut');
 
             return false;
         }
@@ -242,11 +262,20 @@ class Jobs extends Component
             // $record->update() could return 0 if no rows were affected
             if ($success === false)
             {
-                Craft::info([
-                    'message' => 'Job not saved due to record upsert failure',
+                if ($isNewJob) {
+                    $message = "Could not upsert new job record";
+                } else {
+                    $message = "Could not upsert job record with ID ".$record->id;
+                }
+
+                $errors = $record->getErrorSummary(true);
+                $info = $errors ? $message."\n  ".implode("\n  -", $errors) : $message;
+
+                Craft::info($info, 'coconut');
+                Craft::debug([
+                    'message' => $message,
                     'method' => __METHOD__,
-                    'recordId' => $record->id,
-                    'recordErrors' => $record->getErrorSummary(true),
+                    'errors' => $errors,
                 ], 'coconut-debug');
 
                 $transaction->rollBack();
@@ -617,145 +646,6 @@ class Jobs extends Component
         return [];
     }
 
-
-
-
-
-
-
-
-
-
-
-    /**
-     * Creates a new Coconut job, runs it synchronously by waiting on its
-     * completion, and returns the resulting outputs
-     *
-     * @param Job $job Coconut job model
-     * @param int $checkInterval Amount of time to wait between each job update (in miliseconds)
-     *
-     * @throws Job error eception if job's status is "error"
-     * @return nul|array List of resulting outputs
-     */
-
-    // public function runJob( Job $job, int $checkInterval = 0, callable $updateCallback = null )
-    // {
-    //     $jobInfo = $this->createJob($job, true);
-
-    //     while ($jobInfo && $jobInfo->status == 'processing')
-    //     {
-    //         // wait a certain amount of time before continuing
-    //         if ($checkInterval) usleep($checkInterval * 1000);
-
-    //         // get updated job info
-    //         $jobInfo = $this->checkJob($jobInfo->id, false);
-
-    //         if ($updateCallback) { // optionally run update callback
-    //             call_user_func($updateCallback, $jobInfo);
-    //         }
-    //     }
-
-    //     // job is completed: update job and return resulting outputs
-    //     return $this->updateJob($jobInfo, true);
-    // }
-
-    /**
-     * Creates a new Coconut job, and optionally updates outputs in the database.
-     *
-     * @param Job $job
-     * @param bool $updateOutputs Whether outputs in the db should be updated
-     *
-     * @throws Job error exception if job's status is "error"
-     * @return object | null Information about the newly created job or null if job creation was cancelled
-     */
-
-    // public function createJob( Config $job, $updateOutputs = true )
-    // {
-    //     $params = $job->getJobParams();
-
-    //     // trigger EVENT_BEFORE_CREATE_JOB
-    //     $beforeCreateEvent = new CancellableJobEvent([
-    //         'config' => $config,
-    //         'updateOutputs' => $updateOutputs,
-    //         'jobInfo' => null,
-    //     ]);
-
-    //     $this->trigger(self::EVENT_BEFORE_CREATE_JOB, $beforeCreateEvent);
-
-    //     // allow event listeners to cancel job creation
-    //     if ($beforeCreateEvent->isValid === false) {
-    //         return null;
-    //     }
-
-    //     // create coconut job using Coconut API
-    //     $jobInfo = CoconutJob::create($params);
-    //     $this->updateJob($jobInfo, false); // update jobInfo
-
-    //     // trigger EVENT_AFTER_CREATE_JOB
-    //     $afterCreateEvent = new JobEvent([
-    //         'config' => $config,
-    //         'updateOutputs' => $updateOutputs,
-    //         'jobInfo' => $jobInfo,
-    //     ]);
-
-    //     $this->trigger(self::EVENT_AFTER_CREATE_JOB, $afterCreateEvent);
-
-    //     if ($updateOutputs) {
-    //         $newOutputs = Coconut::$plugin->getOutputs()->initJobOutputs($config, $jobInfo->id);
-    //     }
-
-    //     return $jobInfo;
-    // }
-
-    /**
-     * Retrieves job information for given Coconut job id, handles job status
-     * update, and optionally updates outputs in the database.
-     *
-     * @param int $jobId Id of job to retrieve
-     * @param bool $updateOutputs Whether outputs in the db should be updated
-     *
-     * @throws Job error exception if job's status is "error"
-     * @return object Information retrieved about the job
-     */
-
-    // public function checkJob( int $jobId, $updateOutputs = true )
-    // {
-    //     $jobInfo = CoconutJob::get($jobId);
-    //     $this->updateJob($jobInfo, $updateOutputs);
-
-    //     return $jobInfo;
-    // }
-
-    /**
-     * Helper method to handle status update status for given Coconut job.
-     *
-     * @param object|int $jobInfo Info object or id of job to update
-     * @param bool $updateOutputs Whether outputs in the db should be updated
-     *
-     * @throws Job error exception if job's status is "error"
-     * @return null|array Updated list of outputs if `$updateOutputs` argument is `true`
-     */
-
-    // public function updateJob( $jobInfo, bool $updateOutputs = true )
-    // {
-    //     $result = null;
-
-    //     // accept a job id
-    //     if (is_numeric($jobInfo)) {
-    //         $jobInfo = CoconutJob::get($jobId);
-    //     }
-
-    //     if ($jobInfo->status == 'error') {
-    //         $this->onJobError($jobInfo, $updateOutputs);
-    //     }
-
-    //     if ($jobInfo->status == 'completed') {
-    //         $result = $this->onJobComplete($jobInfo, $updateOutputs);
-    //     }
-
-    //     return $result;
-    // }
-
     // =Protected Methods
     // =========================================================================
 
@@ -797,133 +687,5 @@ class Jobs extends Component
             $this->_jobsPerInputUrlHash[$input->urlHash][] = $job;
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-    /**
-     * Handles errors for given Coconut job.
-     *
-     * @param object $jobInfo Info object or id of job to update
-     * @param bool $updateOutputs Whether outputs in the db should be updated
-     *
-     * @throws Job error exception
-     */
-    // protected function onJobError( $jobInfo, bool $updateOutputs = true )
-    // {
-    //     $jobId = $jobInfo->id ?? null;
-    //     $jobOutputs = null;
-
-    //     if ($updateOutputs && $jobId)
-    //     {
-    //         $service = Coconut::$plugin->getOutputs();
-    //         $jobOutputs = $service->getJobOutputs($jobId);
-
-    //         foreach ($jobOutputs as $output) {
-    //             $service->deleteOutput($output);
-    //         }
-    //     }
-
-    //     // trigger EVENT_JOB_ERROR
-    //     $errorEvent = new JobEvent([
-    //         'updateOutputs' => $updateOutputs,
-    //         'jobInfo' => $jobInfo,
-    //         'jobOutputs' => $jobOutputs,
-    //     ]);
-
-    //     $this->trigger(self::EVENT_JOB_ERROR, $errorEvent);
-
-    //     throw new Exception($jobInfo->message);
-    // }
-
-    /**
-     * Handles completion for given Coconut job.
-     *
-     * @param object $jobInfo Info object or id of job to update
-     * @param bool $updateOutputs Whether outputs in the db should be updated
-     *
-     * @return null|array Updated list of outputs if `$updateOutputs` argument is `true`
-     */
-    // protected function onJobComplete( $jobInfo, bool $updateOutputs = true )
-    // {
-    //     if (!$updateOutputs) {
-    //         return null;
-    //     }
-
-    //     $service = Coconut::$plugin->getOutputs();
-
-    //     $jobOutputs = $service->getJobOutputs($jobInfo->id);
-    //     $outputUrls = (array)$jobInfo->output_urls;
-
-    //     $metadata = [];
-    //     $result = CoconutJob::getAllMetadata($jobInfo->id);
-    //     if ($result && property_exists($result, 'metadata')) {
-    //         $metadata = JsonHelper::decode(JsonHelper::encode($result->metadata));
-    //     }
-
-    //     // @todo: compare at db output urls with jobInfo->outputUrls to discover
-    //     // errors in anticipative urls saved in the DB
-    //     // -> problem: if we don't add the ?host arg in output urls to the coconut job,
-    //     //  resulting jobInfo->outputUrls use "http://"
-    //     // -> problem: when passing "https://s3.amazonaws.com/<bucket-name>" in the ?host arg,
-    //     //  resulting jobInfo->outputUrls still use "https://<bucket-name>.s3.amazonaws.com/"
-    //     // ->problem: when passing "https://<bucket-name>.s3.amazonaws.com/" in the ?host arg,
-    //     //  the coconut job does not throw an error, but transcoding still fails for every file
-
-    //     foreach ($jobOutputs as $output)
-    //     {
-    //         $output->inProgress = false;
-    //         $output->metadata = $metadata[$output->format] ?? null;
-
-    //         $service->saveOutput($output);
-    //     }
-
-    //     // $completedOutputs = [];
-    //     // $invalidOutputs = [];
-
-    //     // foreach ($jobOutputs as $output)
-    //     // {
-    //     //     $formatUrls = $outputUrls[$output->format] ?? [];
-    //     //     if (!is_array($formatUrls)) $formatUrls = [ $formatUrls ];
-
-    //     //     if (in_array($output->url, $formatUrls)) {
-    //     //         $completedOutputs[] = $output;
-    //     //     }
-
-    //     //     else {
-    //     //         $invalidOutputs[] = $output;
-    //     //     }
-    //     // }
-
-    //     // foreach ($completedOutputs as $output)
-    //     // {
-    //     //     $output->inProgress = false;
-    //     //     $service->saveOutput($output);
-    //     // }
-
-    //     // foreach ($invalidOutputs as $output) {
-    //     //     $service->deleteOutput($output); // removes output file
-    //     // }
-
-    //     // return $completedOutputs;
-
-    //     // trigger EVENT_JOB_COMPLETE
-    //     $completeEvent = new JobEvent([
-    //         'updateOutputs' => $updateOutputs,
-    //         'jobInfo' => $jobInfo,
-    //         'jobOutputs' => $jobOutputs,
-    //     ]);
-
-    //     $this->trigger(self::EVENT_JOB_COMPLETE, $completeEvent);
-
-    //     return $jobOutputs;
-    // }
 
 }

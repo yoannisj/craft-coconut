@@ -13,9 +13,7 @@ namespace yoannisj\coconut\base;
 
 use Craft;
 use craft\models\Volume;
-use craft\helpers\UrlHelper;
 
-use yoannisj\coconut\Coconut;
 use yoannisj\coconut\base\VolumeAdapterInterface;
 use yoannisj\coconut\helpers\JobHelper;
 

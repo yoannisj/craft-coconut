@@ -14,20 +14,15 @@ namespace yoannisj\coconut\models;
 
 use DateTime;
 
-use yii\base\InvalidArgumentException;
 use yii\base\InvalidConfigException;
-use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;
-use craft\db\Query;
 use craft\elements\Asset;
 use craft\validators\DateTimeValidator;
 use craft\helpers\ArrayHelper;
-use craft\helpers\FileHelper;
 use craft\helpers\Json as JsonHelper;
 
-use yoannisj\coconut\Coconut;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**

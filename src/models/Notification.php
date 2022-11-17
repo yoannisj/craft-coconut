@@ -14,9 +14,7 @@ namespace yoannisj\coconut\models;
 
 use Craft;
 use craft\base\Model;
-use craft\helpers\ArrayHelper;
 
-use yoannisj\coconut\Coconut;
 use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 use yoannisj\coconut\models\ServiceCredentials;
 use yoannisj\coconut\helpers\JobHelper;

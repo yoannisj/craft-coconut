@@ -18,14 +18,11 @@ use yii\web\ServerErrorHttpException;
 
 use Craft;
 use craft\base\Fs;
-use craft\elements\Asset;
 use craft\web\Controller;
-use craft\web\Request;
 use craft\web\Response;
 use craft\web\UploadedFile;
 use craft\errors\UploadFailedException;
 use craft\errors\FileException;
-use craft\helpers\ArrayHelper;
 use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
@@ -128,7 +125,7 @@ class JobsController extends Controller
 
         if ($success === false)
         {
-            Craft::info([
+            Craft::debug([
                 'message' => 'Job not updated',
                 'method' => __METHOD__,
                 'jobId' => $jobId,
@@ -145,7 +142,7 @@ class JobsController extends Controller
                 }, $job->getOutputs()),
             ], 'coconut-debug');
 
-            throw new ServerErrorHttpException("Could not handle job notification");
+            throw new ServerErrorHttpException("Could not update job via notification");
         }
 
         // Tell Coconut we get the update :)
@@ -165,6 +162,7 @@ class JobsController extends Controller
     ): Response
     {
         Craft::debug([
+            'message' => 'Upload output...',
             'method' => __METHOD__,
             'volumeHandle' => $volumeHandle,
             'outputPath' => $outputPath,

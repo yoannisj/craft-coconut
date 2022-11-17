@@ -20,7 +20,6 @@ use yii\base\InvalidConfigException;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin;
-use craft\base\Element;
 use craft\elements\Asset;
 use craft\web\UrlManager;
 use craft\services\Elements;
@@ -397,45 +396,22 @@ class Coconut extends Plugin
             // @todo: implement UI for job's feedback progress (based on notifications)
             if (!$coconutJobs->runJob($job))
             {
-                if ($job->hasErrors())
-                {
-                    throw new InvalidConfigException(
-                        "Could not run job due to validation error(s)");
+                if ($job->hasErrors()) {
+                    throw new InvalidConfigException("Could not run new job due to validation error(s)");
                 }
 
                 throw new Exception('Could not run job');
             }
 
-            Craft::info([
-                'message' => 'Run Coconut transcoding job',
-                'method' => __METHOD__,
-                'job' => $job->toParams(),
-            ], 'coconut-debug');
-
             // save new job and its configured outputs to the database
             if (!$coconutJobs->saveJob($job))
             {
-                if ($job->hasErrors())
-                {
-                    $errorsText = implode("\n- ", $job->getErrorSummary(true));
-
-                    if ($job->hasErrors('outputs'))
-                    {
-                        $errorsText .= "\n\tOutput errors:\n";
-
-                        foreach ($job->getOutputs() as $output)
-                        {
-                            $glue = "\n\t- [".$output->key.'] ';
-                            $errorsText .= implode($glue, $output->getErrorSummary(true));
-                        }
-                    }
-
+                if ($job->hasErrors()) {
                     throw new InvalidConfigException(
-                        "Could not save job due to validation error(s)"
-                        ."\n - ". $errorsText);
+                        "Could not save transcoding job due to validation error(s)");
                 }
 
-                throw new Exception('Could not save job');
+                throw new Exception('Could not save transcoding job');
             }
 
             // return newly saved outputs as well
@@ -461,79 +437,6 @@ class Coconut extends Plugin
             'region' => $region,
         ]);
     }
-
-    /**
-     * @param string|Asset $source
-     * @param string|array|Job $job
-     * @param bool|null $useQueue
-     * @param int $checkInterval
-     *
-     * @throws JobException if job errored
-     * @return array
-     */
-    // public function transcodeSource(
-    //     $source,
-    //     $job = null,
-    //     bool $useQueue = null,
-    //     int $checkInterval = 0
-    // ): array
-    // {
-    //     // default to global useQueue value
-    //     if ($useQueue === null) $useQueue = $this->getSettings()->preferQueue;
-    //     // normalize and fill in config attributes based on source
-    //     $job = $this->normalizeSourceConfig($source, $job);
-
-    //     if ($useQueue)
-    //     {
-    //         // add job to the queue
-    //         $queueJob = new TranscodeSourceJob([ 'config' => $job ]);
-    //         Craft::$app->getQueue()->push($queueJob);
-
-    //         // return initialized outputs for job config
-    //         $outputs = $this->getOutputs()->initJobOutputs($job);
-    //     }
-
-    //     else {
-    //         // synchronous use of the coconut job api
-    //         $outputs = $this->getJobs()->runJob($job);
-    //     }
-
-    //     return ArrayHelper::index($outputs, 'format');
-    // }
-
-    /**
-     * @param string|int|Asset $source
-     * @param string|array|Job|null $job
-     * @param bool $strict Whether no job parameters is allowed or not
-     *
-     * @return Job
-     */
-    // public function normalizeSourceConfig( $source, $job = null, bool $strict = true )
-    // {
-    //     if (is_array($job)) {
-    //         $job = new Job($job);
-    //     }
-
-    //     else if (is_string($job)) {
-    //         $job = $this->getJobs()->getNamedJob($job);
-    //     }
-
-    //     else if (!$job && $source instanceof Asset)
-    //     {
-    //         $volume = $source->getVolume();
-    //         $job = $this->getJobs()->getVolumeJob($volume->handle);
-    //     }
-
-    //     if ($strict && !($job instanceof Job))
-    //     {
-    //         throw new InvalidArgumentException(
-    //             'Could not resolve given job into a `'.Job::class.'` instance');
-    //     }
-
-    //     $job->setSource($source);
-
-    //     return $job;
-    // }
 
     // =Protected Methods
     // =========================================================================

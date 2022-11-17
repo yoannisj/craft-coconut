@@ -23,11 +23,9 @@ use craft\validators\HandleValidator;
 use craft\fs\Local as LocalFs;
 use craft\helpers\StringHelper;
 use craft\helpers\ArrayHelper;
-use craft\helpers\UrlHelper;
 use craft\helpers\App as AppHelper;
 use craft\helpers\Component as ComponentHelper;
 
-use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\helpers\JobHelper;
@@ -409,7 +407,7 @@ class Settings extends Model
     public function getPublicBaseUrl(): ?string
     {
         if ($this->_publicBaseUrl) {
-            return Craft::parseEnv($this->_publicBaseUrl);
+            return AppHelper::env($this->_publicBaseUrl);
         }
 
         return null;
@@ -495,7 +493,7 @@ class Settings extends Model
             if ($storage)
             {
                 if (is_string($storage)) {
-                    $storage = Craft::parseEnv($storage);
+                    $storage = AppHelper::parseEnv($storage);
                 }
 
                 $storage = JobHelper::resolveStorage($storage);

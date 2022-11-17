@@ -17,6 +17,7 @@ use yii\base\InvalidValueException;
 use Craft;
 use craft\base\Component;
 use craft\models\Volume;
+
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Storage;
 use yoannisj\coconut\events\VolumeStorageEvent;
@@ -141,9 +142,13 @@ class Storages extends Component
 
             else if (!$storage->validate())
             {
-                $message = "Resolved volume storage is not valid";
+                $message = 'Resolved volume storage is not valid';
+                Craft::debug([
+                    'message' => $message,
+                    'method' => __METHOD__,
+                    'errors' => $storage->getErrorSummary(true),
+                ]);
 
-                Craft::info($message.':'.print_r($storage->errors, true), 'coconut');
                 throw new InvalidValueException(Craft::t('coconut', $message));
             }
 

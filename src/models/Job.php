@@ -14,7 +14,6 @@ namespace yoannisj\coconut\models;
 
 use DateTime;
 
-use yii\base\Exception;
 use yii\base\InvalidConfigException;
 use yii\base\InvalidArgumentException;
 use yii\validators\InlineValidator;
@@ -24,15 +23,11 @@ use craft\base\Model;
 use craft\validators\HandleValidator;
 use craft\validators\DateTimeValidator;
 use craft\models\Volume;
-use craft\elements\Asset;
-use craft\helpers\UrlHelper;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
 use craft\helpers\DateTimeHelper;
-use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
-use yoannisj\coconut\behaviors\PropertyAliasBehavior;
 use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Notification;
 use yoannisj\coconut\validators\AssociativeArrayValidator;
@@ -802,7 +797,7 @@ class Job extends Model
             'storage',
         ], 'required' ];
 
-        $rules['attrint']  = [ [
+        $rules['attrInteger']  = [ [
             'id',
         ], 'integer' ];
 
@@ -1049,112 +1044,6 @@ class Job extends Model
         return $this;
     }
 
-    /**
-     * Returns a new config model, which only includes given list of output
-     * formats.
-     *
-     * @param array $formats
-     *
-     * @return \yoannisj\coconut\models\Job
-     */
-
-    // function forFormats( array $formats )
-    // {
-    //     $config = clone $this;
-    //     $outputs = $this->getOutputs();
-
-    //     $rawOutputs = $this->_outputs;
-    //     $formatOutputs = [];
-
-    //     foreach ($formats as $format => $options)
-    //     {
-    //         if (is_numeric($format)) {
-    //             $format = $options;
-    //             $options = null;
-    //         }
-
-    //         if (in_array($format, $rawOutputs)) {
-    //             $formatOutputs[] = $format;
-    //         }
-
-    //         else if (array_key_exists($format, $rawOutputs)) {
-    //             $formatOutputs[$format] = $rawOutputs[$format];
-    //         }
-    //     }
-
-    //     $newConfig = clone $this;
-    //     $newConfig->outputs = $formatOutputs;
-
-    //     return $newConfig;
-    // }
-
     // =Protected Method
     // =========================================================================
-
-    /**
-     * Resolves parameters for single output in Cococnut job config settings,
-     * and returns the corresponding Output model
-     *
-     * @param array|Output $params The output params from the config's list of `outputs`
-     * @param string|null $formatKey The key of the output in the config's list of `outputs`
-     * @param string|null $formatIndex The output params index when more than one was given for this string index
-     *
-     * @return Output|null
-     */
-    // protected function resolveOutputParams( $params, string $formatKey = null, int $formatIndex = null )
-    // {
-    //     if (!$formatKey)
-    //     {
-    //         if (is_string($params))
-    //         {
-    //             $params =[
-    //                 'format' => JobHelper::decodeFormat($params)
-    //             ];
-    //         }
-    //     }
-
-    //     $isArray = is_array($params);
-    //     $isModel = ($isArray == false && ($params instanceof Output));
-
-    //     if (!$isArray && !$isModel)
-    //     {
-    //         throw new InvalidConfigException(
-    //             "Each output must be a format string, an array of output params or an Output model");
-    //     }
-
-    //     $output = null;
-
-    //     // merge format specs from output index with output params
-    //     $keySpecs = $formatKey ? JobHelper::decodeFormat($formatKey) : [];
-    //     $container = $keySpecs['container'] ?? null; // index should always define a container
-    //     $paramSpecs = ArrayHelper::getValue($params, 'format');
-
-    //     if (is_array($paramSpecs))
-    //     {
-    //         if ($container) $paramSpecs['container'] = $container;
-    //         $paramSpecs = JobHelper::parseFormat($paramSpecs);
-    //     }
-
-    //     else if (is_string($paramSpecs)) { // support defining 'format' param as a JSON or format string
-    //         $paramSpecs = JobHelper::decodeFormat($paramSpecs);
-    //         if ($container) $paramSpecs['container'] = $container;
-    //     }
-
-
-    //     // @todo: should index specs override param specs?
-    //     $formatSpecs = array_merge($keySpecs, $paramSpecs ?? []);
-
-    //     if ($isArray)
-    //     {
-    //         $params['format'] = $formatSpecs;
-    //         $output = new Output($params);
-    //     }
-
-    //     else {
-    //         $output = $params;
-    //         $output->format = $formatSpecs;
-    //     }
-
-    //     return $output;
-    // }
 }

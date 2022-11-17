@@ -15,18 +15,14 @@ use yii\base\InvalidArgumentException;
 use Craft;
 use craft\models\Volume;
 use craft\elements\Asset;
-use craft\helpers\StringHelper;
 use craft\helpers\UrlHelper;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
-use craft\helpers\DateTimeHelper;
-use craft\helpers\FileHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Input;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Storage;
-use yoannisj\coconut\models\Notification;
 use yoannisj\coconut\models\Job;
 use yoannisj\coconut\records\OutputRecord;
 use yoannisj\coconut\records\JobRecord;
@@ -759,22 +755,10 @@ class JobHelper
         if (!$url) return null;
 
         $volumeFs = $volume->getFs();
-        if (!$volumeFs->hasUrls) {
-            Craft::info([
-                'message' => 'VOLUME FS HAS NO URLS',
-                'url' => $url,
-                'volume' => $volume->handle,
-            ], 'coconut-debug');
-            return null;
-        }
+        if (!$volumeFs->hasUrls) return null;
 
         $rootUrl = rtrim($volumeFs->getRootUrl(), '/');
         if (strncmp($rootUrl, $url, mb_strlen($rootUrl)) === 0) {
-            Craft::info([
-                'message' => 'URL ALREADY BASED ON VOLUME',
-                'url' => $url,
-                'rootUrl' => $rootUrl,
-            ], 'coconut-debug');
             return $url; // URL is already based on volume's file-system
         }
 
@@ -782,11 +766,6 @@ class JobHelper
 
         // if the URL is not based on the output route
         if (strpos($url, $trigger) === false) {
-            Craft::info([
-                'message' => 'OUTPUT ROUTE TRIGGER NOT FOUND',
-                'url' => $url,
-                'trigger' => $trigger,
-            ], 'coconut-debug');
             return $url; // leave it unchanged
         }
 
@@ -796,11 +775,6 @@ class JobHelper
         $path = implode($trigger, $urlParts);
 
         if (!$path) {
-            Craft::info([
-                'message' => 'EMPTY URL PATH',
-                'url' => $url,
-                'urlParts' => $urlParts,
-            ], 'coconut-debug');
             return null; // maybe there is nothing left?
         }
 

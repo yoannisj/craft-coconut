@@ -16,7 +16,6 @@ use DateTime;
 
 use yii\base\InvalidArgumentException;
 use yii\base\InvalidConfigException;
-use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;

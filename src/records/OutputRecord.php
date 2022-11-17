@@ -16,7 +16,6 @@ use yii\db\ActiveQueryInterface;
 
 use Craft;
 use craft\db\ActiveRecord;
-use craft\records\Volume as VolumeRecord;
 use craft\errors\VolumeException;
 use craft\helpers\Json as JsonHelper;
 

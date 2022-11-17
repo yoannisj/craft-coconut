@@ -15,6 +15,7 @@ namespace yoannisj\coconut\elements\actions;
 use Craft;
 use craft\base\ElementAction;
 use craft\db\Query;
+use craft\elements\db\AssetQuery;
 use craft\elements\db\ElementQueryInterface;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
@@ -91,9 +92,8 @@ EOD;
     public function performAction( ElementQueryInterface $query ): bool
     {
         // fetch video elements only
-        $videos = $query
-            ->kind('video')
-            ->all();
+        /** @var AssetQuery $query */
+        $videos = $query->kind('video')->all();
 
         if (empty($videos)) return true;
 

@@ -14,7 +14,6 @@ use yoannisj\coconut\migrations\Install;
 /**
  * m200914_132537_add_output_metadata_column migration.
  */
-
 class m221026_144600_api_v2_upgrade extends Migration
 {
     /**

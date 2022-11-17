@@ -155,13 +155,6 @@ class PropertyAliasBehavior extends Behavior
         $target = $this->_propertyAliasesMap[$name] ?? null;
         if ($target) return $target;
 
-        // foreach ($this->_propertyAliasesMap as $alias => $target)
-        // {
-        //     if (in_array($name, $aliases)) {
-        //         return $target;
-        //     }
-        // }
-
         if ($checkCamelCase && $this->camelCasePropertyAliases == true
             && ($camelCased = $this->camelCasePropertyAlias($name)) != $name)
         {
