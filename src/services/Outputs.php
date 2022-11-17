@@ -396,7 +396,7 @@ class Outputs extends Component
      *
      * @return bool Whether *all* Outputs were deleted successfully
      */
-    public function clearOutputs( array $outputs ): bool
+    public function deleteOutputs( array $outputs ): bool
     {
         $success = true;
 
@@ -425,7 +425,7 @@ class Outputs extends Component
     public function clearOutputsForJob( Job $job ): bool
     {
         $outputs = $this->getOutputsForJob($job);
-        return $this->clearOutputs($outputs);
+        return $this->deleteOutputs($outputs);
     }
 
     /**
@@ -566,7 +566,7 @@ class Outputs extends Component
     //     $sourceCriteria = $this->getSourceCriteria($source);
     //     $criteria = array_merge($criteria, $sourceCriteria);
 
-    //     return $this->clearOutputs($criteria);
+    //     return $this->deleteOutputs($criteria);
     // }
 
     /**
