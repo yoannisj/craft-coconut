@@ -20,6 +20,7 @@ use craft\base\FsInterface;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 use craft\helpers\DateTimeHelper;
+use craft\helpers\UrlHelper;
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Job;
@@ -233,6 +234,18 @@ class Outputs extends Component
         // or get new record
         if (!$record) $record = new OutputRecord();
 
+        // update output URL once it is completed
+        // @todo Conditionally rewrite output URLs in `Output::getUrl()` and `Output::getUrls()` getters
+        $isCompleted = $output->getIsCompleted();
+        if ($isCompleted && ($volume = $output->getJob()?->getStorage()?->getVolume())) {
+            Craft::info([
+                'message' => 'REWRITE OUTPUT URLS',
+                'outputKey' => $output->key,
+                'volumeHandle' => $volume->handle,
+            ], 'coconut-debug');
+            JobHelper::rewriteOutputUrls($output, $volume);
+        }
+
         // update the record attributes
         JobHelper::populateRecordFromOutput($record, $output);
 
@@ -254,7 +267,7 @@ class Outputs extends Component
         }
 
         // trigger output completion event
-        if (!$wasCompleted && $output->getIsCompleted()
+        if (!$wasCompleted && $isCompleted
             && $this->hasEventHandlers(self::EVENT_COMPLETE_OUTPUT))
         {
             $this->trigger(self::EVENT_COMPLETE_OUTPUT, new OutputEvent([

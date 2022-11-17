@@ -711,6 +711,113 @@ class JobHelper
     }
 
     /**
+     * Rewrites and output's routing URL to be based on given Volume.
+     *
+     * @param Output $output
+     * @param Volume $volume
+     *
+     * @return bool Whether the output URL(s) was/were changed
+     */
+    public static function rewriteOutputUrls( Output &$output, Volume $volume ): bool
+    {
+        $url = $output->url;
+        $output->url = static::rewriteOutputUrl($url, $volume);
+        $changed = ($output->url != $url);
+
+        $urls = $output->getUrls();
+        if (!empty($urls))
+        {
+            $newUrls = [];
+
+            foreach ($urls as $url)
+            {
+                $newUrl = static::rewriteOutputUrl($url, $volume);
+                if (!$changed) $changed = ($newUrl != $url);
+
+                $newUrls[] = $newUrl;
+            }
+
+            $output->setUrls($newUrls);
+        }
+
+        return $changed;
+    }
+
+    /**
+     * Rewrites an output URL to be based on given Volume.
+     *
+     * Note that the URL will only be changed if it is based on the plugin's
+     * Output routing URL.
+     *
+     * @param ?string $url
+     * @param Volume $volume
+     *
+     * @return string|null The rewritten URL, or null if it is empty
+     */
+    public static function rewriteOutputUrl( ?string $url, Volume $volume ): ?string
+    {
+        if (!$url) return null;
+
+        $volumeFs = $volume->getFs();
+        if (!$volumeFs->hasUrls) {
+            Craft::info([
+                'message' => 'VOLUME FS HAS NO URLS',
+                'url' => $url,
+                'volume' => $volume->handle,
+            ], 'coconut-debug');
+            return null;
+        }
+
+        $rootUrl = rtrim($volumeFs->getRootUrl(), '/');
+        if (strncmp($rootUrl, $url, mb_strlen($rootUrl)) === 0) {
+            Craft::info([
+                'message' => 'URL ALREADY BASED ON VOLUME',
+                'url' => $url,
+                'rootUrl' => $rootUrl,
+            ], 'coconut-debug');
+            return $url; // URL is already based on volume's file-system
+        }
+
+        $trigger = '/coconut/outputs/'.$volume->handle;
+
+        // if the URL is not based on the output route
+        if (strpos($url, $trigger) === false) {
+            Craft::info([
+                'message' => 'OUTPUT ROUTE TRIGGER NOT FOUND',
+                'url' => $url,
+                'trigger' => $trigger,
+            ], 'coconut-debug');
+            return $url; // leave it unchanged
+        }
+
+        // remove trigger base from output path
+        $urlParts = explode($trigger, $url);
+        array_shift($urlParts);
+        $path = implode($trigger, $urlParts);
+
+        if (!$path) {
+            Craft::info([
+                'message' => 'EMPTY URL PATH',
+                'url' => $url,
+                'urlParts' => $urlParts,
+            ], 'coconut-debug');
+            return null; // maybe there is nothing left?
+        }
+
+        // preserve URL params
+        $params = [];
+        parse_str(parse_url($url, PHP_URL_QUERY), $params);
+
+        // @todo Add timestamp param to the URL in an `Output::getUrl()` method
+
+        // encode URL path
+        $pathParts = explode('/', ltrim($path, '/'));
+        $path = implode('/', array_map('rawurlencode', $pathParts));
+
+        return UrlHelper::urlWithParams($rootUrl.'/'.$path, $params);
+    }
+
+    /**
      * Parses given format string or array of format specs, by analyzing and
      * validating spec values against the format container, and discarding
      * invalid and irrelevant values.
