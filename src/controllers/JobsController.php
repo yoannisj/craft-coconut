@@ -126,7 +126,7 @@ class JobsController extends Controller
             }
         }
 
-        if (!$success)
+        if ($success === false)
         {
             Craft::info([
                 'message' => 'Job not updated',
@@ -148,8 +148,9 @@ class JobsController extends Controller
             throw new ServerErrorHttpException("Could not handle job notification");
         }
 
-        $message = Craft::t('coconut', "Coconut Job updated");
-        return $this->asModelSuccess($job, $message, 'job');
+        // Tell Coconut we get the update :)
+        $this->response->setStatusCode(200);
+        return $this->response;
     }
 
     /**
@@ -213,8 +214,8 @@ class JobsController extends Controller
         }
 
         // Tell coconut we managed to upload the file successfully
-        $message = Craft::t('coconut', 'Uploaded Output file');
-        return $this->asSuccess($message);
+        $this->response->setStatusCode(200);
+        return $this->response;
     }
 
     /**
