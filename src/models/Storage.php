@@ -17,6 +17,7 @@ use yii\validators\InlineValidator;
 use Craft;
 use craft\base\Model;
 use craft\models\Volume;
+use craft\validators\HandleValidator;
 use craft\helpers\App as AppHelper;
 
 use yoannisj\coconut\Coconut;
@@ -394,6 +395,7 @@ class Storage extends Model
 
         // =format attributes
         $rules['attrString'] = [ [
+            'handle',
             'url',
             'service',
             'bucket',
@@ -404,6 +406,10 @@ class Storage extends Model
             'expires',
             'cacheControl',
         ], 'string' ];
+
+        $rules[ 'attrHandle' ] = [ [
+            'handle',
+        ], HandleValidator::class ];
 
         $rules['attrBool'] = [ ['secure'], 'boolean' ];
         $rules['credentialsValid'] = [ ['credentials'], 'validateCredentials' ];

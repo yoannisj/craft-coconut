@@ -802,6 +802,7 @@ class Job extends Model
         ], 'integer' ];
 
         $rules['attrString'] = [ [
+            'handle',
             'coconutId',
             'status',
             'progress',
@@ -809,6 +810,10 @@ class Job extends Model
             'message',
             'uid',
         ], 'string' ];
+
+        $rules['attrHandle'] = [ [
+            'handle'
+        ], HandleValidator::class ];
 
         $rules['attrAssociativeArray'] = [ ['metadata'], AssociativeArrayValidator::class ];
 
