@@ -41,7 +41,7 @@ class RunJob extends BaseJob implements RetryableJobInterface
     /**
      * @inheritdoc
      */
-    public function init()
+    public function init(): void
     {
         if (!$this->jobId)
         {

@@ -14,7 +14,10 @@
     "source": "https://github.com/yoannisj/craft-plugin",
     "docs": "https://github.com/yoannisj/craft-plugin/blob/master/README.md"
   },
-  "require": {},
+  "require": {
+    "craftcms/cms": "^4.0.0",
+    "yoannisj/craft-coconut": "dev-master"
+  },
   "require-dev": {
     "codeception/codeception": "^4.1",
     "codeception/module-phpbrowser": "^1.0.0",
@@ -22,12 +25,6 @@
     "codeception/module-yii2": "^1.1",
     "codeception/specify": "^1.4",
     "codeception/assert-throws": "^1.1"
-  },
-  "autoload": {
-    "classmap": [
-      "vendor/yiisoft/yii2/Yii.php",
-      "vendor/craftcms/cms/src/Craft.php"
-    ]
   },
   "config": {
     "allow-plugins": {

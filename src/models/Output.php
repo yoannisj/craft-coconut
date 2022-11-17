@@ -432,14 +432,14 @@ class Output extends Model
      *
      * @var int|null
      */
-    public ?int $offset;
+    public ?int $offset = null;
 
     /**
      * The duration (in seconds) at which resulting output should be cut
      *
      * @var int|null
      */
-    private ?int $_duration;
+    private ?int $_duration = null;
 
     /**
      * Whether `duration` property has already been normalized
@@ -618,7 +618,7 @@ class Output extends Model
     /**
      * @inheritdoc
      */
-    public function init()
+    public function init(): void
     {
         parent::init();
 
@@ -1384,7 +1384,7 @@ class Output extends Model
             'duration',
         ], 'number' ];
 
-        $rules['attrint'] = [ [
+        $rules['attrInteger'] = [ [
             'id',
             'jobId',
             'formatIndex',
@@ -1393,7 +1393,7 @@ class Output extends Model
             'offset',
             'number',
             'interval',
-        ], 'int', 'min' => 0 ];
+        ], 'integer', 'min' => 0 ];
 
         $rules['attrString'] = [ [
             'key',

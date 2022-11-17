@@ -16,9 +16,10 @@ use yii\base\InvalidArgumentException;
 
 use Craft;
 use craft\base\Component;
+use craft\base\FsInterface;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
-
+use craft\helpers\DateTimeHelper;
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Output;
 use yoannisj\coconut\models\Job;
@@ -240,8 +241,8 @@ class Outputs extends Component
 
         // update output model's attributes based on what's now saved in the database
         $output->id = $record->id;
-        $output->dateCreated = $record->dateCreated;
-        $output->dateUpdated = $record->dateUpdated;
+        $output->dateCreated = DateTimeHelper::toDateTime($record->dateCreated);
+        $output->dateUpdated = DateTimeHelper::toDateTime($record->dateUpdated);
         $output->uid = $record->uid;
 
         if ($this->hasEventHandlers(self::EVENT_AFTER_SAVE_OUTPUT))

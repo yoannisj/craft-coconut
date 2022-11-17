@@ -29,7 +29,7 @@ use yoannisj\coconut\helpers\JobHelper;
  * @property ServiceCredentials $credentials Credentials used for storage service
  * @property string $bucket_id Alias for 'bucket' property
  * @property string $container Alias for 'bucket' property
- *
+ * @property string $handle The storage's handle (a.k.a its name)
  */
 class Storage extends Model
 {
@@ -241,8 +241,13 @@ class Storage extends Model
         $this->_handle = $handle;
         $this->_volumeId = null;
 
-        if ($this->_volume && $this->_volume->handle != $handle) {
-            $this->_volume = null;
+        if ($this->_volume)
+        {
+            if ($this->_volume->handle != $handle) {
+                $this->_volume = null;
+            } else {
+                $this->_volumeId = $this->_volume->id;
+            }
         }
 
         return $this;

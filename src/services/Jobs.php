@@ -24,6 +24,7 @@ use craft\models\Volume;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
+use craft\helpers\DateTimeHelper;
 
 use yoannisj\coconut\Coconut;
 use yoannisj\coconut\models\Input;
@@ -77,14 +78,14 @@ class Jobs extends Component
     /**
      * Map of memoized Coconut jobs indexed by their input asset ID
      *
-     * @var Job[]
+     * @var array
      */
     private array $_jobsPerInputAssetId = [];
 
     /**
      * Map of memoized Coconut jobs indexed by their input asset ID
      *
-     * @var Job[]
+     * @var array
      */
     private array $_jobsPerInputUrlHash = [];
 
@@ -210,7 +211,15 @@ class Jobs extends Component
             ]));
         }
 
-        if ($runValidation && !$job->validate()) {
+        if ($runValidation && !$job->validate())
+        {
+            Craft::info([
+                'message' => 'Job not saved due to validation errors',
+                'method' => __METHOD__,
+                'jobId' => $job->id,
+                'jobErrors' => $job->getErrorSummary(true),
+            ], 'coconut-debug');
+
             return false;
         }
 
@@ -230,15 +239,24 @@ class Jobs extends Component
                 $success = $record->insert();
             }
 
-            if (!$success) {
+            // $record->update() could return 0 if no rows were affected
+            if ($success === false)
+            {
+                Craft::info([
+                    'message' => 'Job not saved due to record upsert failure',
+                    'method' => __METHOD__,
+                    'recordId' => $record->id,
+                    'recordErrors' => $record->getErrorSummary(true),
+                ], 'coconut-debug');
+
                 $transaction->rollBack();
                 return false;
             }
 
             // update job model's attributes based on what's now saved in the database
             $job->id = $record->id;
-            $job->dateCreated = $record->dateCreated;
-            $job->dateUpdated = $record->dateUpdated;
+            $job->dateCreated = DateTimeHelper::toDateTime($record->dateCreated);
+            $job->dateUpdated = DateTimeHelper::toDateTime($record->dateUpdated);
             $job->uid = $record->uid;
 
             // save job outputs

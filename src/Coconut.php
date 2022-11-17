@@ -44,6 +44,7 @@ use yoannisj\coconut\elements\actions\TranscodeVideo;
 use yoannisj\coconut\elements\actions\ClearVideoOutputs;
 use yoannisj\coconut\variables\CoconutVariable;
 use yoannisj\coconut\helpers\JobHelper;
+use yoannisj\coconut\models\Output;
 
 /**
  * Coconut plugin class for Craft-CMS
@@ -138,7 +139,7 @@ class Coconut extends Plugin
     /**
      * @inheritdoc
      */
-    public $schemaVersion = '2.0.0';
+    public string $schemaVersion = '2.0.0';
 
     // =Public Methods
     // =========================================================================
@@ -160,7 +161,7 @@ class Coconut extends Plugin
         Event::on(
             CraftVariable::class,
             CraftVariable::EVENT_INIT,
-            function ( Event $e ) {
+            function( Event $e ) {
                 /** @var CraftVariable $variable */
                 $variable = $e->sender;
                 $variable->set('coconut', CoconutVariable::class);
@@ -193,6 +194,8 @@ class Coconut extends Plugin
         }
 
         // register action types
+        // @todo Register and check user permissions for transcoding/clearing actions
+        // @body These actions can lead to increased Coconut service costs so some organisations might want to restrict their usage to specific members on their editors' team
         Event::on(
             Asset::class,
             Asset::EVENT_REGISTER_ACTIONS,
@@ -214,7 +217,7 @@ class Coconut extends Plugin
         Event::on(
             Elements::class,
             Elements::EVENT_AFTER_RESTORE_ELEMENT,
-            function ( ElementEvent $event ) {
+            function( ElementEvent $event ) {
                 $this->onAfterRestoreElement($event);
             }
         );
@@ -222,7 +225,7 @@ class Coconut extends Plugin
         Event::on(
             Assets::class,
             Assets::EVENT_AFTER_REPLACE_ASSET,
-            function ( AssetEvent $event ) {
+            function( AssetEvent $event ) {
                 $this->onAfterReplaceAsset($event);
             }
         );
@@ -398,6 +401,12 @@ class Coconut extends Plugin
 
                 throw new Exception('Could not run job');
             }
+
+            Craft::info([
+                'message' => 'Run Coconut transcoding job',
+                'method' => __METHOD__,
+                'job' => $job->toParams(),
+            ], 'coconut-debug');
 
             // save new job and its configured outputs to the database
             if (!$coconutJobs->saveJob($job))

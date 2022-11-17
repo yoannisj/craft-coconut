@@ -53,12 +53,12 @@ class JobsController extends Controller
     /**
      * @inheritdoc
      */
-    public bool $allowAnonymous = true;
+    public array|int|bool $allowAnonymous = true;
 
     /**
      * @inheritdoc
      */
-    public bool $enableCsrfValidation = false;
+    public $enableCsrfValidation = false;
 
     // =Public Methods
     // =========================================================================
@@ -128,10 +128,13 @@ class JobsController extends Controller
 
         if (!$success)
         {
-            Craft::info('Could not update job with ID '.$job->id, 'coconut');
-
-            Craft::debug([
+            Craft::info([
+                'message' => 'Job not updated',
                 'method' => __METHOD__,
+                'jobId' => $jobId,
+                'event' => $event,
+                'hasMetadata' => $hasMetadata,
+                'data' => $data,
                 'jobErrors' => $job->getErrorSummary(true),
                 'inputErrors' => $job->getInput()->getErrorSummary(true),
                 'outputErrors' => array_map(function($output) {
@@ -170,7 +173,6 @@ class JobsController extends Controller
 
         // get volume model based on given handle
         $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
-
         if (!$volume)
         {
             throw new NotFoundHttpException(
@@ -198,8 +200,10 @@ class JobsController extends Controller
             ]));
         }
 
+        $volumeFs = $volume->getFs();
+
         // write uploaded file contents to target file on the volume
-        $volume->getFs()->writeFileFromStream($outputPath, $stream, [
+        $volumeFs->writeFileFromStream($outputPath, $stream, [
             Fs::CONFIG_MIMETYPE => FileHelper::getMimeType($tempPath),
         ]);
 
@@ -231,16 +235,19 @@ class JobsController extends Controller
                 "Could not find storage volume '$volumeHandle'.");
         }
 
-        // check filename for allowed chars (do not allow ../ to avoid security issue: downloading arbitrary files)
+        $volumeFs = $volume->getFs();
+
+        // check filename for allowed chars
+        // (do not allow ../ to avoid security issue: downloading arbitrary files)
         if (preg_match(static::FORBIDDEN_PATH_PATTERN, $outputPath)
-            || !$volume->fileExists($outputPath)
+            || !$volumeFs->fileExists($outputPath)
         ) {
             throw new NotFoundHttpException('The output file does not exists.');
         }
 
         $fileName = basename($outputPath);
         $mimeType = FileHelper::getMimeTypeByExtension($outputPath);
-        $stream = $volume->getFileStream($outputPath);
+        $stream = $volumeFs->getFileStream($outputPath);
 
         return $this->response->setCacheHeaders()
             ->sendStreamAsFile($stream, $fileName, [

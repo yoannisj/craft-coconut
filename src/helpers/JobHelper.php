@@ -33,8 +33,9 @@ use yoannisj\coconut\records\JobRecord;
 
 /**
  * Static helper class to work with coconut configs
+ *
+ * @todo Enable ultra-fast mode for 4K or 1080p:60s+ videos by default
  */
-
 class JobHelper
 {
     // =Constants

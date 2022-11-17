@@ -13,7 +13,7 @@
 namespace yoannisj\coconut\events;
 
 use yii\base\Event;
-use yoannisj\models\Output;
+use yoannisj\coconut\models\Output;
 
 /**
  * Model for transcoding Output events

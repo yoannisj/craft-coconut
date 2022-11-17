@@ -87,6 +87,13 @@ class Job extends Model
     public ?string $coconutId = null;
 
     /**
+     * Job's handle (a.k.a its name)
+     *
+     * @var string|null
+     */
+    public ?string $handle = null;
+
+    /**
      * Model representing the job's input video to transcode
      *
      * @var Input|null
@@ -146,9 +153,9 @@ class Job extends Model
     protected ?bool $isFallbackStorage = null;
 
     /**
-     * @var Notification
+     * @var string|Notification|null
      */
-    private ?Notification $_notification = null;
+    private string|Notification|null $_notification = null;
 
     /**
      * @var bool
@@ -797,7 +804,7 @@ class Job extends Model
 
         $rules['attrint']  = [ [
             'id',
-        ], 'int' ];
+        ], 'integer' ];
 
         $rules['attrString'] = [ [
             'coconutId',

@@ -64,7 +64,7 @@ class PropertyAliasBehavior extends Behavior
     /**
      * @inheritdoc
      */
-    public function init()
+    public function init(): void
     {
         if (is_array($this->camelCasePropertyAliases)) {
             $this->_camelPropertyAliasesMap = $this->camelCasePropertyAliases;

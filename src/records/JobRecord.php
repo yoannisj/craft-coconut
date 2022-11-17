@@ -33,15 +33,15 @@ use yoannisj\coconut\models\Notification;
  * @property string inputUrlHash
  * @property string inputStatus
  * @property string inputMetadata
- * @property Datetime inputExpires
+ * @property DateTime inputExpires
  * @property string storageHandle
  * @property int storageVolumeId
  * @property array storageParams
  * @property array notification
- * @property Datetime createdAt
- * @property Datetime completedAt
- * @property Datetime dateCreated
- * @property Datetime dateUpdated
+ * @property DateTime createdAt
+ * @property DateTime completedAt
+ * @property DateTime dateCreated
+ * @property DateTime dateUpdated
  */
 class JobRecord extends ActiveRecord
 {
