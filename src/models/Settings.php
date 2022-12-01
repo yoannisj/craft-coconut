@@ -594,6 +594,9 @@ class Settings extends Model
         $notificationUrl = JobHelper::publicActionUrl(
             'coconut/jobs/notify', null, null, true);
 
+        $environment = \craft\helpers\App::env('CRAFT_ENVIRONMENT');
+        Craft::error('['.$environment.'] '.$notificationUrl, 'coconut-debug');
+
         // $baseCpUrl = UrlHelper::baseCpUrl();
         // $baseSiteUrl = UrlHelper::baseSiteUrl();
         // $publicBaseUrl = rtrim($this->getPublicBaseUrl(), '/').'/';
