@@ -1179,9 +1179,19 @@ class JobHelper
         string $scheme = null
     ): string
     {
-        // always include script name to avoid 404s trying to render a template
+        $request = Craft::$app->getRequest();
+        $isCpRequest = $request->getIsCpRequest();
+
+        // When tunnelling to local dev, CP action URLs don't work:
+        // - https://xxx.ngrok.io/index.php?p=<cp-trigger>/action/path => 404
+        // - https://xxx.ngrok.io/index.php?p=action/path => 200
+        if ($isCpRequest) $request->setIsCpRequest(false);
+
         return static::publicUrl(
             UrlHelper::actionUrl($action, $params, $scheme, true));
+
+        // restore request type
+        if ($isCpRequest) $request->setIsCpRequest(true);
     }
 
     /**
