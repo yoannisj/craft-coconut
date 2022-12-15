@@ -364,17 +364,24 @@ class Input extends Model
             if ($volume instanceof FortrabbitStorageVolume)
             {
                 if ($volume->subfolder
-                    && ($subfolder = rtrim(Craft::parseEnv($this->subfolder), '/')) !== '')
+                    && ($subfolder = rtrim(AppHelper::parseEnv($volume->subfolder), '/')) !== '')
                 {
                     $assetPath = $subfolder.'/'.ltrim($assetPath, '/');
                 }
 
+                // get full https endpoint
+                $endpoint = AppHelper::parseEnv($volume->endpoint);
+                if (!str_contains($endpoint, 'https')) {
+                    $endpoint = 'https://' .  $endpoint;
+                }
+
                 return [
                     'service' => 's3other',
-                    'endpoint' => AppHelper::parseEnv($volume->endpoint),
+                    'endpoint' => $endpoint,
+                    'region' => AppHelper::parseEnv($volume->region),
                     'credentials' => [
                         'access_key_id' => AppHelper::parseEnv($volume->keyId),
-                        'access_key_id' => AppHelper::parseEnv($volume->secret),
+                        'secret_access_key' => AppHelper::parseEnv($volume->secret),
                     ],
                     'bucket' => AppHelper::parseEnv($volume->bucket),
                     'key' => $assetPath,
