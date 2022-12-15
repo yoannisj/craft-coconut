@@ -20,8 +20,12 @@ use Craft;
 use craft\base\Model;
 use craft\elements\Asset;
 use craft\validators\DateTimeValidator;
+use craft\helpers\App as AppHelper;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Json as JsonHelper;
+
+use craft\awss3\Fs as AwsS3Fs;
+use fortrabbit\ObjectStorage\Fs as FortrabbitFs;
 
 use yoannisj\coconut\helpers\JobHelper;
 
@@ -355,6 +359,62 @@ class Input extends Model
      */
     public function toParams(): array
     {
+        // @todo Use volume adapters to get input params
+        $asset = $this->getAsset();
+        if ($asset)
+        {
+            $fs = $asset->getVolume()->getFs();
+            $assetPath = $asset->path;
+
+            if ($fs instanceof AwsS3Fs)
+            {
+                // prefix asset path with volume subfolder
+                if ($fs->addSubfolderToRootUrl && $fs->subfolder
+                    && ($subfolder = rtrim(AppHelper::parseEnv($fs->subfolder), '/')) !== '')
+                {
+                    $assetPath = $subfolder.'/'.ltrim($assetPath, '/');
+                }
+
+                return [
+                    'service' => 's3',
+                    'region' => AppHelper::parseEnv($fs->region),
+                    'credentials' => [
+                        'access_key_id' => AppHelper::parseEnv($fs->keyId),
+                        'secret_access_key' => AppHelper::parseEnv($fs->secret),
+                    ],
+                    'bucket' => AppHelper::parseEnv($fs->bucket),
+                    'key' => $assetPath,
+                ];
+            }
+
+            if ($fs instanceof FortrabbitFs)
+            {
+                if ($fs->subfolder
+                    && ($subfolder = rtrim(AppHelper::parseEnv($fs->subfolder), '/')) !== '')
+                {
+                    $assetPath = $subfolder.'/'.ltrim($assetPath, '/');
+                }
+
+                // get full https endpoint
+                $endpoint = AppHelper::parseEnv($fs->endpoint);
+                if (!str_contains($endpoint, 'https')) {
+                    $endpoint = 'https://' .  $endpoint;
+                }
+
+                return [
+                    'service' => 's3other',
+                    'endpoint' => $endpoint,
+                    'region' => AppHelper::parseEnv($fs->region),
+                    'credentials' => [
+                        'access_key_id' => AppHelper::parseEnv($fs->keyId),
+                        'secret_access_key' => AppHelper::parseEnv($fs->secret),
+                    ],
+                    'bucket' => AppHelper::parseEnv($fs->bucket),
+                    'key' => $assetPath,
+                ];
+            }
+        }
+
         return [
             'url' => JobHelper::publicUrl($this->getUrl()),
         ];

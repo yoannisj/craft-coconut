@@ -407,7 +407,7 @@ class Settings extends Model
     public function getPublicBaseUrl(): ?string
     {
         if ($this->_publicBaseUrl) {
-            return AppHelper::env($this->_publicBaseUrl);
+            return AppHelper::parseEnv($this->_publicBaseUrl);
         }
 
         return null;
@@ -593,19 +593,6 @@ class Settings extends Model
 
         $notificationUrl = JobHelper::publicActionUrl(
             'coconut/jobs/notify', null, null, true);
-
-        $environment = \craft\helpers\App::env('CRAFT_ENVIRONMENT');
-        Craft::error('['.$environment.'] '.$notificationUrl, 'coconut-debug');
-
-        // $baseCpUrl = UrlHelper::baseCpUrl();
-        // $baseSiteUrl = UrlHelper::baseSiteUrl();
-        // $publicBaseUrl = rtrim($this->getPublicBaseUrl(), '/').'/';
-
-        // $notificationUrl = str_replace(
-        //     [ $baseCpUrl, $baseSiteUrl, ],
-        //     $publicBaseUrl,
-        //     $notificationUrl
-        // );
 
         return new Notification([
             'type' => 'http',
