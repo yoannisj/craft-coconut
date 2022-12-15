@@ -161,6 +161,12 @@ class Jobs extends Component
         $data = $client->job->create($job->toParams()); // client will throw potential API errors
         $data = ArrayHelper::toArray($data); // client returns a StdObject instance
 
+        Craft::info([
+            'message' => 'RUN COCONUT JOB',
+            'params' => $job->toParams(),
+            'data' => $data,
+        ], 'coconut-debug');
+
         $job = JobHelper::populateJobFromData($job, $data);
 
         return true;

@@ -618,13 +618,24 @@ class Coconut extends Plugin
             return false;
         }
 
-        Craft::error('CHECK WATCH ASSET:: '.$asset->volume->handle.' > '.$asset->filename);
+        Craft::error([
+            'message' => 'CHECK WATCH ASSET',
+            'method' => __METHOD__,
+            'volume' => $asset->volume->handle,
+            'filename' => $asset->filename
+        ], 'coconut-debug');
 
         $settings = $this->getSettings();
         $volume = $asset->getVolume();
 
         if (in_array($volume->handle, $settings->watchVolumes))
         {
+            Craft::info([
+                'message' => 'TRANSCODE WATCHED ASSET',
+                'method' => __METHOD__,
+                'input' => JobHelper::resolveInput($asset),
+            ], 'coconut-debug');
+
             $this->transcodeVideo($asset, null);
             return true;
         }

@@ -21,11 +21,14 @@ use craft\base\Model;
 use craft\db\Query;
 use craft\elements\Asset;
 use craft\validators\DateTimeValidator;
+use craft\helpers\App as AppHelper;
 use craft\helpers\ArrayHelper;
 use craft\helpers\FileHelper;
 use craft\helpers\Json as JsonHelper;
 
-use yoannisj\coconut\Coconut;
+
+use craft\awss3\Volume as AwsS3Volume;
+use fortrabbit\ObjectStorage\Volume as FortrabbitStorageVolume;
 use yoannisj\coconut\helpers\JobHelper;
 
 /**
@@ -144,6 +147,8 @@ class Input extends Model
     {
         $this->assetId = $asset ? $asset->id : null;
         $this->_asset = $asset;
+        $this->_url = null;
+        $this->_urlHash = null;
     }
 
     /**
@@ -328,6 +333,55 @@ class Input extends Model
 
     public function toParams(): array
     {
+        // @todo Use volume adapters to get input params
+        $asset = $this->getAsset();
+        if ($asset)
+        {
+            $volume = $asset->getVolume();
+            $assetPath = $asset->path;
+
+            if ($volume instanceof AwsS3Volume)
+            {
+                // prefix asset path with volume subfolder
+                if ($volume->addSubfolderToRootUrl && $volume->subfolder
+                    && ($subfolder = rtrim(AppHelper::parseEnv($volume->subfolder), '/')) !== '')
+                {
+                    $assetPath = $subfolder.'/'.ltrim($assetPath, '/');
+                }
+
+                return [
+                    'service' => 's3',
+                    'region' => AppHelper::parseEnv($volume->region),
+                    'credentials' => [
+                        'access_key_id' => AppHelper::parseEnv($volume->keyId),
+                        'secret_access_key' => AppHelper::parseEnv($volume->secret),
+                    ],
+                    'bucket' => AppHelper::parseEnv($volume->bucket),
+                    'key' => $assetPath,
+                ];
+            }
+
+            if ($volume instanceof FortrabbitStorageVolume)
+            {
+                if ($volume->subfolder
+                    && ($subfolder = rtrim(Craft::parseEnv($this->subfolder), '/')) !== '')
+                {
+                    $assetPath = $subfolder.'/'.ltrim($assetPath, '/');
+                }
+
+                return [
+                    'service' => 's3other',
+                    'endpoint' => AppHelper::parseEnv($volume->endpoint),
+                    'credentials' => [
+                        'access_key_id' => AppHelper::parseEnv($volume->keyId),
+                        'access_key_id' => AppHelper::parseEnv($volume->secret),
+                    ],
+                    'bucket' => AppHelper::parseEnv($volume->bucket),
+                    'key' => $assetPath,
+                ];
+            }
+        }
+
         return [
             'url' => JobHelper::publicUrl($this->getUrl()),
         ];
