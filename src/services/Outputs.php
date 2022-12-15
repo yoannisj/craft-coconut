@@ -16,7 +16,6 @@ use yii\base\InvalidArgumentException;
 
 use Craft;
 use craft\base\Component;
-use craft\volumes\Local as LocalVolume;
 use craft\elements\Asset;
 use craft\helpers\ArrayHelper;
 
@@ -173,6 +172,26 @@ class Outputs extends Component
 
         // or get new record
         if (!$record) $record = new OutputRecord();
+
+        // update output URL once it is completed
+        // @todo Conditionally rewrite output URLs in `Output::getUrl()` and `Output::getUrls()` getters
+        $isCompleted = $output->getIsCompleted();
+        if ($isCompleted)
+        {
+            $job = $output->getJob();
+            $storage = $job ? $job->getStorage() : null;
+            $volume = $storage ? $storage->getVolume() : null;
+
+            if ($volume)
+            {
+                Craft::info([
+                    'message' => 'REWRITE OUTPUT URLS',
+                    'outputKey' => $output->key,
+                    'volumeHandle' => $volume->handle,
+                ], 'coconut-debug');
+                JobHelper::rewriteOutputUrls($output, $volume);
+            }
+        }
 
         // update the record attributes
         JobHelper::populateRecordFromOutput($record, $output);

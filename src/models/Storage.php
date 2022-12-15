@@ -16,6 +16,7 @@ use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;
+use craft\base\VolumeInterface;
 use craft\helpers\StringHelper;
 
 use yoannisj\coconut\Coconut;
