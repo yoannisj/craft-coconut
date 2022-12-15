@@ -612,7 +612,7 @@ class Coconut extends Plugin
         // to avoid creating 2x coconut jobs in case there is a conflicting
         // filename on upload, let the "replaceAsset" event handler decide
         // whether asset should be automatically transcoded or not
-        if (!$asset->kind == 'video'
+        if ($asset->kind != Asset::KIND_VIDEO
             || !empty($asset->conflictingFilename))
         {
             return false;
