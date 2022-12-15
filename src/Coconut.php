@@ -568,7 +568,7 @@ class Coconut extends Plugin
     protected function onAfterDeleteElement( ElementEvent $event )
     {
         if ($event->element instanceof Asset
-            && $element->kind == 'video' // only videos can be inputs
+            && $event->element->kind == Asset::KIND_VIDEO // only videos can be inputs
             && !ElementHelper::isDraftOrRevision($event->element)
         ) {
             Craft::error('CLEAR OUTPUTS FOR DELETED ASSET');
