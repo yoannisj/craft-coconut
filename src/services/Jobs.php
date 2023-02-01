@@ -564,8 +564,8 @@ class Jobs extends Component
             return $this->getJobsForInputAssetId($input->assetId);
         }
 
-        else if ($input->url) {
-            return $this->getJobsForInputUrl($input->url);
+        else if ($input && ($inputUrl = $input->getUrl())) {
+            return $this->getJobsForInputUrl($inputUrl);
         }
 
         return [];

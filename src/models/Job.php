@@ -278,14 +278,14 @@ class Job extends Model
     {
         $resolvedOutputs = [];
 
+        // if this is an existing coconut job
         if ($this->coconutId)
         {
-            // if this is an existing coconut job
             $savedOutputs = $this->getSavedOutputs();
             $savedOutputsByKey = [];
 
             foreach ($savedOutputs as $index => $savedOutput) {
-                $savedOutputsByKey[$savedOutput->key] = $savedOutput;
+                $savedOutputsByKey[$savedOutput->getKey()] = $savedOutput;
             }
 
             $savedOutputs = $savedOutputsByKey;
@@ -299,11 +299,11 @@ class Job extends Model
                         'Existing job outputs must be an indexed list of output models or parameters');
                 }
 
-                $outputKey = ArrayHelper::getValue($output, 'key');
-
                 if (is_array($output)) {
                     $output = new Output($output);
                 }
+
+                $outputKey = ArrayHelper::getValue($output, 'key');
 
                 // if output with same key was saved before
                 $savedOutput = $savedOutputs[$outputKey] ?? null;
