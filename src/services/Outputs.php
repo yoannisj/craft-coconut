@@ -88,7 +88,7 @@ class Outputs extends Component
         {
             // don't include outputs Coconut does not know about ;)
             if ($job->coconutId) {
-                $outputs += $job->getOutputs();
+                $outputs = array_merge($outputs, array_values($job->getOutputs()));
             }
         }
 
