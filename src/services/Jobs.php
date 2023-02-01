@@ -282,6 +282,9 @@ class Jobs extends Component
                 return false;
             }
 
+            // memoize job record
+            $this->memoizeJobRecord($record);
+
             // update job model's attributes based on what's now saved in the database
             $job->id = $record->id;
             $job->dateCreated = DateTimeHelper::toDateTime($record->dateCreated);
