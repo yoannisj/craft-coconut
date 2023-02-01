@@ -94,7 +94,7 @@ class Jobs extends Component
      * @return Job|null
      */
 
-    public function getNamedJobs( string $handle )
+    public function getNamedJob( string $handle )
     {
         $namedJobs = Coconut::$plugin->getSettings()->getNamedJobs();
         return $namedJobs[$handle] ?? null;
